@@ -1,0 +1,18 @@
+# ignore text editor files
+*~
+*#
+
+# ignore binaries and raw data
+out
+__pycache__
+*.aux
+*.bbl
+*.blg
+*.egg-info
+*.log
+*.out
+*.pdf
+*.pyc
+
+
+
