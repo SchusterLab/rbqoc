@@ -35,7 +35,7 @@ OMEGA_Q = 1e-2 # GHz
 SYSTEM_HAMILTONIAN_0 = SIGMA_Z / 2
 CONTROL_HAMILTONIAN_0 = SIGMA_X / 2
 HAMILTONIAN_ARGS = anp.array([OMEGA_Q])
-hamiltonian = lambda controls, time, args: (args[0] * SYSTEM_HAMILTONIAN_0
+hamiltonian = lambda controls, hargs, time: (args[0] * SYSTEM_HAMILTONIAN_0
                                             + controls[0] * CONTROL_HAMILTONIAN_0)
 MAX_CONTROL_NORMS = anp.array((MAX_AMP_CONTROL_0,))
 MAX_CONTROL_BANDWIDTHS = anp.array((MAX_AMP_BANDWIDTH_CONTROL_0,))
