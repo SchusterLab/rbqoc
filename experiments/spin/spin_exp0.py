@@ -26,9 +26,9 @@ os.environ["OPENBLAS_NUM_THREADS"] = "{}".format(CORE_COUNT)
 
 # Define experimental constants.
 CONTROL_SAMPLING_RATE = 1.2 # GS/s
-MAX_AMP_CONTROL_0 = 1e-1 # GHz
-MAX_AMP_BANDWIDTH_CONTROL_0 = 5e-1 # GHz
-OMEGA_Q = 1e-2 # GHz
+MAX_AMP_CONTROL_0 = 2 * anp.pi * 1e-1 # GHz
+MAX_AMP_BANDWIDTH_CONTROL_0 = 2 * anp.pi * 5e-1 # GHz
+OMEGA_Q = 2 * anp.pi * 1e-2 # GHz
 
 # Define the system.
 SYSTEM_HAMILTONIAN_0 = SIGMA_Z / 2
@@ -40,24 +40,27 @@ MAX_CONTROL_NORMS = anp.array((MAX_AMP_CONTROL_0,))
 MAX_CONTROL_BANDWIDTHS = anp.array((MAX_AMP_BANDWIDTH_CONTROL_0,))
 
 # Define the optimization.
-CONTROLS_PATH = "/home/tcpropson/repos/rbqoc/out/spin/spin_exp0/00011_spin_exp0.h5"
-CONTROLS_PATH_LOCK = "{}.lock".format(CONTROLS_PATH)
-try:
-    with FileLock(CONTROLS_PATH_LOCK):
-        with h5py.File(CONTROLS_PATH) as controls_file:
-            index = anp.argmin(controls_file["error"][()])
-            initial_controls = controls_file["controls"][index]
-    #ENDWITH
-except Timeout:
-    initial_controls = None
-    print("Unable to load initial controls.")
-INITIAL_CONTROLS = initial_controls
+WDIR = os.environ["ROBUST_QOC_PATH"]
+# CONTROLS_PATH = os.path.join(WDIR, "out/spin/spin_exp0/00000_spin_exp0.h5")
+# CONTROLS_PATH_LOCK = "{}.lock".format(CONTROLS_PATH)
+# try:
+#     with FileLock(CONTROLS_PATH_LOCK):
+#         with h5py.File(CONTROLS_PATH) as controls_file:
+#             index = anp.argmin(controls_file["error"][()])
+#             initial_controls = controls_file["controls"][index]
+#     #ENDWITH
+# except Timeout:
+#     initial_controls = None
+#     print("Unable to load initial controls.")
+# INITIAL_CONTROLS = initial_controls
+INITIAL_CONTROLS = None
 ITERATION_COUNT = int(1e4)
 COMPLEX_CONTROLS = False
 CONTROL_COUNT = 1
-EVOLUTION_TIME = 200 # nanoseconds
+EVOLUTION_TIME = 150 # nanoseconds
 CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = EVOLUTION_TIME + 1
-OPTIMIZER = Adam(learning_rate=1e-4)
+LEARNING_RATE = 1e-3
+OPTIMIZER = Adam(learning_rate=LEARNING_RATE)
 
 # Define the problem.
 INITIAL_STATE_0 = anp.array(((1,),
@@ -70,7 +73,9 @@ TARGET_STATE_0 = anp.array(((0,),
 TARGET_STATE_1 = anp.array(((-1j,),
                             (0,)))
 TARGET_STATES = anp.stack((TARGET_STATE_0, TARGET_STATE_1,))
-COSTS = [TargetStateInfidelity(TARGET_STATES)]
+COSTS = (
+    TargetStateInfidelity(TARGET_STATES),
+    )
 
 # Define output.
 LOG_ITERATION_STEP = 1
@@ -82,7 +87,7 @@ WDIR_PATH = os.environ["ROBUST_QOC_PATH"]
 SAVE_PATH = os.path.join(WDIR_PATH, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 SAVE_FILE = EXPERIMENT_NAME
 
-GRAPE_ARGS = {
+GRAPE_CONFIG = {
     "control_count": CONTROL_COUNT,
     "control_eval_count": CONTROL_EVAL_COUNT,
     "costs": COSTS,
@@ -101,29 +106,29 @@ GRAPE_ARGS = {
     "save_iteration_step": SAVE_ITERATION_STEP,
 }
 
-EVOL_ARGS = {
+EVOL_CONFIG = {
     "evolution_time": EVOLUTION_TIME,
     "hamiltonian": hamiltonian,
     "initial_states": INITIAL_STATES,
     "system_eval_count": SYSTEM_EVAL_COUNT,
+    "controls": INITIAL_CONTROLS,
     "costs": COSTS,
+    "hamiltonian_args": HAMILTONIAN_ARGS,
 }
 
+GRAPE = 1
+
 def main():
-    grape_save_file_path = generate_save_file_path(SAVE_FILE, SAVE_PATH)
-    result = grape_schroedinger_discrete(CONTROL_COUNT, CONTROL_EVAL_COUNT,
-                                         COSTS, EVOLUTION_TIME, hamiltonian,
-                                         INITIAL_STATES, SYSTEM_EVAL_COUNT,
-                                         complex_controls=COMPLEX_CONTROLS,
-                                         hamiltonian_args=HAMILTONIAN_ARGS,
-                                         initial_controls=INITIAL_CONTROLS,
-                                         iteration_count=ITERATION_COUNT,
-                                         log_iteration_step=LOG_ITERATION_STEP,
-                                         max_control_norms=MAX_CONTROL_NORMS,
-                                         optimizer=OPTIMIZER,
-                                         save_intermediate_states=SAVE_INTERMEDIATE_STATES,
-                                         save_file_path=grape_save_file_path,
-                                         save_iteration_step=SAVE_ITERATION_STEP,)
+    if GRAPE:
+        grape_save_file_path = generate_save_file_path(SAVE_FILE, SAVE_PATH)
+        GRAPE_CONFIG.update({
+                "save_file_path": grape_save_file_path,
+                })
+        result = grape_schroedinger_discrete(**GRAPE_CONFIG)
+    else:
+        result = evolve_schroedinger_discrete(**EVOL_CONFIG)
+        print("error: {}"
+              "".format(result.error))
 
 
 if __name__ == "__main__":

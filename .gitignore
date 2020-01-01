@@ -13,6 +13,7 @@ __pycache__
 *.out
 *.pdf
 *.pyc
+*.DS_Store
 !report/report.pdf
 
 
