@@ -2,6 +2,7 @@
 spin_exp0.py - Spin experiment 0.
 """
 
+from argparse import ArgumentParser
 import os
 
 import autograd.numpy as anp
@@ -34,32 +35,34 @@ OMEGA_Q = 2 * anp.pi * 1e-2 # GHz
 SYSTEM_HAMILTONIAN_0 = SIGMA_Z / 2
 CONTROL_HAMILTONIAN_0 = SIGMA_X / 2
 HAMILTONIAN_ARGS = anp.array([OMEGA_Q])
-hamiltonian = lambda controls, hargs, time: (hargs[0] * SYSTEM_HAMILTONIAN_0
-                                             + controls[0] * CONTROL_HAMILTONIAN_0)
+hamiltonian = lambda controls, hargs, time: (
+    hargs[0] * SYSTEM_HAMILTONIAN_0
+    + controls[0] * CONTROL_HAMILTONIAN_0
+)
 MAX_CONTROL_NORMS = anp.array((MAX_AMP_CONTROL_0,))
 MAX_CONTROL_BANDWIDTHS = anp.array((MAX_AMP_BANDWIDTH_CONTROL_0,))
 
 # Define the optimization.
 WDIR = os.environ["ROBUST_QOC_PATH"]
-# CONTROLS_PATH = os.path.join(WDIR, "out/spin/spin_exp0/00000_spin_exp0.h5")
-# CONTROLS_PATH_LOCK = "{}.lock".format(CONTROLS_PATH)
-# try:
-#     with FileLock(CONTROLS_PATH_LOCK):
-#         with h5py.File(CONTROLS_PATH) as controls_file:
-#             index = anp.argmin(controls_file["error"][()])
-#             initial_controls = controls_file["controls"][index]
-#     #ENDWITH
-# except Timeout:
-#     initial_controls = None
-#     print("Unable to load initial controls.")
-# INITIAL_CONTROLS = initial_controls
-INITIAL_CONTROLS = None
+CONTROLS_PATH = os.path.join(WDIR, "out/spin/spin_exp0/00017_spin_exp0.h5")
+CONTROLS_PATH_LOCK = "{}.lock".format(CONTROLS_PATH)
+try:
+    with FileLock(CONTROLS_PATH_LOCK):
+        with h5py.File(CONTROLS_PATH) as controls_file:
+            index = anp.argmin(controls_file["error"][()])
+            initial_controls = controls_file["controls"][index]
+    #ENDWITH
+except Timeout:
+    initial_controls = None
+    print("Unable to load initial controls.")
+INITIAL_CONTROLS = initial_controls
+# INITIAL_CONTROLS = None
 ITERATION_COUNT = int(1e4)
 COMPLEX_CONTROLS = False
 CONTROL_COUNT = 1
 EVOLUTION_TIME = 150 # nanoseconds
 CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = EVOLUTION_TIME + 1
-LEARNING_RATE = 1e-3
+LEARNING_RATE = 1e-6
 OPTIMIZER = Adam(learning_rate=LEARNING_RATE)
 
 # Define the problem.
@@ -116,16 +119,21 @@ EVOL_CONFIG = {
     "hamiltonian_args": HAMILTONIAN_ARGS,
 }
 
-GRAPE = 1
-
 def main():
-    if GRAPE:
+    parser = ArgumentParser()
+    parser.add_argument("--grape", action="store_true")
+    parser.add_argument("--evol", action="store_true")
+    args = vars(parser.parse_args())
+    do_grape = args["grape"]
+    do_evol = args["evol"]
+    
+    if do_grape:
         grape_save_file_path = generate_save_file_path(SAVE_FILE, SAVE_PATH)
         GRAPE_CONFIG.update({
                 "save_file_path": grape_save_file_path,
                 })
         result = grape_schroedinger_discrete(**GRAPE_CONFIG)
-    else:
+    elif do_evol:
         result = evolve_schroedinger_discrete(**EVOL_CONFIG)
         print("error: {}"
               "".format(result.error))

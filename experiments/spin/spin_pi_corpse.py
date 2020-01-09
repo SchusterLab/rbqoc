@@ -40,8 +40,8 @@ OMEGA_Q = 2 * anp.pi * 1e-2 # GHz
 SYSTEM_HAMILTONIAN_0 = SIGMA_Z / 2
 CONTROL_HAMILTONIAN_0 = SIGMA_X / 2
 HAMILTONIAN_ARGS = anp.array([OMEGA_Q])
-hamiltonian = lambda controls, time: (
-    OMEGA_Q * SYSTEM_HAMILTONIAN_0
+hamiltonian = lambda controls, hargs, time: (
+    hargs[0] * SYSTEM_HAMILTONIAN_0
     + controls[0] * CONTROL_HAMILTONIAN_0)
 MAX_CONTROL_NORMS = anp.array((MAX_AMP_CONTROL_0,))
 MAX_CONTROL_BANDWIDTHS = anp.array((MAX_AMP_BANDWIDTH_CONTROL_0,))
@@ -146,7 +146,7 @@ EVOL_CONFIG = {
     "system_eval_count": SYSTEM_EVAL_COUNT,
     "controls": INITIAL_CONTROLS,
     "costs": COSTS,
-    # "hamiltonian_args": HAMILTONIAN_ARGS,
+    "hamiltonian_args": HAMILTONIAN_ARGS,
 }
 
 # Qutip
@@ -185,6 +185,10 @@ def main():
                 })
         result = grape_schroedinger_discrete(**GRAPE_CONFIG)
     elif do_evol:
+        evol_save_file_path = generate_save_file_path(SAVE_FILE, SAVE_PATH)
+        EVOL_CONFIG.update({
+            "save_file_path": evol_save_file_path,
+        })
         result = evolve_schroedinger_discrete(**EVOL_CONFIG)
         print("error: {}\nfinal_states:\n{}\ntarget_unitary:\n{}"
               "".format(result.error, column_vector_list_to_matrix(result.final_states),
