@@ -28,12 +28,13 @@ OMEGA = 2 * anp.pi * 1e-2
 
 # Define the system.
 HILBERT_SIZE = 2
-H_SYSTEM_0 = OMEGA * SIGMA_Z / 2
+H_SYSTEM_0 = SIGMA_Z / 2
 H_CONTROL_0 = SIGMA_X / 2
-hamiltonian = lambda controls, hamiltonian_args, time: (
-    H_SYSTEM_0
+hamiltonian = lambda controls, hargs, time: (
+    hargs[0] * H_SYSTEM_0
     + controls[0] * H_CONTROL_0
 )
+HAMILTONIAN_ARGS = anp.array([OMEGA])
 MAX_CONTROL_NORMS = anp.array([MAX_AMP_0])
 
 # Define the problem.
@@ -41,8 +42,8 @@ INITIAL_STATE_0 = anp.array([[1], [0]])
 TARGET_STATE_0 = anp.array([[0], [1]])
 INITIAL_STATES = anp.stack((INITIAL_STATE_0,),)
 TARGET_STATES = anp.stack((TARGET_STATE_0,),)
-TARGET_STATE_CONSTRAINT = None
-TARGET_STATE_RMS = True
+TARGET_STATE_CONSTRAINT = 1e-3
+TARGET_STATE_RMS = False
 COSTS = [
     TargetStateInfidelity(TARGET_STATES,
                           constraint=TARGET_STATE_CONSTRAINT,
@@ -52,7 +53,7 @@ COSTS = [
 # Define the optimization.
 COMPLEX_CONTROLS = False
 CONTROL_COUNT = 1
-EVOLUTION_TIME = 200
+EVOLUTION_TIME = 150
 CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = 2 * int(EVOLUTION_TIME) + 1
 ITERATION_COUNT = 1000
 
@@ -95,10 +96,10 @@ def project(x, basis):
 
 def impose_control_conditions(controls):
     # Project onto zero net flux constraint manifold.
-#     controls_ = np.zeros_like(controls)
-#     for control_index in range(controls.shape[1]):
-#         controls_[:, control_index] = project(controls[:, control_index], ZF_BASIS)
-#     controls = controls_
+    controls_ = np.zeros_like(controls)
+    for control_index in range(controls.shape[1]):
+        controls_[:, control_index] = project(controls[:, control_index], ZF_BASIS)
+    controls = controls_
 
     # Impose zero at boundaries.
     controls[0, :] = 0
@@ -119,10 +120,10 @@ SAVE_INTERMEDIATE_STATES_GRAPE = False
 SAVE_EVOL = False
 SAVE_INTERMEDIATE_STATES_EVOL = False
 
-GRAB_CONTROLS = False
+GRAB_CONTROLS = True
 GEN_CONTROLS = False
 if GRAB_CONTROLS:
-    controls_file_path = os.path.join(SAVE_PATH, "00001_{}.h5".format(EXPERIMENT_NAME))
+    controls_file_path = os.path.join(SAVE_PATH, "00005_{}.h5".format(EXPERIMENT_NAME))
     controls_lock_file_path = "{}.lock".format(controls_file_path)
     try:
         with FileLock(controls_lock_file_path):
@@ -149,6 +150,7 @@ GRAPE_CONFIG = {
     "costs": COSTS,
     "evolution_time": EVOLUTION_TIME,
     "hamiltonian": hamiltonian,
+    "hamiltonian_args": HAMILTONIAN_ARGS,
     "impose_control_conditions": impose_control_conditions,
     "initial_states": INITIAL_STATES,
     "initial_controls": INITIAL_CONTROLS,
@@ -165,6 +167,7 @@ EVOL_CONFIG = {
     "costs": COSTS,
     "evolution_time": EVOLUTION_TIME,
     "hamiltonian": hamiltonian,
+    "hamiltonian_args": HAMILTONIAN_ARGS,
     "initial_states": INITIAL_STATES,
     "save_intermediate_states": SAVE_INTERMEDIATE_STATES_EVOL,
     "system_eval_count": SYSTEM_EVAL_COUNT,
