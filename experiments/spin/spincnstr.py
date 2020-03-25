@@ -4,10 +4,14 @@ spincnstr.py - constrained robust optimization of the spin system
 
 from argparse import ArgumentParser
 from copy import copy
+import os
 
 import autograd.numpy as anp
+from filelock import FileLock, Timeout
+import h5py
 import numpy as np
-from qoc import grape_schroedinger_discrete
+from qoc import (grape_schroedinger_discrete,
+                 evolve_schroedinger_discrete,)
 from qoc.standard import (TargetStateInfidelity,
                           conjugate_transpose,
                           get_annihilation_operator,
@@ -15,7 +19,7 @@ from qoc.standard import (TargetStateInfidelity,
                           SIGMA_Z, SIGMA_X,
                           generate_save_file_path,)
 
-CORE_COUNT = 8
+CORE_COUNT = 4
 os.environ["MKL_NUM_THREADS"] = "{}".format(CORE_COUNT)
 os.environ["OPENBLAS_NUM_THREADS"] = "{}".format(CORE_COUNT)
 
@@ -37,20 +41,26 @@ INITIAL_STATE_0 = anp.array([[1], [0]])
 TARGET_STATE_0 = anp.array([[0], [1]])
 INITIAL_STATES = anp.stack((INITIAL_STATE_0,),)
 TARGET_STATES = anp.stack((TARGET_STATE_0,),)
-TARGET_STATE_INFIDELITY_CONSTRAINT=1e-3
+TARGET_STATE_CONSTRAINT = None
+TARGET_STATE_RMS = True
 COSTS = [
     TargetStateInfidelity(TARGET_STATES,
-                          constraint=1e-3)
+                          constraint=TARGET_STATE_CONSTRAINT,
+                          rms=TARGET_STATE_RMS,)
 ]
 
 # Define the optimization.
 COMPLEX_CONTROLS = False
 CONTROL_COUNT = 1
-EVOLUTION_TIME = 100 # nanoseconds
+EVOLUTION_TIME = 200
 CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = 2 * int(EVOLUTION_TIME) + 1
 ITERATION_COUNT = 1000
 
 def gs(X, row_vecs=True, norm=True):
+    """
+    References:
+    [0] https://gist.github.com/iizukak/1287876/edad3c337844fac34f7e56ec09f9cb27d4907cc7
+    """
     if not row_vecs:
         X = X.T
     Y = X[0:1,:].copy()
@@ -84,15 +94,18 @@ def project(x, basis):
 
 
 def impose_control_conditions(controls):
-    controls_ = np.zeros_like(controls)
-    
     # Project onto zero net flux constraint manifold.
-    for control_index in range(controls.shape[1]):
-        controls_[:, control_index] = project(controls[:, control_index], ZF_BASIS)
+#     controls_ = np.zeros_like(controls)
+#     for control_index in range(controls.shape[1]):
+#         controls_[:, control_index] = project(controls[:, control_index], ZF_BASIS)
+#     controls = controls_
 
-    # TODO: Project onto maximum amplitude constraint manifold.
-    
-    return controls_
+    # Impose zero at boundaries.
+    controls[0, :] = 0
+    controls[-1, :] = 0
+
+    return controls
+
 
 # Define output.
 EXPERIMENT_META = "spin"
@@ -102,7 +115,32 @@ SAVE_PATH = os.path.join(WDIR_PATH, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 SAVE_FILE = EXPERIMENT_NAME
 LOG_ITERATION_STEP = 1
 SAVE_ITERATION_STEP = 1
-SAVE_INTERMEDIATE_STATES_GRAPE = True
+SAVE_INTERMEDIATE_STATES_GRAPE = False
+SAVE_EVOL = False
+SAVE_INTERMEDIATE_STATES_EVOL = False
+
+GRAB_CONTROLS = False
+GEN_CONTROLS = False
+if GRAB_CONTROLS:
+    controls_file_path = os.path.join(SAVE_PATH, "00001_{}.h5".format(EXPERIMENT_NAME))
+    controls_lock_file_path = "{}.lock".format(controls_file_path)
+    try:
+        with FileLock(controls_lock_file_path):
+            with h5py.File(controls_file_path) as f:
+                index = np.argmin(f["error"][()])
+                controls_ = f["controls"][index][()]
+    except Timeout:
+        print("Timeout on {}."
+              "".format(controls_lock_file_path))
+elif GEN_CONTROLS:
+    controls_ = np.ones((CONTROL_EVAL_COUNT, CONTROL_COUNT))
+    mid_index = int(np.floor(CONTROL_EVAL_COUNT / 2))
+    controls_[:mid_index] = -controls_[:mid_index]
+    controls_ = controls_ * (3 * MAX_CONTROL_NORMS / 4)
+else:
+    controls_ = None
+INITIAL_CONTROLS = controls_
+
 
 GRAPE_CONFIG = {
     "complex_controls": COMPLEX_CONTROLS,
@@ -113,6 +151,7 @@ GRAPE_CONFIG = {
     "hamiltonian": hamiltonian,
     "impose_control_conditions": impose_control_conditions,
     "initial_states": INITIAL_STATES,
+    "initial_controls": INITIAL_CONTROLS,
     "iteration_count": ITERATION_COUNT,
     "log_iteration_step": LOG_ITERATION_STEP,
     "max_control_norms": MAX_CONTROL_NORMS,
@@ -121,8 +160,19 @@ GRAPE_CONFIG = {
     "system_eval_count": SYSTEM_EVAL_COUNT,
 }
 
+EVOL_CONFIG = {
+    "controls": INITIAL_CONTROLS,
+    "costs": COSTS,
+    "evolution_time": EVOLUTION_TIME,
+    "hamiltonian": hamiltonian,
+    "initial_states": INITIAL_STATES,
+    "save_intermediate_states": SAVE_INTERMEDIATE_STATES_EVOL,
+    "system_eval_count": SYSTEM_EVAL_COUNT,
+}
+
+
 def do_grape():
-    save_file_path = generate_save_file_path(SAVE_FILE_NAME, SAVE_PATH)
+    save_file_path = generate_save_file_path(SAVE_FILE, SAVE_PATH)
     config = copy(GRAPE_CONFIG)
     config.update({
         "save_file_path": save_file_path
@@ -130,15 +180,30 @@ def do_grape():
     result = grape_schroedinger_discrete(**config)
 
 
+def do_evol():
+    config = copy(EVOL_CONFIG)
+    if SAVE_EVOL:
+        save_file_path = generate_save_file_path(SAVE_FILE, SAVE_PATH)
+        config.update({
+                "save_file_path": save_file_path
+        })
+    result = evolve_schroedinger_discrete(**config)
+    print("e: {}\ns:\n{}"
+          "".format(result.error, result.final_states))
+
 
 def main():
     parser = ArgumentParser()
     parser.add_argument("--grape", dest="grape", action="store_true", default=False)
+    parser.add_argument("--evol", dest="evol", action="store_true", default=False)
     args = vars(parser.parse_args())
     run_grape = args["grape"]
+    run_evol = args["evol"]
     
     if run_grape:
         do_grape()
+    elif run_evol:
+        do_evol()
 
 
 if __name__ == "__main__":
