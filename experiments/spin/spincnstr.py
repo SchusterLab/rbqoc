@@ -1,5 +1,5 @@
 """
-spin_constrained.py
+spincnstr.py - constrained robust optimization of the spin system
 """
 
 from argparse import ArgumentParser
@@ -14,6 +14,10 @@ from qoc.standard import (TargetStateInfidelity,
                           get_creation_operator,
                           SIGMA_Z, SIGMA_X,
                           generate_save_file_path,)
+
+CORE_COUNT = 8
+os.environ["MKL_NUM_THREADS"] = "{}".format(CORE_COUNT)
+os.environ["OPENBLAS_NUM_THREADS"] = "{}".format(CORE_COUNT)
 
 MAX_AMP_0 = 2 * anp.pi * 3e-1
 OMEGA = 2 * anp.pi * 1e-2
@@ -33,8 +37,10 @@ INITIAL_STATE_0 = anp.array([[1], [0]])
 TARGET_STATE_0 = anp.array([[0], [1]])
 INITIAL_STATES = anp.stack((INITIAL_STATE_0,),)
 TARGET_STATES = anp.stack((TARGET_STATE_0,),)
+TARGET_STATE_INFIDELITY_CONSTRAINT=1e-3
 COSTS = [
-    TargetStateInfidelity(TARGET_STATES)
+    TargetStateInfidelity(TARGET_STATES,
+                          constraint=1e-3)
 ]
 
 # Define the optimization.
@@ -89,8 +95,11 @@ def impose_control_conditions(controls):
     return controls_
 
 # Define output.
-SAVE_PATH = "./out"
-SAVE_FILE_NAME = "spin"
+EXPERIMENT_META = "spin"
+EXPERIMENT_NAME = "spincnstr"
+WDIR_PATH = os.environ["ROBUST_QOC_PATH"]
+SAVE_PATH = os.path.join(WDIR_PATH, "out", EXPERIMENT_META, EXPERIMENT_NAME)
+SAVE_FILE = EXPERIMENT_NAME
 LOG_ITERATION_STEP = 1
 SAVE_ITERATION_STEP = 1
 SAVE_INTERMEDIATE_STATES_GRAPE = True
@@ -124,7 +133,7 @@ def do_grape():
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument("-g", dest="grape", action="store_true", default=False)
+    parser.add_argument("--grape", dest="grape", action="store_true", default=False)
     args = vars(parser.parse_args())
     run_grape = args["grape"]
     
