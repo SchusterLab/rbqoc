@@ -19,7 +19,7 @@ from qoc.standard import (TargetStateInfidelity,
                           SIGMA_Z, SIGMA_X,
                           generate_save_file_path,)
 
-CORE_COUNT = 4
+CORE_COUNT = 8
 os.environ["MKL_NUM_THREADS"] = "{}".format(CORE_COUNT)
 os.environ["OPENBLAS_NUM_THREADS"] = "{}".format(CORE_COUNT)
 
@@ -44,8 +44,12 @@ INITIAL_STATES = anp.stack((INITIAL_STATE_0,),)
 TARGET_STATES = anp.stack((TARGET_STATE_0,),)
 TARGET_STATE_CONSTRAINT = 1e-3
 TARGET_STATE_RMS = False
+TARGET_STATE_MULT = 1.
+TARGET_STATE_MULT_FACTOR = None
 COSTS = [
     TargetStateInfidelity(TARGET_STATES,
+                          cost_multiplier=TARGET_STATE_MULT,
+                          cost_multiplier_factor=TARGET_STATE_MULT_FACTOR,
                           constraint=TARGET_STATE_CONSTRAINT,
                           rms=TARGET_STATE_RMS,)
 ]
@@ -120,7 +124,7 @@ SAVE_INTERMEDIATE_STATES_GRAPE = False
 SAVE_EVOL = False
 SAVE_INTERMEDIATE_STATES_EVOL = False
 
-GRAB_CONTROLS = True
+GRAB_CONTROLS = False
 GEN_CONTROLS = False
 if GRAB_CONTROLS:
     controls_file_path = os.path.join(SAVE_PATH, "00005_{}.h5".format(EXPERIMENT_NAME))
