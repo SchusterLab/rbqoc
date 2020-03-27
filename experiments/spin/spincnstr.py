@@ -17,7 +17,8 @@ from qoc.standard import (TargetStateInfidelity,
                           get_annihilation_operator,
                           get_creation_operator,
                           SIGMA_Z, SIGMA_X,
-                          generate_save_file_path,)
+                          generate_save_file_path,
+                          SGD)
 
 CORE_COUNT = 8
 os.environ["MKL_NUM_THREADS"] = "{}".format(CORE_COUNT)
@@ -43,21 +44,18 @@ TARGET_STATE_0 = anp.array([[0], [1]])
 INITIAL_STATES = anp.stack((INITIAL_STATE_0,),)
 TARGET_STATES = anp.stack((TARGET_STATE_0,),)
 TARGET_STATE_CONSTRAINT = 1e-3
-TARGET_STATE_RMS = False
-TARGET_STATE_MULT = 1.
-TARGET_STATE_MULT_FACTOR = None
+TARGET_STATE_MULT = 1e2
 COSTS = [
     TargetStateInfidelity(TARGET_STATES,
                           cost_multiplier=TARGET_STATE_MULT,
-                          cost_multiplier_factor=TARGET_STATE_MULT_FACTOR,
-                          constraint=TARGET_STATE_CONSTRAINT,
-                          rms=TARGET_STATE_RMS,)
+                          constraint=TARGET_STATE_CONSTRAINT,)
 ]
 
 # Define the optimization.
+OPTIMIZER = SGD()
 COMPLEX_CONTROLS = False
 CONTROL_COUNT = 1
-EVOLUTION_TIME = 150
+EVOLUTION_TIME = 130
 CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = 2 * int(EVOLUTION_TIME) + 1
 ITERATION_COUNT = 1000
 
@@ -161,6 +159,7 @@ GRAPE_CONFIG = {
     "iteration_count": ITERATION_COUNT,
     "log_iteration_step": LOG_ITERATION_STEP,
     "max_control_norms": MAX_CONTROL_NORMS,
+    "optimizer": OPTIMIZER,
     "save_intermediate_states": SAVE_INTERMEDIATE_STATES_GRAPE,
     "save_iteration_step": SAVE_ITERATION_STEP,
     "system_eval_count": SYSTEM_EVAL_COUNT,

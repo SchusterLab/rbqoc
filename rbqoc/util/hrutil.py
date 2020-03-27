@@ -2,6 +2,7 @@
 hrutil.py - This module exposes utility functions for hamiltonian parameter robustness
 """
 
+from copy import copy
 import os
 
 from filelock import FileLock, Timeout
@@ -48,7 +49,12 @@ def hamiltonian_args_sweep(evol_args, hamiltonian_args_set, pulse_path, suffix):
         with FileLock(pulse_path_lock):
             with h5py.File(pulse_path, "r") as pulse_file:
                 if "error" in pulse_file.keys():
-                    index = np.argmin(pulse_file["error"])
+                    if "constraint" in pulse_file.keys():
+                        indices = np.nonzero(pulse_file["constraint"][()])[0]
+                        errors = pulse_file["error"][()][indices]
+                        index = indices[np.argmin(errors)]
+                    else:
+                        index = np.argmin(pulse_file["error"][()])
                     controls = pulse_file["controls"][index][()]
                 else:
                     controls = pulse_file["controls"][()]
@@ -78,10 +84,16 @@ def hamiltonian_args_sweep(evol_args, hamiltonian_args_set, pulse_path, suffix):
     # For each hamiltonian_args array in hamiltonian_args_set,
     # record the optimization error in the save file.
     if not sweep_exists:
+        evol_args_ = copy(evol_args)
+        evol_args_.update({
+            "controls": controls,
+        })
         for trial, hamiltonian_args in enumerate(hamiltonian_args_set):
             # Perform the evolution.
-            result = evolve_schroedinger_discrete(**evol_args, controls=controls,
-                                                  hamiltonian_args=hamiltonian_args)
+            evol_args_.update({
+                "hamiltonian_args": hamiltonian_args,
+            })
+            result = evolve_schroedinger_discrete(**evol_args_)
             error = result.error
 
             # Save the optimization error of the evolution.
