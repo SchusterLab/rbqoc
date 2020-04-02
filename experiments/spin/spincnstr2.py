@@ -6,6 +6,7 @@ from argparse import ArgumentParser
 from copy import copy
 import os
 
+from autograd.extend import Box
 import autograd.numpy as anp
 import jax.numpy as jnp
 from filelock import FileLock, Timeout
@@ -67,7 +68,7 @@ HAMILTONIAN_ARGS = np.array([OMEGA])
 MAX_CONTROL_NORMS = np.array([MAX_AMP_0])
 
 # Define the optimization.
-OPTIMIZER = SGD()
+OPTIMIZER = Adam()
 COMPLEX_CONTROLS = False
 CONTROL_COUNT = 1
 EVOLUTION_TIME = 120
@@ -76,30 +77,24 @@ CONTROL_EVAL_TIMES = np.linspace(0, EVOLUTION_TIME, CONTROL_EVAL_COUNT)
 ITERATION_COUNT = 100
 
 # Define the problem.
-INITIAL_STATE_0 = np.array([[1], [0]])
-TARGET_STATE_0 = np.array([[0], [1]])
+INITIAL_STATE_0 = np.array([[1], [0]], dtype=np.float64)
+TARGET_STATE_0 = np.array([[0], [1]], dtype=np.float64)
 INITIAL_STATES = np.stack((INITIAL_STATE_0,),)
 TARGET_STATES = np.stack((TARGET_STATE_0,),)
 TARGET_STATES_DAGGER = conjugate_transpose(TARGET_STATES)
 FIDELITY_CONSTRAINT = 1e-3
 FIDELITY_MULTIPLIER = 5
 FIDELITY_MULTIPLIER_SCALE = 5
-INITIAL_FIDELITY = np.sum(np.matmul(TARGET_STATES_DAGGER, INITIAL_STATES)[:,0,0])
 INITIAL_FIDELITY_ROBUSTNESS = 0
 
 INITIAL_ASTATE = np.hstack([
     INITIAL_STATES.ravel(),
-    INITIAL_FIDELITY.ravel(),
 ],)
 states_count = INITIAL_STATES.shape[0]
 states_offset = 0
 states_shape = INITIAL_STATES.shape
 states_size = np.prod(states_shape)
 get_states = lambda astate: anp.reshape(astate[states_offset:states_offset + states_size], states_shape)
-fidelity_offset = states_size
-fidelity_shape = INITIAL_FIDELITY.shape
-fidelity_size = 1
-get_fidelity = lambda astate: anp.reshape(astate[fidelity_offset:fidelity_offset + fidelity_size], fidelity_shape)
 
 # Define the problem.
 class Fidelity(Cost):
@@ -111,9 +106,8 @@ class Fidelity(Cost):
 
         
     def cost(self, controls, final_astate):
-        # final_states = get_states(final_astate)
-        # inner_products_ = anp.matmul(TARGET_STATES_DAGGER, final_states)[:, 0, 0]        
-        inner_products = get_fidelity(final_astate)
+        final_states = get_states(final_astate)
+        inner_products = anp.matmul(TARGET_STATES_DAGGER, final_states)[:, 0, 0]        
         fidelities = anp.real(inner_products * anp.conjugate(inner_products))
         fidelity_normalized = anp.sum(fidelities) / states_count
         cost_ = 1 - fidelity_normalized
@@ -143,28 +137,27 @@ COSTS = [
 
 
 def rhs(astate, controls, time):
-    dastate = anp.zeros_like(astate)
-    controls_ = interpolate_linear_set(time, CONTROL_EVAL_TIMES, controls)
+    delta_astate = anp.zeros_like(astate)
+    # controls_ = interpolate_linear_set(time, CONTROL_EVAL_TIMES, controls)
+    controls_ = controls[0]
     hamiltonian_ = hamiltonian(controls_, HAMILTONIAN_ARGS, time)
     states = get_states(astate)
-    dstates = -1j * anp.matmul(hamiltonian_, states)
-    dfidelity = anp.sum(anp.matmul(TARGET_STATES_DAGGER, dstates)[:, 0, 0])
-    # dpsi_dw
-    # dastate.append(-1j * anp.matmul(H_SYSTEM_0, astate[0]) -1j * anp.matmul(hamiltonian_, astate[1]))
-    # d2psi_dw2
-    # dastate.append(-2j * anp.matmul(H_SYSTEM_0, astate[1]) -1j * anp.matmul(hamiltonian_, astate[2]))
-    # d2f_dw2
-    # d2f_dw2 = anp.sum(
+    delta_states = -1j * anp.matmul(hamiltonian_, states)
+    # # dpsi_dw
+    # delta_dpsi_dw = -1j * anp.matmul(H_SYSTEM_0, astate[0]) -1j * anp.matmul(hamiltonian_, astate[1])
+    # # d2psi_dw2
+    # delta_d2psi_d21 = -2j * anp.matmul(H_SYSTEM_0, astate[1]) -1j * anp.matmul(hamiltonian_, astate[2])
+    # # d2f_dw2
+    # delta_d2f_dw2 = anp.sum(
     #     -1j * anp.matmul(TARGET_STATES_DAGGER,
     #                      (2 * anp.matmul(H_SYSTEM_0, astate[1])
     #                       + anp.matmul(hamiltonian_, astate[2]))
     #     )[:, 0, 0])
 
-    dastate = anp.hstack([
-        dstates.ravel(),
-        dfidelity.ravel()
+    delta_astate = anp.hstack([
+        delta_states.ravel(),
     ])
-    return dastate
+    return delta_astate
 
 
 # Define controls update procedure.
@@ -177,18 +170,18 @@ ZF_BASIS = gram_schmidt(ZF_BASIS)
 
 
 def impose_control_conditions(controls):
-    # Impose control norm constraints.
-    clip_control_norms(controls, MAX_CONTROL_NORMS)
-    
     # Impose zero at boundaries.
-    controls[0, :] = 0
-    controls[-1, :] = 0
+    # controls[0, :] = 0
+    # controls[-1, :] = 0
     
     # Project onto zero net flux constraint manifold.
-    controls_ = anp.zeros_like(controls)
-    for control_index in range(controls.shape[1]):
-        controls_[:, control_index] = project(controls[:, control_index], ZF_BASIS)
-    controls = controls_
+    # controls_ = anp.zeros_like(controls)
+    # for control_index in range(controls.shape[1]):
+    #     controls_[:, control_index] = project(controls[:, control_index], ZF_BASIS)
+    # controls = controls_
+
+    # Impose control norm constraints.
+    # clip_control_norms(controls, MAX_CONTROL_NORMS)
 
     return controls
 
@@ -237,7 +230,9 @@ LQR_CONFIG = {
 def do_lqr():
     config = copy(LQR_CONFIG)
     result = lqr(**config)
-    final_states = get_states(result.final_astate)._value
+    final_states = get_states(result.final_astate)
+    while isinstance(final_states, Box):
+        final_states = final_states._value
     c = np.matmul(TARGET_STATES_DAGGER, final_states)[0, 0, 0]
     print("final_states:\n{}\nc:\n{}"
           "".format(final_states, c))
@@ -271,10 +266,12 @@ def do_evolve():
     initial_time = 0
     final_times = np.array([EVOLUTION_TIME])
     
-    def rhs_(time, state):
-        controls_ = interpolate_linear_set(time, CONTROL_EVAL_TIMES, controls)
-        hamiltonian_ = hamiltonian(controls_, hargs, time)
-        return -1j * np.matmul(hamiltonian_, state)
+def rhs_(time, state):
+        
+        # controls_ = interpolate_linear_set(time, CONTROL_EVAL_TIMES, controls)
+        # hamiltonian_ = hamiltonian(controls_, hargs, time)
+        # return -1j * np.matmul(hamiltonian_, state)
+        return -1j * np.matmul(OMEGA * H_SYSTEM_0, state)
     result = integrate_rkdp5(rhs_, final_times, initial_time, initial_state)
     final_state = result
     ip = np.matmul(conjugate_transpose(final_state), final_state)[0, 0]
