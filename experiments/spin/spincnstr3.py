@@ -71,6 +71,7 @@ TARGET_STATE_DAGGER = conjugate_transpose(TARGET_STATE)
 
 INITIAL_ASTATE = np.hstack([
     INITIAL_STATE.ravel(),
+    # np.zeros_like(INITIAL_STATE).ravel(),
 ],)
 state_offset = 0
 state_shape = INITIAL_STATE.shape
@@ -90,6 +91,7 @@ class Fidelity(Cost):
         final_state = get_state(final_astate)
         inner_product = anp.matmul(TARGET_STATE_DAGGER, final_state)[0, 0]        
         fidelity = anp.real(inner_product * anp.conjugate(inner_product))
+        print("fidelity:\n{}".format(fidelity))
         cost_ = 1 - fidelity
         return cost_
 
@@ -164,10 +166,11 @@ def do_lqr():
     result = lqr(**config)
     final_state = get_state(result.final_astate)
     grads = result.grads
+    cost = result.cost
     while isinstance(final_state, Box):
         final_state = final_state._value
-    print("final_state:\n{}\ngrads:\n{}"
-          "".format(final_state, grads))
+    print("cost:\n{}\nfinal_state:\n{}\ngrads:\n{}"
+          "".format(cost, final_state, grads))
 
     
 def main():
