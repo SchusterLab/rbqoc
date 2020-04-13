@@ -16,5 +16,9 @@ __pycache__
 *.DS_Store
 !report/report.pdf
 
+# ignore local files
+_test
+
+
 
 

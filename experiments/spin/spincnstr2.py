@@ -202,9 +202,9 @@ if GRAB_CONTROLS:
               "".format(controls_lock_file_path))
 elif GEN_CONTROLS:
     controls_ = np.ones((CONTROL_EVAL_COUNT, CONTROL_COUNT))
-    mid_index = int(np.floor(CONTROL_EVAL_COUNT / 2))
-    controls_[:mid_index] = -controls_[:mid_index]
-    controls_ = controls_ * (3 * MAX_CONTROL_NORMS / 4)
+    # mid_index = int(np.floor(CONTROL_EVAL_COUNT / 2))
+    # controls_[:mid_index] = -controls_[:mid_index]
+    # controls_ = controls_ * (3 * MAX_CONTROL_NORMS / 4)
 else:
     controls_ = None
 INITIAL_CONTROLS = controls_
@@ -267,16 +267,15 @@ def do_evolve():
     final_times = np.array([EVOLUTION_TIME])
     
 def rhs_(time, state):
-        
-        # controls_ = interpolate_linear_set(time, CONTROL_EVAL_TIMES, controls)
-        # hamiltonian_ = hamiltonian(controls_, hargs, time)
-        # return -1j * np.matmul(hamiltonian_, state)
-        return -1j * np.matmul(OMEGA * H_SYSTEM_0, state)
-    result = integrate_rkdp5(rhs_, final_times, initial_time, initial_state)
-    final_state = result
-    ip = np.matmul(conjugate_transpose(final_state), final_state)[0, 0]
-    print("final_state:\n{}\nip:\n{}"
-          "".format(final_state, ip))
+    # controls_ = interpolate_linear_set(time, CONTROL_EVAL_TIMES, controls)
+    hamiltonian_ = hamiltonian(controls_, hargs, time)
+    return -1j * np.matmul(hamiltonian_, state)
+    # return -1j * np.matmul(OMEGA * H_SYSTEM_0, state)
+    # result = integrate_rkdp5(rhs_, final_times, initial_time, initial_state)
+    # final_state = result
+    # ip = np.matmul(conjugate_transpose(final_state), final_state)[0, 0]
+    # print("final_state:\n{}\nip:\n{}"
+    #       "".format(final_state, ip))
     
 
 

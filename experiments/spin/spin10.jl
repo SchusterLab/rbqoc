@@ -1,16 +1,46 @@
 #=
-# foo.jl - A module to try out julia.
+# spin10.jl - A module to try out julia for the spin system.
 =#
 module Foo
 
+using BenchmarkTools
 using CUDAnative
 using CuArrays
 using DiffEqSensitivity
 using DifferentialEquations
+using HDF5
 using LinearAlgebra
 using Polynomials
 using Printf
+using StaticArrays
 using Zygote
+
+
+EXPERIMENT_META = "spin"
+EXPERIMENT_NAME = "spin10"
+WDIR = ENV["ROBUST_QOC_PATH"]
+SAVE_PATH = joinpath(WDIR, "out/$EXPERIMENT_META/$EXPERIMENT_NAME")
+
+function generate_save_file_path(save_file_name, save_path)
+    # Ensure the path exists.
+    mkpath(save_path)
+
+    # Create a save file name based on the one given; ensure it will
+    # not conflict with others in the directory.
+    max_numeric_prefix = -1
+    for (_, _, files) in walkdir(save_path)
+        for file_name in files
+            if occursin("_$save_file_name.h5", file_name)
+                max_numeric_prefix = max(parse(Int, split(file_name, "_")[1]))
+            end
+        end
+    end
+
+    save_file_name = "_$save_file_name.h5"
+    save_file_name = @sprintf("%05d%s", max_numeric_prefix + 1, save_file_name)
+
+    return joinpath(save_path, save_file_name)
+end
 
 mutable struct Reporter
     cost :: Float64
@@ -21,11 +51,12 @@ mutable struct PState
     control_count :: Int64
     control_eval_count :: Int64
     cost_multipliers :: Array{Float64, 1}
+    dt :: Float64
     evolution_time :: Float64
     initial_astate :: Any
     lagrange_multipliers :: Array{Float64, 1}
-    
 end
+
 
 # We need an isomorphism from complex numbers to real numbers.
 # TODO: It may be more memory efficient to store the augmented
@@ -55,9 +86,7 @@ end
 Promote a complex operator on the Hilbert space to a real
 operator on the augmented Hilbert space.
 """
-function augment_mat(mat)
-    mat_r = real(mat)
-    mat_i = imag(mat)
+function augment_mat(mat_r, mat_i)
     return [mat_r -mat_i ; mat_i mat_r]
 end
 
@@ -116,28 +145,48 @@ MAX_CONTROL_NORMS = [
 ]
 
 # Define the system.
-SIGMA_X = augment_mat([0 1; 1  0])
-SIGMA_Z = augment_mat([1 0; 0 -1])
+NEG_I = SA_F64[0   0  1  0 ;
+               0   0  0  1 ;
+               -1  0  0  0 ;
+               0  -1  0  0 ;]
+SIGMA_X = SA_F64[0 1 0 0;
+                 1 0 0 0;
+                 0 0 0 1;
+                 0 0 1 0]
+SIGMA_Z = SA_F64[1   0  0   0;
+                 0  -1  0   0;
+                 0   0  1   0;
+                 0   0  0  -1]
 H_S = SIGMA_Z / 2
-neg_i_H_S = neg_i_mat(H_S)
+neg_i_H_S = NEG_I * H_S
 H_C1 = SIGMA_X / 2
 
 # Define the optimization.
-EVOLUTION_TIME = 120.
-TSPAN = (0., EVOLUTION_TIME)
+EVOLUTION_TIME = 120
 COMPLEX_CONTROLS = false
 CONTROL_COUNT = 1
 CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = Int(EVOLUTION_TIME) + 1
-CONTROL_EVAL_TIMES = Array(range(0., stop=EVOLUTION_TIME, length=CONTROL_EVAL_COUNT))
-INITIAL_CONTROLS = ones(CONTROL_EVAL_COUNT, CONTROL_COUNT)
+CONTROL_EVAL_TIMES = SVector{CONTROL_EVAL_COUNT, Float64}(Array(range(0., stop=EVOLUTION_TIME, length=CONTROL_EVAL_COUNT)))
+DT = 1e-2
+GRAB_CONTROLS = true
+if GRAB_CONTROLS
+    initial_controls_ = h5open(joinpath(SAVE_PATH, "00007_spin10.h5")) do save_file
+        save_file["controls"][200, :, :]
+    end
+else
+    initial_controls_ = @SMatrix ones(CONTROL_EVAL_COUNT, CONTROL_COUNT)    
+end
+INITIAL_CONTROLS = initial_controls_
+
 
 # Define the problem.
-INITIAL_STATE = augment_vec([1.; 0])
-TARGET_STATE_DAGGER = conjugate_transpose_vec([0; 1.])
+INITIAL_STATE = augment_vec(SA[1.; 0])
+ZEROS_INITIAL_STATE = augment_vec(SA[0; 0])
+TARGET_STATE_DAGGER = conjugate_transpose_vec(SA[0; 1.])
 INITIAL_ASTATE = [
     INITIAL_STATE; # state
-    zeros(size(INITIAL_STATE)); # dstate_dw
-    zeros(size(INITIAL_STATE)); # d2state_dw2
+    ZEROS_INITIAL_STATE; # dstate_dw
+    ZEROS_INITIAL_STATE; # d2state_dw2
 ]
 (STATE_SIZE,) = size(INITIAL_STATE)
 (ASTATE_SIZE,) = size(INITIAL_ASTATE)
@@ -146,16 +195,35 @@ DSTATE_DW_INDICES = STATE_SIZE + 1:STATE_SIZE * 2
 D2STATE_DW2_INDICES = STATE_SIZE * 2 + 1:STATE_SIZE * 3
 
 HILBERT_DIM = Int(STATE_SIZE / 2)
-NEG_I = [zeros(HILBERT_DIM, HILBERT_DIM) Matrix(I, HILBERT_DIM, HILBERT_DIM) ;
-         -Matrix(I, HILBERT_DIM, HILBERT_DIM) zeros(HILBERT_DIM, HILBERT_DIM)]
 
 # Define Misc
 LEARNING_RATE = 1e-3
-ITERATION_COUNT = 100
+ITERATION_COUNT = 200
 INITIAL_COSTS = [0., 0]
 INITIAL_COST_MULTIPLIERS = [1., 1.]
 INITIAL_LAGRANGE_MULTIPLIERS = [0., 0]
 COST_MULTIPLIER_STEP = 5.
+
+
+"""
+"""
+function rk3_step(rhs_, x, u, t, dt)
+    k1 = rhs_(x,             u, t       ) * dt
+    k2 = rhs_(x + k1/2,      u, t + dt/2) * dt
+    k3 = rhs_(x - k1 + 2*k2, u, t + dt  ) * dt
+    return x + (k1 + 4 * k2 + k3) / 6
+end
+
+
+"""
+"""
+function rk4_step(rhs_, x, u, t, dt)
+    k1 = rhs_(x,        u, t       ) * dt
+	k2 = rhs_(x + k1/2, u, t + dt/2) * dt
+	k3 = rhs_(x + k2/2, u, t + dt/2) * dt
+	k4 = rhs_(x + k3,   u, t + dt  ) * dt
+	return x + (k1 + 2 * k2 + 2 * k3 + k4) / 6
+end
 
 
 """
@@ -215,11 +283,14 @@ end
 The right-hand-side of the Schroedinger equation for the dynamics
 we consider.
 """
-function rhs(delta_astate, astate, controls, time)
+function rhs(astate, controls, time)
     # Unpack augmented state.
     state = astate[STATE_INDICES]
     dstate_dw = astate[DSTATE_DW_INDICES]
     d2state_dw2 = astate[D2STATE_DW2_INDICES]
+    # state = SVector{4, Float64}(astate[STATE_INDICES])
+    # dstate_dw = SVector{4, Float64}(astate[DSTATE_DW_INDICES])
+    # d2state_dw2 = SVector{4, Float64}(astate[D2STATE_DW2_INDICES])
 
     # Compute
     controls_ = interpolate(controls, CONTROL_EVAL_TIMES, time)
@@ -227,9 +298,21 @@ function rhs(delta_astate, astate, controls, time)
     neg_i_hamiltonian = NEG_I * hamiltonian_
     
     # Pack delta augmented state.    
-    delta_astate[STATE_INDICES] = neg_i_hamiltonian * state
-    delta_astate[DSTATE_DW_INDICES] = neg_i_H_S * state + neg_i_hamiltonian * dstate_dw
-    delta_astate[D2STATE_DW2_INDICES] = neg_i_H_S * dstate_dw + neg_i_hamiltonian * d2state_dw2
+    # delta_astate[STATE_INDICES] = neg_i_hamiltonian * state
+    # delta_astate[DSTATE_DW_INDICES] = neg_i_H_S * state + neg_i_hamiltonian * dstate_dw
+    # delta_astate[D2STATE_DW2_INDICES] = neg_i_H_S * dstate_dw + neg_i_hamiltonian * d2state_dw2
+    
+    delta_state = neg_i_hamiltonian * state
+    delta_dstate_dw = neg_i_H_S * state + neg_i_hamiltonian * dstate_dw
+    delta_d2state_dw2 = neg_i_H_S * dstate_dw + neg_i_hamiltonian * d2state_dw2
+    
+    delta_astate = [
+        delta_state;
+        delta_dstate_dw;
+        delta_d2state_dw2
+    ]
+
+    return delta_astate
 end
 
 
@@ -249,9 +332,6 @@ end
 """
 Infidelity Robustness captures the sensitivity of the difference between
 the final state and the target final state to the parameter OMEGA.
-
-Note:
-d2/dw2 |<psi_t | psi_f>|^2 = 2 * |<psi_t | d2psi_f_dw2>|
 """
 function infidelity_robustness(final_astate)
     d2final_state_dw2 = final_astate[D2STATE_DW2_INDICES]
@@ -271,18 +351,28 @@ end
 Evolve a state and compute associated costs.
 """
 function evolve(controls, pstate, reporter)
-    # Unpack pstate.
-    tspan = (0., pstate.evolution_time)
-    ode_problem = ODEProblem(rhs, pstate.initial_astate, tspan, p=controls)
-    
     # Evolve the state.
-    sol = Array(concrete_solve(ode_problem, Tsit5(), pstate.initial_astate, controls,
-                               saveat=pstate.evolution_time, sensealg=QuadratureAdjoint(abstol=1e-8), abstol=1e-8))
-    final_astate = sol[ASTATE_SIZE + 1:2 * ASTATE_SIZE]
+    # tspan = (0., pstate.evolution_time)
+    # ode_problem = ODEProblem(rhs, pstate.initial_astate, tspan, p=controls)
+    # sol = Array(concrete_solve(ode_problem, RK4(), pstate.initial_astate, controls,
+    #                            saveat=pstate.evolution_time, sensealg=QuadratureAdjoint(abstol=1e-8),
+    #                            abstol=1e-8, adaptive=false, dt=pstate.dt))
+    # final_astate = sol[ASTATE_SIZE + 1:2 * ASTATE_SIZE]
+    
+    t = 0
+    dt = pstate.dt
+    N = pstate.evolution_time / dt
+    final_astate = pstate.initial_astate
+    for i=1:N
+        final_astate = rk3_step(rhs, final_astate, controls, t, dt)
+        t = t + dt
+    end
+    final_state = final_astate[STATE_INDICES]
+    # println(final_state)
     
     # Compute costs.
     infidelity_cost = infidelity(final_astate)
-    infidelity_robustness_cost = infidelity_robustness(final_astate)
+    # infidelity_robustness_cost = infidelity_robustness(final_astate)
     augmented_cost = (
         augment_cost(infidelity_cost, pstate.cost_multipliers[1], pstate.lagrange_multipliers[1])
         # + augment_cost(infidelity_robustness_cost, pstate.cost_multipliers[2], pstate.lagrange_multipliers[2])
@@ -292,11 +382,12 @@ function evolve(controls, pstate, reporter)
     # Report.
     reporter.costs = [
         infidelity_cost
-        infidelity_robustness_cost
+        # infidelity_robustness_cost
     ]
     reporter.cost = augmented_cost
 
     return augmented_cost
+
 end
 
 
@@ -306,20 +397,27 @@ function main()
     control_eval_count = CONTROL_EVAL_COUNT
     controls = INITIAL_CONTROLS
     cost_multipliers = INITIAL_COST_MULTIPLIERS
+    dt = DT
     evolution_time = EVOLUTION_TIME
     control_eval_times = Array(range(0., stop=evolution_time, length=control_eval_count))
     initial_astate = INITIAL_ASTATE
     iteration_count = ITERATION_COUNT
     lagrange_multipliers = INITIAL_LAGRANGE_MULTIPLIERS
+    learning_rate = LEARNING_RATE
     # Construct the program state.
     pstate = PState(
         control_count, control_eval_count,
-        cost_multipliers, evolution_time,
+        cost_multipliers, dt, evolution_time,
         initial_astate, lagrange_multipliers,
     )
     reporter = Reporter(0, INITIAL_COSTS)
     # Create a wrapper around the cost function. Zygote takes gradients with repsect to all arguments.
     evolve_(controls_) = evolve(controls_, pstate, reporter)
+    # Generate save file path
+    save_file_path = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
+    println("saving this optimization to $save_file_path")
+    h5write(save_file_path, "controls", zeros(iteration_count, control_eval_count, control_count))
+    
     # AL loop
     # for i = 1:5
     #     # iLQR loop
@@ -329,109 +427,22 @@ function main()
     #     println(pstate.cost_multipliers)
     #     println("lagrange_multipliers")
     #     println(pstate.lagrange_multipliers)
-    learning_rate = LEARNING_RATE
-    for j = 1:iteration_count
+
+    for iteration = 1:iteration_count
         (dcontrols,) = Zygote.gradient(evolve_, controls)
         dcontrols_norm = norm(dcontrols)
         controls = controls - dcontrols * learning_rate
-        @printf("%f %f %f\n", reporter.cost, dcontrols_norm, learning_rate)
-        if j == 40
-            learning_rate /= 1e1
+        @printf("%05d %f %f\n", iteration, reporter.cost, dcontrols_norm,)
+        h5open(save_file_path, "r+") do save_file
+            save_file["controls"][iteration, :, :] = controls
         end
     end
+    
     #     pstate.cost_multipliers = pstate.cost_multipliers * COST_MULTIPLIER_STEP
     #     pstate.lagrange_multipliers = (
     #         pstate.lagrange_multipliers + pstate.cost_multipliers .* reporter.costs
     #     )
     # end
-end
-
-end
-
-
-"""
-This module is for testing.
-"""
-module Test
-
-using Polynomials
-using Random
-using Statistics
-using Zygote
-
-function horner(coeffs, x)
-    (len,) = size(coeffs)
-    if len == 1
-        val = coeffs[1]
-    else
-        val = coeffs[len]
-        for i in len:2
-            val = coeffs[i - 1] + x * val
-        end
-    end
-    return val
-end
-
-function poly_zygote(x, y)
-    poly_ = polyfit(x, y)
-    val = horner(coeffs(poly_), mean(x))
-    return val
-end
-
-"""
-This function doesn't work because `polyfit` uses in-place array manipulation [0].
-
-References:
-[0] https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl
-"""
-function test_poly_zygote()
-    x = rand(5)
-    y = rand(5)
-    poly_zygote_ = (x_) -> poly_zygote(x_, y)
-    (dx,) = Zygote.gradient(poly_zygote_, x)
-end
-
-function main()
-    test_poly_zygote()
-end
-
-end
-
-"""
-This module provides a minimum working example of obtaining the adjoint
-sensitivity with respect to auxiliary parameters
-of a functional defined on the final state of evolution.
-
-References:
-[0] https://docs.sciml.ai/dev/analysis/sensitivity/#concrete_solve-Examples-1
-"""
-module MWE
-
-using DiffEqSensitivity
-using DifferentialEquations
-using Zygote
-
-function rhs(du, u, p, t)
-  du[1] = p[1] * u[1]
-  du[2] = p[2] * u[2]
-end
-
-function cost(u0, p, prob, end_time)
-    sol = Array(concrete_solve(prob, Tsit5(abstol=1e-10), u0, p, saveat=end_time, sensealg=QuadratureAdjoint(abstol=1e-8)))
-    final_u = sol[3:4]
-    cost_ = real(final_u[1])
-    return cost_
-end
-
-function main()
-    p = [1.0, 1.0, 3.0, 1.0]
-    u0 = [1.0 ; 1.0]
-    end_time = 1.0
-    tspan = (0.0, end_time)
-    prob = ODEProblem(rhs, u0, tspan, p=p)
-    cost_(p_) = cost(u0, p_, prob, end_time)
-    (dp,) = Zygote.gradient(cost_, p)
-    println(dp)
 end
 
 end
