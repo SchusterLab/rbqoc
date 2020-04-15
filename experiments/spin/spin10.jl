@@ -8,6 +8,7 @@ using CUDAnative
 using CuArrays
 using DiffEqSensitivity
 using DifferentialEquations
+using ForwardDiff
 using HDF5
 using LinearAlgebra
 using Polynomials
@@ -50,6 +51,7 @@ end
 mutable struct PState
     control_count :: Int64
     control_eval_count :: Int64
+    control_eval_times :: AbstractArray{Float64}
     cost_multipliers :: Array{Float64, 1}
     dt :: Float64
     evolution_time :: Float64
@@ -168,11 +170,12 @@ CONTROL_COUNT = 1
 CONTROL_EVAL_COUNT = SYSTEM_EVAL_COUNT = Int(EVOLUTION_TIME) + 1
 CONTROL_EVAL_TIMES = SVector{CONTROL_EVAL_COUNT, Float64}(Array(range(0., stop=EVOLUTION_TIME, length=CONTROL_EVAL_COUNT)))
 DT = 1e-2
-GRAB_CONTROLS = true
+GRAB_CONTROLS = false
 if GRAB_CONTROLS
     initial_controls_ = h5open(joinpath(SAVE_PATH, "00007_spin10.h5")) do save_file
         save_file["controls"][200, :, :]
     end
+    initial_controls_ = SMatrix{CONTROL_EVAL_COUNT, CONTROL_COUNT, Float64}(initial_controls_)
 else
     initial_controls_ = @SMatrix ones(CONTROL_EVAL_COUNT, CONTROL_COUNT)    
 end
@@ -203,25 +206,37 @@ INITIAL_COSTS = [0., 0]
 INITIAL_COST_MULTIPLIERS = [1., 1.]
 INITIAL_LAGRANGE_MULTIPLIERS = [0., 0]
 COST_MULTIPLIER_STEP = 5.
+SAVE = false
 
 
 """
 """
-function rk3_step(rhs_, x, u, t, dt)
-    k1 = rhs_(x,             u, t       ) * dt
-    k2 = rhs_(x + k1/2,      u, t + dt/2) * dt
-    k3 = rhs_(x - k1 + 2*k2, u, t + dt  ) * dt
+function rk3_step(rhs_, x, u, t, dt, us)
+    k1 = rhs_(x,             u, t       , us) * dt
+    k2 = rhs_(x + k1/2,      u, t + dt/2, us) * dt
+    k3 = rhs_(x - k1 + 2*k2, u, t + dt  , us) * dt
     return x + (k1 + 4 * k2 + k3) / 6
 end
 
+# Attempt at in-place was slower than static array version.
+# function rk3_step(rhs_, x, u, t, dt, dx, ks)
+#     rhs_(dx, x,             u, t       )
+#     ks[1,:] = dx * dt
+#     rhs_(dx, x + ks[1,:]/2,      u, t + dt/2)
+#     ks[2,:] = dx * dt
+#     rhs_(dx, x - ks[1,:] + 2*ks[2,:], u, t + dt  )
+#     ks[3, :] = dx * dt
+#     return x + (ks[1,:] + 4 * ks[2,:] + ks[3,:]) / 6
+# end
+
 
 """
 """
-function rk4_step(rhs_, x, u, t, dt)
-    k1 = rhs_(x,        u, t       ) * dt
-	k2 = rhs_(x + k1/2, u, t + dt/2) * dt
-	k3 = rhs_(x + k2/2, u, t + dt/2) * dt
-	k4 = rhs_(x + k3,   u, t + dt  ) * dt
+function rk4_step(rhs_, x, u, t, dt, us)
+    k1 = rhs_(x,        u, t       , us) * dt
+	k2 = rhs_(x + k1/2, u, t + dt/2, us) * dt
+	k3 = rhs_(x + k2/2, u, t + dt/2, us) * dt
+	k4 = rhs_(x + k3,   u, t + dt  , us) * dt
 	return x + (k1 + 2 * k2 + 2 * k3 + k4) / 6
 end
 
@@ -283,24 +298,28 @@ end
 The right-hand-side of the Schroedinger equation for the dynamics
 we consider.
 """
-function rhs(astate, controls, time)
+function rhs(astate, controls, time, control_step)
     # Unpack augmented state.
     state = astate[STATE_INDICES]
     dstate_dw = astate[DSTATE_DW_INDICES]
     d2state_dw2 = astate[D2STATE_DW2_INDICES]
+    # less gc time but more allocations = slower in the no gradient regime
     # state = SVector{4, Float64}(astate[STATE_INDICES])
     # dstate_dw = SVector{4, Float64}(astate[DSTATE_DW_INDICES])
     # d2state_dw2 = SVector{4, Float64}(astate[D2STATE_DW2_INDICES])
 
     # Compute
-    controls_ = interpolate(controls, CONTROL_EVAL_TIMES, time)
+    # linear interpolation
+    # controls_ = interpolate_linear_points(CONTROL_EVAL_TIMES[control_step],
+    #                                       CONTROL_EVAL_TIMES[control_step + 1],
+    #                                       time,
+    #                                       controls[control_step],
+    #                                       controls[control_step + 1])
+    # zero-order-hold
+    controls_ = controls[control_step]
+    
     hamiltonian_ = OMEGA * H_S + controls_[1] * H_C1
     neg_i_hamiltonian = NEG_I * hamiltonian_
-    
-    # Pack delta augmented state.    
-    # delta_astate[STATE_INDICES] = neg_i_hamiltonian * state
-    # delta_astate[DSTATE_DW_INDICES] = neg_i_H_S * state + neg_i_hamiltonian * dstate_dw
-    # delta_astate[D2STATE_DW2_INDICES] = neg_i_H_S * dstate_dw + neg_i_hamiltonian * d2state_dw2
     
     delta_state = neg_i_hamiltonian * state
     delta_dstate_dw = neg_i_H_S * state + neg_i_hamiltonian * dstate_dw
@@ -352,42 +371,38 @@ Evolve a state and compute associated costs.
 """
 function evolve(controls, pstate, reporter)
     # Evolve the state.
-    # tspan = (0., pstate.evolution_time)
-    # ode_problem = ODEProblem(rhs, pstate.initial_astate, tspan, p=controls)
-    # sol = Array(concrete_solve(ode_problem, RK4(), pstate.initial_astate, controls,
-    #                            saveat=pstate.evolution_time, sensealg=QuadratureAdjoint(abstol=1e-8),
-    #                            abstol=1e-8, adaptive=false, dt=pstate.dt))
-    # final_astate = sol[ASTATE_SIZE + 1:2 * ASTATE_SIZE]
-    
     t = 0
     dt = pstate.dt
     N = pstate.evolution_time / dt
     final_astate = pstate.initial_astate
+    control_step = 1
     for i=1:N
-        final_astate = rk3_step(rhs, final_astate, controls, t, dt)
-        t = t + dt
+        final_astate = rk3_step(rhs, final_astate, controls, t, dt, control_step)
+        t += + dt
+        if t > pstate.control_eval_times[control_step + 1]
+            control_step += 1
+        end
     end
     final_state = final_astate[STATE_INDICES]
-    # println(final_state)
+    println(final_state)
     
     # Compute costs.
     infidelity_cost = infidelity(final_astate)
-    # infidelity_robustness_cost = infidelity_robustness(final_astate)
+    infidelity_robustness_cost = infidelity_robustness(final_astate)
     augmented_cost = (
         augment_cost(infidelity_cost, pstate.cost_multipliers[1], pstate.lagrange_multipliers[1])
-        # + augment_cost(infidelity_robustness_cost, pstate.cost_multipliers[2], pstate.lagrange_multipliers[2])
+        + augment_cost(infidelity_robustness_cost, pstate.cost_multipliers[2], pstate.lagrange_multipliers[2])
     )
     
     
     # Report.
     reporter.costs = [
         infidelity_cost
-        # infidelity_robustness_cost
+        infidelity_robustness_cost
     ]
     reporter.cost = augmented_cost
 
     return augmented_cost
-
 end
 
 
@@ -404,9 +419,10 @@ function main()
     iteration_count = ITERATION_COUNT
     lagrange_multipliers = INITIAL_LAGRANGE_MULTIPLIERS
     learning_rate = LEARNING_RATE
+    save = SAVE
     # Construct the program state.
     pstate = PState(
-        control_count, control_eval_count,
+        control_count, control_eval_count, control_eval_times,
         cost_multipliers, dt, evolution_time,
         initial_astate, lagrange_multipliers,
     )
@@ -414,9 +430,11 @@ function main()
     # Create a wrapper around the cost function. Zygote takes gradients with repsect to all arguments.
     evolve_(controls_) = evolve(controls_, pstate, reporter)
     # Generate save file path
-    save_file_path = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
-    println("saving this optimization to $save_file_path")
-    h5write(save_file_path, "controls", zeros(iteration_count, control_eval_count, control_count))
+    if save
+        save_file_path = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
+        println("saving this optimization to $save_file_path")
+        h5write(save_file_path, "controls", zeros(iteration_count, control_eval_count, control_count))
+    end
     
     # AL loop
     # for i = 1:5
@@ -428,21 +446,39 @@ function main()
     #     println("lagrange_multipliers")
     #     println(pstate.lagrange_multipliers)
 
-    for iteration = 1:iteration_count
-        (dcontrols,) = Zygote.gradient(evolve_, controls)
-        dcontrols_norm = norm(dcontrols)
-        controls = controls - dcontrols * learning_rate
-        @printf("%05d %f %f\n", iteration, reporter.cost, dcontrols_norm,)
-        h5open(save_file_path, "r+") do save_file
-            save_file["controls"][iteration, :, :] = controls
-        end
-    end
-    
+    # for iteration = 1:iteration_count
+    #     (dcontrols,) = Zygote.gradient(evolve_, controls)
+    #     dcontrols_norm = norm(dcontrols)
+    #     controls = controls - dcontrols * learning_rate
+    #     @printf("%05d %f %f\n", iteration, reporter.cost, dcontrols_norm,)
+    #     if save
+    #         h5open(save_file_path, "r+") do save_file
+    #             save_file["controls"][iteration, :, :] = controls
+    #         end
+    #     end
+    # end
+
     #     pstate.cost_multipliers = pstate.cost_multipliers * COST_MULTIPLIER_STEP
     #     pstate.lagrange_multipliers = (
     #         pstate.lagrange_multipliers + pstate.cost_multipliers .* reporter.costs
     #     )
     # end
+
+    evolve_(controls)
+    # cfg = ForwardDiff.GradientConfig(evolve_, controls)
+    # out = zeros(11, control_eval_count, control_count)
+    # ForwardDiff.gradient!(out[11, :, :], evolve_, controls, cfg)
+    # Zygote.gradient(evolve_, controls)
+    # function test()
+    #     for i=1:10
+    #         # evolve_(controls)
+    #         # ForwardDiff.gradient!(out[i, :, :], evolve_, controls, cfg)
+    #         Zygote.gradient(evolve_, controls)
+    #     end
+    #     return
+    # end
+
+    # @time test()
 end
 
 end
