@@ -1,25 +1,25 @@
 #=
-# spin10.jl - A module to try out julia for the spin system.
+# spin10.jl - This module demonstrates grape on the spin system in julia.
 =#
 module Foo
 
-using BenchmarkTools
-using CUDAnative
-using CuArrays
-using DiffEqSensitivity
-using DifferentialEquations
-using ForwardDiff
+# using BenchmarkTools
+# using CUDAnative
+# using CuArrays
+# using DiffEqSensitivity
+# using DifferentialEquations
+# using ForwardDiff
 using HDF5
 using LinearAlgebra
-using Polynomials
+# using Polynomials
 using Printf
 using StaticArrays
 using Zygote
 
 
 EXPERIMENT_META = "spin"
-EXPERIMENT_NAME = "spin10"
-WDIR = ENV["ROBUST_QOC_PATH"]
+EXPERIMENT_NAME = "spin0"
+WDIR = ENV["QC_PATH"]
 SAVE_PATH = joinpath(WDIR, "out/$EXPERIMENT_META/$EXPERIMENT_NAME")
 
 function generate_save_file_path(save_file_name, save_path)
@@ -160,8 +160,11 @@ SIGMA_Z = SA_F64[1   0  0   0;
                  0   0  1   0;
                  0   0  0  -1]
 H_S = SIGMA_Z / 2
-neg_i_H_S = NEG_I * H_S
+NEG_I_H_S = NEG_I * H_S
+OMEGA_NEG_I_H_S = OMEGA * NEG_I_H_S
 H_C1 = SIGMA_X / 2
+NEG_I_H_C1 = NEG_I * H_C1
+
 
 # Define the optimization.
 EVOLUTION_TIME = 120
@@ -188,8 +191,8 @@ ZEROS_INITIAL_STATE = augment_vec(SA[0; 0])
 TARGET_STATE_DAGGER = conjugate_transpose_vec(SA[0; 1.])
 INITIAL_ASTATE = [
     INITIAL_STATE; # state
-    ZEROS_INITIAL_STATE; # dstate_dw
-    ZEROS_INITIAL_STATE; # d2state_dw2
+    # ZEROS_INITIAL_STATE; # dstate_dw
+    # ZEROS_INITIAL_STATE; # d2state_dw2
 ]
 (STATE_SIZE,) = size(INITIAL_STATE)
 (ASTATE_SIZE,) = size(INITIAL_ASTATE)
@@ -301,8 +304,8 @@ we consider.
 function rhs(astate, controls, time, control_step)
     # Unpack augmented state.
     state = astate[STATE_INDICES]
-    dstate_dw = astate[DSTATE_DW_INDICES]
-    d2state_dw2 = astate[D2STATE_DW2_INDICES]
+    # dstate_dw = astate[DSTATE_DW_INDICES]
+    # d2state_dw2 = astate[D2STATE_DW2_INDICES]
     # less gc time but more allocations = slower in the no gradient regime
     # state = SVector{4, Float64}(astate[STATE_INDICES])
     # dstate_dw = SVector{4, Float64}(astate[DSTATE_DW_INDICES])
@@ -315,20 +318,20 @@ function rhs(astate, controls, time, control_step)
     #                                       time,
     #                                       controls[control_step],
     #                                       controls[control_step + 1])
+    
     # zero-order-hold
     controls_ = controls[control_step]
     
-    hamiltonian_ = OMEGA * H_S + controls_[1] * H_C1
-    neg_i_hamiltonian = NEG_I * hamiltonian_
+    neg_i_hamiltonian = OMEGA * NEG_I_H_S + controls_[1] * NEG_I_H_C1
     
     delta_state = neg_i_hamiltonian * state
-    delta_dstate_dw = neg_i_H_S * state + neg_i_hamiltonian * dstate_dw
-    delta_d2state_dw2 = neg_i_H_S * dstate_dw + neg_i_hamiltonian * d2state_dw2
+    # delta_dstate_dw = neg_i_H_S * state + neg_i_hamiltonian * dstate_dw
+    # delta_d2state_dw2 = neg_i_H_S * dstate_dw + neg_i_hamiltonian * d2state_dw2
     
     delta_astate = [
         delta_state;
-        delta_dstate_dw;
-        delta_d2state_dw2
+        # delta_dstate_dw;
+        # delta_d2state_dw2
     ]
 
     return delta_astate
@@ -378,27 +381,27 @@ function evolve(controls, pstate, reporter)
     control_step = 1
     for i=1:N
         final_astate = rk3_step(rhs, final_astate, controls, t, dt, control_step)
-        t += + dt
+        t += dt
         if t > pstate.control_eval_times[control_step + 1]
             control_step += 1
         end
     end
     final_state = final_astate[STATE_INDICES]
-    println(final_state)
+    # println(final_state)
     
     # Compute costs.
     infidelity_cost = infidelity(final_astate)
-    infidelity_robustness_cost = infidelity_robustness(final_astate)
+    # infidelity_robustness_cost = infidelity_robustness(final_astate)
     augmented_cost = (
         augment_cost(infidelity_cost, pstate.cost_multipliers[1], pstate.lagrange_multipliers[1])
-        + augment_cost(infidelity_robustness_cost, pstate.cost_multipliers[2], pstate.lagrange_multipliers[2])
+        # + augment_cost(infidelity_robustness_cost, pstate.cost_multipliers[2], pstate.lagrange_multipliers[2])
     )
     
     
     # Report.
     reporter.costs = [
         infidelity_cost
-        infidelity_robustness_cost
+        # infidelity_robustness_cost
     ]
     reporter.cost = augmented_cost
 
@@ -446,17 +449,17 @@ function main()
     #     println("lagrange_multipliers")
     #     println(pstate.lagrange_multipliers)
 
-    # for iteration = 1:iteration_count
-    #     (dcontrols,) = Zygote.gradient(evolve_, controls)
-    #     dcontrols_norm = norm(dcontrols)
-    #     controls = controls - dcontrols * learning_rate
-    #     @printf("%05d %f %f\n", iteration, reporter.cost, dcontrols_norm,)
-    #     if save
-    #         h5open(save_file_path, "r+") do save_file
-    #             save_file["controls"][iteration, :, :] = controls
-    #         end
-    #     end
-    # end
+    for iteration = 1:iteration_count
+        (dcontrols,) = Zygote.gradient(evolve_, controls)
+        dcontrols_norm = norm(dcontrols)
+        controls = controls - dcontrols * learning_rate
+        @printf("%05d %f %f\n", iteration, reporter.cost, dcontrols_norm,)
+        if save
+            h5open(save_file_path, "r+") do save_file
+                save_file["controls"][iteration, :, :] = controls
+            end
+        end
+    end
 
     #     pstate.cost_multipliers = pstate.cost_multipliers * COST_MULTIPLIER_STEP
     #     pstate.lagrange_multipliers = (
@@ -464,7 +467,7 @@ function main()
     #     )
     # end
 
-    evolve_(controls)
+    # evolve_(controls)
     # cfg = ForwardDiff.GradientConfig(evolve_, controls)
     # out = zeros(11, control_eval_count, control_count)
     # ForwardDiff.gradient!(out[11, :, :], evolve_, controls, cfg)
