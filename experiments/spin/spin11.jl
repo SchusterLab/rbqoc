@@ -43,21 +43,39 @@ function generate_save_file_path(save_file_name, save_path)
 end
 
 
-function plot_controls(controls_file_path, save_file_path)
+function plot_controls(controls_file_path, save_file_path,
+                       title=nothing)
+    # Grab and prep data.
     (
         controls,
         evolution_time,
+        states,
     ) = h5open(controls_file_path, "r+") do save_file
         controls = read(save_file, "controls")
         evolution_time = read(save_file, "evolution_time")
+        states = read(save_file, "states")
         return (
             controls,
             evolution_time,
+            states
         )
     end
     (control_eval_count, control_count) = size(controls)
     control_eval_times = Array(range(0., stop=evolution_time, length=control_eval_count))
-    fig = Plots.plot(control_eval_times, controls[:, 1], show=false, dpi=DPI)
+    file_name = split(basename(controls_file_path), ".h5")[1]
+    if isnothing(title)
+        title = file_name
+    end
+
+    # Plot.
+    if false
+        fig = Plots.plot(control_eval_times, controls[:, 1], show=false, dpi=DPI)
+    else
+        fig = Plots.plot(control_eval_times, states[1:N-1, CONTROLS_IDX], show=false, dpi=DPI,
+                         label="controls", title=title)
+        Plots.xlabel!("Time (ns)")
+        Plots.ylabel!("Amplitude (GHz)")
+    end
     Plots.savefig(fig, save_file_path)
     return
 end
@@ -122,7 +140,9 @@ INITIAL_ASTATE = [
     INITIAL_STATE;
     @SVector zeros(STATE_SIZE); # dstate_dw
     @SVector zeros(STATE_SIZE); # d2state_dw2
-    @SVector zeros(1); # int_u
+    @SVector zeros(1); # int_control
+    @SVector zeros(1); # control
+    @SVector zeros(1); # dcontrol_dt
     # @SVector zeros(2); # d2j_dw2
 ]
 ASTATE_SIZE, = size(INITIAL_ASTATE)
@@ -132,15 +152,17 @@ TARGET_ASTATE = [
     @SVector zeros(STATE_SIZE);
     @SVector zeros(STATE_SIZE);
     @SVector zeros(1); # int_u
+    @SVector zeros(1); # control
+    @SVector zeros(1); # dcontrol_dt
     # @SVector zeros(2);
 ]
-STATE_INDICES = 1:STATE_SIZE
-DSTATE_DW_INDICES = STATE_SIZE + 1:2 * STATE_SIZE
-D2STATE_DW2_INDICES = 2 * STATE_SIZE + 1:3 * STATE_SIZE
-INT_U_INDICES = 3 * STATE_SIZE + 1
-U_START_INDICES = 3 * STATE_SIZE + 2
-U_STOP_INDICES = 3 * STATE_SIZE + 3
-# D2J_DW2_INDICES = 3 * STATE_SIZE + 1:3 * STATE_SIZE + 2
+STATE_IDX = 1:STATE_SIZE
+DSTATE_DW_IDX = STATE_SIZE + 1:2 * STATE_SIZE
+D2STATE_DW2_IDX = 2 * STATE_SIZE + 1:3 * STATE_SIZE
+INT_CONTROLS_IDX = 3 * STATE_SIZE + 1:3 * STATE_SIZE + CONTROL_COUNT
+CONTROLS_IDX = 3 * STATE_SIZE + CONTROL_COUNT + 1:3 * STATE_SIZE + 2 * CONTROL_COUNT
+DCONTROLS_DT_IDX = 3 * STATE_SIZE + 2 * CONTROL_COUNT + 1:3 * STATE_SIZE + 3 * CONTROL_COUNT
+# D2J_DW2_IDX = 3 * STATE_SIZE + 1:3 * STATE_SIZE + 2
 
 
 # Generate initial controls.
@@ -155,8 +177,9 @@ if GRAB_CONTROLS
         ]
     end
 else
+    # INIITAL_CONTROLS should be small if optimizing over derivatives.
     INITIAL_CONTROLS = [
-        @SVector fill(MAX_CONTROL_NORM_0 * 0.25, CONTROL_COUNT) for k = 1:N-1
+        @SVector fill(1e-4, CONTROL_COUNT) for k = 1:N-1
     ]
 end
 
@@ -175,26 +198,29 @@ function Base.size(model::Model)
 end
 
 
-function TrajectoryOptimization.dynamics(model::Model, astate, controls, time)
-    neg_i_hamiltonian = OMEGA * NEG_I_H_S + controls[1] * NEG_I_H_C1
-    delta_state = neg_i_hamiltonian * astate[STATE_INDICES]
-    delta_dstate_dw = NEG_I_H_S * astate[STATE_INDICES] + neg_i_hamiltonian * astate[DSTATE_DW_INDICES]
-    delta_d2state_dw2 = 2 * NEG_I_H_S * astate[DSTATE_DW_INDICES] + neg_i_hamiltonian * astate[D2STATE_DW2_INDICES]
-    delta_int_u = controls[1]
+function TrajectoryOptimization.dynamics(model::Model, astate, d2controls_dt2, time)
+    neg_i_hamiltonian = OMEGA * NEG_I_H_S + astate[CONTROLS_IDX][1] * NEG_I_H_C1
+    delta_state = neg_i_hamiltonian * astate[STATE_IDX]
+    delta_dstate_dw = NEG_I_H_S * astate[STATE_IDX] + neg_i_hamiltonian * astate[DSTATE_DW_IDX]
+    delta_d2state_dw2 = 2 * NEG_I_H_S * astate[DSTATE_DW_IDX] + neg_i_hamiltonian * astate[D2STATE_DW2_IDX]
+    delta_int_control = astate[CONTROLS_IDX]
+    delta_control = astate[DCONTROLS_DT_IDX]
+    delta_dcontrol_dt = d2controls_dt2
     # delta_d2j_dw2 = (
-    #     inner_product(TARGET_STATE, astate[D2STATE_DW2_INDICES])
-    #     .* inner_product(astate[STATE_INDICES], TARGET_STATE)
-    #     + 2 * inner_product(TARGET_STATE, astate[DSTATE_DW_INDICES])
-    #     .* inner_product(astate[DSTATE_DW_INDICES], TARGET_STATE)
-    #     + inner_product(TARGET_STATE, astate[STATE_INDICES])
-    #     .* inner_product(astate[D2STATE_DW2_INDICES], TARGET_STATE)
+    #     inner_product(TARGET_STATE, astate[D2STATE_DW2_IDX])
+    #     .* inner_product(astate[STATE_IDX], TARGET_STATE)
+    #     + 2 * inner_product(TARGET_STATE, astate[DSTATE_DW_IDX])
+    #     .* inner_product(astate[DSTATE_DW_IDX], TARGET_STATE)
+    #     + inner_product(TARGET_STATE, astate[STATE_IDX])
+    #     .* inner_product(astate[D2STATE_DW2_IDX], TARGET_STATE)
     # )
     return [
         delta_state;
         delta_dstate_dw;
         delta_d2state_dw2;
-        delta_int_u;
-        # delta_d2j_dw2;
+        delta_int_control;
+        delta_control;
+        delta_dcontrol_dt;
     ]
 end
 
@@ -207,41 +233,73 @@ function run_traj()
     tf = EVOLUTION_TIME
     x0 = INITIAL_ASTATE
     xf = TARGET_ASTATE
-    u_max = SA[MAX_CONTROL_NORM_0]
-    u_min = SA[-MAX_CONTROL_NORM_0]
+    # control amplitude constraint
+    x_max = [
+        @SVector fill(Inf, STATE_SIZE);
+        @SVector fill(Inf, STATE_SIZE);
+        @SVector fill(Inf, STATE_SIZE);
+        @SVector fill(Inf, 1);
+        @SVector fill(MAX_CONTROL_NORM_0, 1); # control
+        @SVector fill(Inf, 1);
+    ]
+    x_min = [
+        @SVector fill(-Inf, STATE_SIZE);
+        @SVector fill(-Inf, STATE_SIZE);
+        @SVector fill(-Inf, STATE_SIZE);
+        @SVector fill(-Inf, 1);
+        @SVector fill(-MAX_CONTROL_NORM_0, 1); # control
+        @SVector fill(-Inf, 1);
+    ]
     # controls start and end at 0
-    u_max_boundary = @SVector fill(0, CONTROL_COUNT)
-    u_min_boundary = @SVector fill(0, CONTROL_COUNT)
-    U0 = INITIAL_CONTROLS
-    
-    model = Model(n, m)
+    x_max_boundary = [
+        @SVector fill(Inf, STATE_SIZE);
+        @SVector fill(Inf, STATE_SIZE);
+        @SVector fill(Inf, STATE_SIZE);
+        @SVector fill(Inf, 1);
+        @SVector fill(0, 1); # control
+        @SVector fill(Inf, 1);
+    ]
+    x_min_boundary = [
+        @SVector fill(-Inf, STATE_SIZE);
+        @SVector fill(-Inf, STATE_SIZE);
+        @SVector fill(-Inf, STATE_SIZE);
+        @SVector fill(-Inf, 1);
+        @SVector fill(0, 1); # control
+        @SVector fill(-Inf, 1);
+    ]
 
+    model = Model(n, m)
+    U0 = INITIAL_CONTROLS
     X0 = [
         @SVector fill(NaN, n) for k = 1:N
     ]
     Z = Traj(X0, U0, dt * ones(N))
 
-
     Q = Diagonal([
         @SVector fill(1e-2, STATE_SIZE);
         @SVector zeros(STATE_SIZE);
         @SVector zeros(STATE_SIZE); # fill(1e-8, STATE_SIZE);
-        @SVector fill(1e-2, 1);
-        # @SVector zeros(2)
+        @SVector fill(1e-2, 1); # int_control
+        @SVector fill(1e-1, 1); # control
+        @SVector fill(1e-1, 1); # dcontrol_dt
     ])
     Qf = Q * N
-    R = 1e-1 * Diagonal(@SVector ones(m))
+    R = Diagonal(@SVector fill(1e1, m))
     obj = LQRObjective(Q, R, Qf, xf, N)
-    
-    control_bnd = BoundConstraint(n, m, u_max=u_max, u_min=u_min)
-    control_bnd_boundary = BoundConstraint(n, m, u_max=u_max_boundary, u_min=u_min_boundary)
-    target_astate_constraint = GoalConstraint(xf, [STATE_INDICES;INT_U_INDICES])
+
+    # must satisfy control amplitudes
+    control_bnd = BoundConstraint(n, m, x_max=x_max, x_min=x_min)
+    # must statisfy conrols start and stop at 0
+    control_bnd_boundary = BoundConstraint(n, m, x_max=x_max_boundary, x_min=x_min_boundary)
+    # must reach target state, must have zero net flux
+    target_astate_constraint = GoalConstraint(xf, [STATE_IDX;INT_CONTROLS_IDX])
     
     constraints = ConstraintSet(n, m, N)
-    add_constraint!(constraints, target_astate_constraint, N:N)
     add_constraint!(constraints, control_bnd, 2:N-2)
     add_constraint!(constraints, control_bnd_boundary, 1:1)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
+    add_constraint!(constraints, target_astate_constraint, N:N)
+
     
     prob = Problem{RK4}(model, obj, constraints, x0, xf, Z, N, t0, tf)
     opts = SolverOptions(verbose=VERBOSE)
