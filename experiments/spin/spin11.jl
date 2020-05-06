@@ -12,8 +12,8 @@ using StaticArrays
 
 # Construct paths.
 EXPERIMENT_META = "spin"
-EXPERIMENT_NAME = "spin1"
-WDIR = ENV["QC_PATH"]
+EXPERIMENT_NAME = "spin11"
+WDIR = ENV["ROBUST_QOC_PATH"]
 SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
 # Plotting configuration.
@@ -122,6 +122,7 @@ INITIAL_ASTATE = [
     INITIAL_STATE;
     @SVector zeros(STATE_SIZE); # dstate_dw
     @SVector zeros(STATE_SIZE); # d2state_dw2
+    @SVector zeros(1); # int_u
     # @SVector zeros(2); # d2j_dw2
 ]
 ASTATE_SIZE, = size(INITIAL_ASTATE)
@@ -130,18 +131,23 @@ TARGET_ASTATE = [
     TARGET_STATE;
     @SVector zeros(STATE_SIZE);
     @SVector zeros(STATE_SIZE);
+    @SVector zeros(1); # int_u
     # @SVector zeros(2);
 ]
 STATE_INDICES = 1:STATE_SIZE
 DSTATE_DW_INDICES = STATE_SIZE + 1:2 * STATE_SIZE
 D2STATE_DW2_INDICES = 2 * STATE_SIZE + 1:3 * STATE_SIZE
-D2J_DW2_INDICES = 3 * STATE_SIZE + 1:3 * STATE_SIZE + 2
+INT_U_INDICES = 3 * STATE_SIZE + 1
+U_START_INDICES = 3 * STATE_SIZE + 2
+U_STOP_INDICES = 3 * STATE_SIZE + 3
+# D2J_DW2_INDICES = 3 * STATE_SIZE + 1:3 * STATE_SIZE + 2
+
 
 # Generate initial controls.
-GRAB_CONTROLS = true
+GRAB_CONTROLS = false
 INITIAL_CONTROLS = nothing
 if GRAB_CONTROLS
-    controls_file_path = joinpath(SAVE_PATH, "00002_spin1.h5")
+    controls_file_path = joinpath(SAVE_PATH, "00002_spin11.h5")
     INITIAL_CONTROLS = h5open(controls_file_path, "r") do save_file
         controls = Array(save_file["controls"])
         return [
@@ -170,11 +176,11 @@ end
 
 
 function TrajectoryOptimization.dynamics(model::Model, astate, controls, time)
-    hamiltonian = OMEGA * NEG_I_H_S + controls[1] * NEG_I_H_C1
-    dhamiltonian_dw = NEG_I_H_S
-    delta_state = hamiltonian * astate[STATE_INDICES]
-    delta_dstate_dw = dhamiltonian_dw * astate[STATE_INDICES] + hamiltonian * astate[DSTATE_DW_INDICES]
-    delta_d2state_dw2 = 2 * dhamiltonian_dw * astate[DSTATE_DW_INDICES] + hamiltonian * astate[D2STATE_DW2_INDICES]
+    neg_i_hamiltonian = OMEGA * NEG_I_H_S + controls[1] * NEG_I_H_C1
+    delta_state = neg_i_hamiltonian * astate[STATE_INDICES]
+    delta_dstate_dw = NEG_I_H_S * astate[STATE_INDICES] + neg_i_hamiltonian * astate[DSTATE_DW_INDICES]
+    delta_d2state_dw2 = 2 * NEG_I_H_S * astate[DSTATE_DW_INDICES] + neg_i_hamiltonian * astate[D2STATE_DW2_INDICES]
+    delta_int_u = controls[1]
     # delta_d2j_dw2 = (
     #     inner_product(TARGET_STATE, astate[D2STATE_DW2_INDICES])
     #     .* inner_product(astate[STATE_INDICES], TARGET_STATE)
@@ -187,6 +193,7 @@ function TrajectoryOptimization.dynamics(model::Model, astate, controls, time)
         delta_state;
         delta_dstate_dw;
         delta_d2state_dw2;
+        delta_int_u;
         # delta_d2j_dw2;
     ]
 end
@@ -202,6 +209,9 @@ function run_traj()
     xf = TARGET_ASTATE
     u_max = SA[MAX_CONTROL_NORM_0]
     u_min = SA[-MAX_CONTROL_NORM_0]
+    # controls start and end at 0
+    u_max_boundary = @SVector fill(0, CONTROL_COUNT)
+    u_min_boundary = @SVector fill(0, CONTROL_COUNT)
     U0 = INITIAL_CONTROLS
     
     model = Model(n, m)
@@ -215,19 +225,23 @@ function run_traj()
     Q = Diagonal([
         @SVector fill(1e-2, STATE_SIZE);
         @SVector zeros(STATE_SIZE);
-        @SVector fill(1e-8, STATE_SIZE);
+        @SVector zeros(STATE_SIZE); # fill(1e-8, STATE_SIZE);
+        @SVector fill(1e-2, 1);
         # @SVector zeros(2)
     ])
     Qf = Q * N
     R = 1e-1 * Diagonal(@SVector ones(m))
     obj = LQRObjective(Q, R, Qf, xf, N)
     
-    bnd = BoundConstraint(n, m, u_max=u_max, u_min=u_min)
-    target_state_constraint = GoalConstraint(xf, STATE_INDICES)
+    control_bnd = BoundConstraint(n, m, u_max=u_max, u_min=u_min)
+    control_bnd_boundary = BoundConstraint(n, m, u_max=u_max_boundary, u_min=u_min_boundary)
+    target_astate_constraint = GoalConstraint(xf, [STATE_INDICES;INT_U_INDICES])
     
     constraints = ConstraintSet(n, m, N)
-    add_constraint!(constraints, target_state_constraint, N:N)
-    add_constraint!(constraints, bnd, 1:N)
+    add_constraint!(constraints, target_astate_constraint, N:N)
+    add_constraint!(constraints, control_bnd, 2:N-2)
+    add_constraint!(constraints, control_bnd_boundary, 1:1)
+    add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
     
     prob = Problem{RK4}(model, obj, constraints, x0, xf, Z, N, t0, tf)
     opts = SolverOptions(verbose=VERBOSE)
