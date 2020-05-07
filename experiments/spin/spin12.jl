@@ -1,5 +1,5 @@
 """
-spin11.jl - derivative robustness
+spin12.jl - sampling robustness
 """
 
 import DifferentialEquations
@@ -12,7 +12,7 @@ using StaticArrays
 
 # Construct paths.
 EXPERIMENT_META = "spin"
-EXPERIMENT_NAME = "spin11"
+EXPERIMENT_NAME = "spin12"
 WDIR = ENV["ROBUST_QOC_PATH"]
 SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
@@ -104,6 +104,9 @@ end
 
 # Define experimental constants.
 OMEGA = 2 * pi * 1e-2
+DOMEGA = OMEGA * 5e-2
+OMEGA_PLUS = OMEGA + DOMEGA
+OMEGA_MINUS = OMEGA - DOMEGA
 MAX_CONTROL_NORM_0 = 2 * pi * 3e-1
 
 # Define the system.
@@ -137,9 +140,9 @@ ITERATION_COUNT = Int(1e3)
 INITIAL_STATE = SA[1., 0, 0, 0]
 STATE_SIZE, = size(INITIAL_STATE)
 INITIAL_ASTATE = [
-    INITIAL_STATE;
-    @SVector zeros(STATE_SIZE); # dstate_dw
-    @SVector zeros(STATE_SIZE); # d2state_dw2
+    INITIAL_STATE; # state (w)
+    INITIAL_STATE; # state (w + dw)
+    INITIAL_STATE; # state (w - dw)
     @SVector zeros(1); # int_control
     @SVector zeros(1); # control
     @SVector zeros(1); # dcontrol_dt
@@ -148,15 +151,15 @@ ASTATE_SIZE, = size(INITIAL_ASTATE)
 TARGET_STATE = SA[0, 1., 0, 0]
 TARGET_ASTATE = [
     TARGET_STATE;
-    @SVector zeros(STATE_SIZE);
-    @SVector zeros(STATE_SIZE);
-    @SVector zeros(1); # int_u
+    TARGET_STATE;
+    TARGET_STATE;
+    @SVector zeros(1); # int_control
     @SVector zeros(1); # control
     @SVector zeros(1); # dcontrol_dt
 ]
 STATE_IDX = 1:STATE_SIZE
-DSTATE_DW_IDX = STATE_SIZE + 1:2 * STATE_SIZE
-D2STATE_DW2_IDX = 2 * STATE_SIZE + 1:3 * STATE_SIZE
+STATE_PLUS_IDX = STATE_SIZE + 1:2 * STATE_SIZE
+STATE_MINUS_IDX = 2 * STATE_SIZE + 1:3 * STATE_SIZE
 INT_CONTROLS_IDX = 3 * STATE_SIZE + 1:3 * STATE_SIZE + CONTROL_COUNT
 CONTROLS_IDX = 3 * STATE_SIZE + CONTROL_COUNT + 1:3 * STATE_SIZE + 2 * CONTROL_COUNT
 DCONTROLS_DT_IDX = 3 * STATE_SIZE + 2 * CONTROL_COUNT + 1:3 * STATE_SIZE + 3 * CONTROL_COUNT
@@ -166,7 +169,7 @@ DCONTROLS_DT_IDX = 3 * STATE_SIZE + 2 * CONTROL_COUNT + 1:3 * STATE_SIZE + 3 * C
 GRAB_CONTROLS = false
 INITIAL_CONTROLS = nothing
 if GRAB_CONTROLS
-    controls_file_path = joinpath(SAVE_PATH, "00002_spin11.h5")
+    controls_file_path = joinpath(SAVE_PATH, "00000_spin12.h5")
     INITIAL_CONTROLS = h5open(controls_file_path, "r") do save_file
         controls = Array(save_file["controls"])
         return [
@@ -196,17 +199,17 @@ end
 
 
 function TrajectoryOptimization.dynamics(model::Model, astate, d2controls_dt2, time)
-    neg_i_hamiltonian = OMEGA * NEG_I_H_S + astate[CONTROLS_IDX][1] * NEG_I_H_C1
-    delta_state = neg_i_hamiltonian * astate[STATE_IDX]
-    delta_dstate_dw = NEG_I_H_S * astate[STATE_IDX] + neg_i_hamiltonian * astate[DSTATE_DW_IDX]
-    delta_d2state_dw2 = 2 * NEG_I_H_S * astate[DSTATE_DW_IDX] + neg_i_hamiltonian * astate[D2STATE_DW2_IDX]
+    neg_i_control_hamiltonian = astate[CONTROLS_IDX][1] * NEG_I_H_C1
+    delta_state = (OMEGA * NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_IDX]
+    delta_state_plus = (OMEGA_PLUS * NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_PLUS_IDX]
+    delta_state_minus = (OMEGA_MINUS * NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_MINUS_IDX]
     delta_int_control = astate[CONTROLS_IDX]
     delta_control = astate[DCONTROLS_DT_IDX]
     delta_dcontrol_dt = d2controls_dt2
     return [
         delta_state;
-        delta_dstate_dw;
-        delta_d2state_dw2;
+        delta_state_plus;
+        delta_state_minus;
         delta_int_control;
         delta_control;
         delta_dcontrol_dt;
@@ -266,14 +269,14 @@ function run_traj()
 
     Q = Diagonal([
         @SVector fill(1e-1, STATE_SIZE);
-        @SVector fill(0., STATE_SIZE);
-        @SVector fill(0., STATE_SIZE);
+        @SVector fill(5e-1, STATE_SIZE);
+        @SVector fill(5e-1, STATE_SIZE);
         @SVector fill(1e-1, 1); # int_control
-        @SVector fill(1e-2, 1); # control
-        @SVector fill(1e-2, 1); # dcontrol_dt
+        @SVector fill(1e-1, 1); # control
+        @SVector fill(1e-1, 1); # dcontrol_dt
     ])
     Qf = Q * N
-    R = Diagonal(@SVector fill(5e-2, m))
+    R = Diagonal(@SVector fill(1e-1, m))
     obj = LQRObjective(Q, R, Qf, xf, N)
 
     # must satisfy control amplitudes
@@ -291,7 +294,7 @@ function run_traj()
     
     prob = Problem{RK4}(model, obj, constraints, x0, xf, Z, N, t0, tf)
     opts = SolverOptions(verbose=VERBOSE)
-    solver = AugmentedLagrangianSolver(prob, opts)
+    solver = ALTROSolver(prob, opts)
     solve!(solver)
 
     controls_raw = controls(solver)
@@ -319,4 +322,3 @@ function run_traj()
         end
     end
 end
-

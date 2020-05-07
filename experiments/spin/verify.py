@@ -13,7 +13,7 @@ from qutip import (
 )
 
 # Directory.
-WDIR = os.environ.get("QC_PATH", ".")
+WDIR = os.environ.get("ROBUST_QOC_PATH", ".")
 OUT_PATH = os.path.join(WDIR, "out")
 
 # Computational constants.
@@ -30,23 +30,28 @@ def fidelity(v1, v2):
     return np.real(ip) ** 2 + np.imag(ip) ** 2
 
 
-def run_spin1():
+def run_spin():
     # get controls
     experiment_meta = "spin"
-    experiment_name = "spin1"
+    experiment_name = "spin12"
     save_path = os.path.join(OUT_PATH, experiment_meta, experiment_name)
-    controls_file_path = os.path.join(save_path, "00000_spin1.h5")
+    controls_file_path = os.path.join(save_path, "00000_spin12.h5")
     with h5py.File(controls_file_path, "r") as save_file:
-        controls = save_file["controls"][()]
+        # controls = save_file["controls"][0, :]
+        states = save_file["states"][()]
+        controls = states[13, 0:-1]
+        # print(save_file["Q"][()])
     #ENDWITH
-    controls = controls[0]
     control_eval_count = controls.shape[0]
     
     # define constants
     evolution_time = 120.
     omega_raw = 2 * np.pi * 1e-2
-    domega = omega_raw * 1e-2
-    omega = omega_raw + domega
+    domega = omega_raw * 5e-2
+    omega = (
+        omega_raw
+        + domega
+    )
     initial_state = np.array([[1], [0]])
     target_state = np.array([[0], [1]])
 
@@ -75,12 +80,12 @@ def run_spin1():
     
 def main():
     parser = ArgumentParser()
-    parser.add_argument("--spin1", action="store_true")
+    parser.add_argument("--spin", action="store_true")
     args = vars(parser.parse_args())
-    do_spin1 = args["spin1"]
+    do_spin = args["spin"]
     
-    if do_spin1:
-        run_spin1()
+    if do_spin:
+        run_spin()
 
 
 if __name__ == "__main__":
