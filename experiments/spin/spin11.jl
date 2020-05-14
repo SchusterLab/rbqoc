@@ -103,7 +103,7 @@ function fidelity(v1, v2)
 end
 
 # Define experimental constants.
-OMEGA = 2 * pi * 1e-2
+OMEGA = 2 * pi * 1.4e-2
 MAX_CONTROL_NORM_0 = 2 * pi * 3e-1
 
 # Define the system.

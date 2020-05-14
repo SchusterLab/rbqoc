@@ -1,17 +1,17 @@
 """
-spin12.jl - sampling robustness
+spin13.jl - vanilla
 """
 
 using HDF5
 using LinearAlgebra
+using TrajectoryOptimization
 import Plots
 using Printf
 using StaticArrays
-using TrajectoryOptimization
 
 # Construct paths.
 EXPERIMENT_META = "spin"
-EXPERIMENT_NAME = "spin12"
+EXPERIMENT_NAME = "spin13"
 WDIR = ENV["ROBUST_QOC_PATH"]
 SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
@@ -101,14 +101,11 @@ function fidelity(v1, v2)
     return ip[1] ^2 + ip[2] ^2
 end
 
-
 # Define experimental constants.
 OMEGA = 2 * pi * 1.4e-2
 DOMEGA = OMEGA * 5e-2
 OMEGA_PLUS = OMEGA + DOMEGA
-OMEGA_2PLUS = OMEGA + 2 * DOMEGA
 OMEGA_MINUS = OMEGA - DOMEGA
-OMEGA_2MINUS = OMEGA - 2 * DOMEGA
 MAX_CONTROL_NORM_0 = 2 * pi * 3e-1
 
 # Define the system.
@@ -131,7 +128,7 @@ H_C1 = SIGMA_X / 2
 NEG_I_H_C1 = NEG_I * H_C1
 
 # Define the optimization.
-EVOLUTION_TIME = 160.
+EVOLUTION_TIME = 40.
 COMPLEX_CONTROLS = false
 CONTROL_COUNT = 1
 DT = 1e-2
@@ -142,11 +139,7 @@ ITERATION_COUNT = Int(1e3)
 INITIAL_STATE = SA[1., 0, 0, 0]
 STATE_SIZE, = size(INITIAL_STATE)
 INITIAL_ASTATE = [
-    INITIAL_STATE; # state (w)
-    INITIAL_STATE; # state (w + dw)
-    INITIAL_STATE; # state (w - dw)
-    # INITIAL_STATE; # state (w + 2dw)
-    # INITIAL_STATE; # state (w - 2dw)
+    INITIAL_STATE; # state
     @SVector zeros(1); # int_control
     @SVector zeros(1); # control
     @SVector zeros(1); # dcontrol_dt
@@ -155,25 +148,14 @@ ASTATE_SIZE, = size(INITIAL_ASTATE)
 TARGET_STATE = SA[0, 1., 0, 0]
 TARGET_ASTATE = [
     TARGET_STATE;
-    TARGET_STATE;
-    TARGET_STATE;
-    # TARGET_STATE;
-    # TARGET_STATE;
     @SVector zeros(1); # int_control
     @SVector zeros(1); # control
     @SVector zeros(1); # dcontrol_dt
 ]
 STATE_IDX = 1:STATE_SIZE
-STATE_PLUS_IDX = STATE_SIZE + 1:2 * STATE_SIZE
-STATE_MINUS_IDX = 2 * STATE_SIZE + 1:3 * STATE_SIZE
-STATE_2PLUS_IDX = 3 * STATE_SIZE + 1:4 * STATE_SIZE
-STATE_2MINUS_IDX = 4 * STATE_SIZE + 1:5 * STATE_SIZE
-SE = STATE_MINUS_IDX[end]
-# SE = STATE_2MINUS_IDX[end]
-INT_CONTROLS_IDX = SE + 1:SE + CONTROL_COUNT
-CONTROLS_IDX = SE + CONTROL_COUNT + 1:SE + 2 * CONTROL_COUNT
-DCONTROLS_DT_IDX = SE + 2 * CONTROL_COUNT + 1:SE + 3 * CONTROL_COUNT
-CE = DCONTROLS_DT_IDX[end]
+INT_CONTROLS_IDX = 1 * STATE_SIZE + 1:1 * STATE_SIZE + CONTROL_COUNT
+CONTROLS_IDX = 1 * STATE_SIZE + CONTROL_COUNT + 1:1 * STATE_SIZE + 2 * CONTROL_COUNT
+DCONTROLS_DT_IDX = 1 * STATE_SIZE + 2 * CONTROL_COUNT + 1:1 * STATE_SIZE + 3 * CONTROL_COUNT
 
 
 # Generate initial controls.
@@ -211,20 +193,12 @@ end
 
 function TrajectoryOptimization.dynamics(model::Model, astate, d2controls_dt2, time)
     neg_i_control_hamiltonian = astate[CONTROLS_IDX][1] * NEG_I_H_C1
-    delta_state = (OMEGA * NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_IDX]
-    delta_state_plus = (OMEGA_PLUS * NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_PLUS_IDX]
-    delta_state_minus = (OMEGA_MINUS * NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_MINUS_IDX]
-    # delta_state_2plus = (OMEGA_2PLUS * NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_2PLUS_IDX]
-    # delta_state_2minus = (OMEGA_2MINUS * NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_2MINUS_IDX]
+    delta_state = (OMEGA_NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_IDX]
     delta_int_control = astate[CONTROLS_IDX]
     delta_control = astate[DCONTROLS_DT_IDX]
     delta_dcontrol_dt = d2controls_dt2
     return [
         delta_state;
-        delta_state_plus;
-        delta_state_minus;
-        # delta_state_2plus;
-        # delta_state_2minus;
         delta_int_control;
         delta_control;
         delta_dcontrol_dt;
@@ -243,20 +217,12 @@ function run_traj()
     # control amplitude constraint
     x_max = [
         @SVector fill(Inf, STATE_SIZE);
-        @SVector fill(Inf, STATE_SIZE);
-        @SVector fill(Inf, STATE_SIZE);
-        # @SVector fill(Inf, STATE_SIZE);
-        # @SVector fill(Inf, STATE_SIZE);
         @SVector fill(Inf, 1);
         @SVector fill(MAX_CONTROL_NORM_0, 1); # control
         @SVector fill(Inf, 1);
     ]
     x_min = [
         @SVector fill(-Inf, STATE_SIZE);
-        @SVector fill(-Inf, STATE_SIZE);
-        @SVector fill(-Inf, STATE_SIZE);
-        # @SVector fill(-Inf, STATE_SIZE);
-        # @SVector fill(-Inf, STATE_SIZE);
         @SVector fill(-Inf, 1);
         @SVector fill(-MAX_CONTROL_NORM_0, 1); # control
         @SVector fill(-Inf, 1);
@@ -264,20 +230,12 @@ function run_traj()
     # controls start and end at 0
     x_max_boundary = [
         @SVector fill(Inf, STATE_SIZE);
-        @SVector fill(Inf, STATE_SIZE);
-        @SVector fill(Inf, STATE_SIZE);
-        # @SVector fill(Inf, STATE_SIZE);
-        # @SVector fill(Inf, STATE_SIZE);
         @SVector fill(Inf, 1);
         @SVector fill(0, 1); # control
         @SVector fill(Inf, 1);
     ]
     x_min_boundary = [
         @SVector fill(-Inf, STATE_SIZE);
-        @SVector fill(-Inf, STATE_SIZE);
-        @SVector fill(-Inf, STATE_SIZE);
-        # @SVector fill(-Inf, STATE_SIZE);
-        # @SVector fill(-Inf, STATE_SIZE);
         @SVector fill(-Inf, 1);
         @SVector fill(0, 1); # control
         @SVector fill(-Inf, 1);
@@ -291,11 +249,7 @@ function run_traj()
     Z = Traj(X0, U0, dt * ones(N))
 
     Q = Diagonal([
-        @SVector fill(1e-1, STATE_SIZE); # state (w)
-        @SVector fill(5e-1, STATE_SIZE); # state (w + dw)
-        @SVector fill(5e-1, STATE_SIZE); # state (w - dw)
-        # @SVector fill(1e-1, STATE_SIZE); # state (w + 2dw)
-        # @SVector fill(1e-1, STATE_SIZE); # state (w - 2dw)
+        @SVector fill(1e-1, STATE_SIZE);
         @SVector fill(1e-1, 1); # int_control
         @SVector fill(1e-1, 1); # control
         @SVector fill(1e-1, 1); # dcontrol_dt

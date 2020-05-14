@@ -21,11 +21,10 @@ WDIR = os.environ.get("ROBUST_QOC_PATH", ".")
 OUT_PATH = os.path.join(WDIR, "out")
 SAVE_PATH = os.path.join(OUT_PATH, "spin", "spin12")
 PULSE_DATA = [
-    ("spin11", "00013_spin11.h5", "vanilla"),
-    ("spin11", "00016_spin11.h5", "derivative"),
-    ("spin12", "00001_spin12.h5", "sample"),
+    ("spin12", "00005_spin12.h5", 21, "sample 2"),
+    ("spin12", "00004_spin12.h5", 13, "sample"),
 ]
-DATA_FILE_PATH = os.path.join(SAVE_PATH, "00001_spin12_hpsweep.h5")
+EXPERIMENT_NAME = "spin12_hpsweep"
 
 # Computational constants.
 SIGMA_X = np.array([[0, 1],
@@ -34,7 +33,7 @@ SIGMA_Z = np.array([[1, 0],
                     [0, -1]])
 H_S = SIGMA_Z / 2
 H_C1 = SIGMA_X / 2
-OMEGA_RAW = 2 * np.pi * 1e-2
+OMEGA_RAW = 2 * np.pi * 1.4e-2
 DOMEGA = OMEGA_RAW * 5e-2
 OMEGA_PLUS = OMEGA_RAW + DOMEGA
 OMEGA_MINUS = OMEGA_RAW - DOMEGA
@@ -61,12 +60,13 @@ def fidelity(v1, v2):
 
 
 def grab_controls(experiment_name, controls_file_name,
+                  controls_idx,
                   experiment_meta="spin"):
     save_path = os.path.join(OUT_PATH, experiment_meta, experiment_name)
     controls_file_path = os.path.join(save_path, controls_file_name)
     with h5py.File(controls_file_path, "r") as save_file:
         states = save_file["states"][()]
-        controls = states[13, 0:-1]
+        controls = states[controls_idx, 0:-1]
     #ENDWITH
     return controls
 #ENDDEF
@@ -113,7 +113,7 @@ def run_sweep(save_file_path=None):
     pulse_count = len(PULSE_DATA)
     if save_file_path is None:
         # initialize
-        save_file_path = generate_save_file_path("spin12_hpsweep", SAVE_PATH)
+        save_file_path = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
         pulse_names = np.array(list(map(np.string_, np.array(PULSE_DATA)[:, 1])))
         with h5py.File(save_file_path, "a") as save_file:
             save_file["sweep_multipliers"] = SWEEP_MULTIPLIERS
@@ -123,8 +123,8 @@ def run_sweep(save_file_path=None):
 
         # sweep
         fidelities = np.zeros((pulse_count, SWEEP_COUNT))
-        for i, (experiment_name, file_name, _) in enumerate(PULSE_DATA):
-            controls = grab_controls(experiment_name, file_name)
+        for i, (experiment_name, file_name, controls_idx, _) in enumerate(PULSE_DATA):
+            controls = grab_controls(experiment_name, file_name, controls_idx)
             for j, sweep_multiplier in enumerate(SWEEP_MULTIPLIERS):
                 fidelities[i][j] = run_spin(controls, sweep_multiplier)
             #ENDFOR
@@ -143,7 +143,7 @@ def run_sweep(save_file_path=None):
     omegas = (OMEGA_RAW + OMEGA_RAW * SWEEP_MULTIPLIERS) / (2 * np.pi)
     plt.figure()
     for i in range(pulse_count):
-        plt.scatter(omegas, fidelities[i], color=COLORS[i], label=PULSE_DATA[i][2],
+        plt.scatter(omegas, fidelities[i], color=COLORS[i], label=PULSE_DATA[i][3],
                     s=MS, alpha=ALPHA)
     #ENDFOR
     # plt.axhline(1., lw=LINE_WIDTH, alpha=LINE_ALPHA, color=LINE_COLOR)

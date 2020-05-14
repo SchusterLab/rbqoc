@@ -30,23 +30,22 @@ def fidelity(v1, v2):
     return np.real(ip) ** 2 + np.imag(ip) ** 2
 
 
-def run_spin():
+def run_spin(experiment_name, controls_file_name, controls_idx):
     # get controls
     experiment_meta = "spin"
-    experiment_name = "spin12"
     save_path = os.path.join(OUT_PATH, experiment_meta, experiment_name)
-    controls_file_path = os.path.join(save_path, "00000_spin12.h5")
+    controls_file_path = os.path.join(save_path, controls_file_name)
     with h5py.File(controls_file_path, "r") as save_file:
         # controls = save_file["controls"][0, :]
         states = save_file["states"][()]
-        controls = states[13, 0:-1]
+        controls = states[controls_idx, 0:-1]
+        evolution_time = save_file["evolution_time"][()]
         # print(save_file["Q"][()])
     #ENDWITH
     control_eval_count = controls.shape[0]
     
     # define constants
-    evolution_time = 120.
-    omega_raw = 2 * np.pi * 1e-2
+    omega_raw = 2 * np.pi * 1.4e-2
     domega = omega_raw * 5e-2
     omega = (
         omega_raw
@@ -81,11 +80,17 @@ def run_spin():
 def main():
     parser = ArgumentParser()
     parser.add_argument("--spin", action="store_true")
+    parser.add_argument("--ename", action="store", type=str)
+    parser.add_argument("--cname", action="store", type=str)
+    parser.add_argument("--cidx", action="store", type=int)
     args = vars(parser.parse_args())
     do_spin = args["spin"]
+    experiment_name = args["ename"]
+    controls_file_name = args["cname"]
+    controls_idx = args["cidx"]
     
     if do_spin:
-        run_spin()
+        run_spin(experiment_name, controls_file_name, controls_idx)
 
 
 if __name__ == "__main__":
