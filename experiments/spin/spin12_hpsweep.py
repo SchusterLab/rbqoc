@@ -3,6 +3,7 @@ spin12_hpsweep.py - hp sweep for spin11 and spin12
 """
 
 from argparse import ArgumentParser
+from enum import Enum
 import os
 
 import h5py
@@ -16,13 +17,21 @@ from qutip import (
     mesolve, Qobj,
 )
 
+class PulseType(Enum):
+    TRAJ = 0
+    QOC = 1
+#ENDDEF
+
 # Directory.
 WDIR = os.environ.get("ROBUST_QOC_PATH", ".")
 OUT_PATH = os.path.join(WDIR, "out")
 SAVE_PATH = os.path.join(OUT_PATH, "spin", "spin12")
 PULSE_DATA = [
-    ("spin12", "00005_spin12.h5", 21, "sample 2"),
-    ("spin12", "00004_spin12.h5", 13, "sample"),
+    ("spin11", "00023_spin11.h5", 13, PulseType.TRAJ, "derivative"),
+    ("spin12", "00010_spin12.h5", 13, PulseType.TRAJ, "sample"),
+    ("spin12", "00022_spin12.h5", 21, PulseType.TRAJ, "sample 2"),
+    ("spin13", "00006_spin13.h5", 5, PulseType.TRAJ, "vanilla"),
+    ("spin14", "00000_spin14.h5", 0, PulseType.QOC, "analytic"),
 ]
 EXPERIMENT_NAME = "spin12_hpsweep"
 
@@ -61,22 +70,27 @@ def fidelity(v1, v2):
 
 def grab_controls(experiment_name, controls_file_name,
                   controls_idx,
+                  pulse_type,
                   experiment_meta="spin"):
     save_path = os.path.join(OUT_PATH, experiment_meta, experiment_name)
     controls_file_path = os.path.join(save_path, controls_file_name)
     with h5py.File(controls_file_path, "r") as save_file:
-        states = save_file["states"][()]
-        controls = states[controls_idx, 0:-1]
+        if pulse_type == PulseType.TRAJ:
+            states = save_file["states"][()]
+            controls = states[controls_idx, 0:-1]
+            evolution_time = save_file["evolution_time"][()]
+        elif pulse_type == PulseType.QOC:
+            controls = save_file["controls"][controls_idx][()]
+            evolution_time = save_file["evolution_time"][()]
     #ENDWITH
-    return controls
+    return controls, evolution_time
 #ENDDEF
 
 
-def run_spin(controls, domega_multiplier):
+def run_spin(controls, domega_multiplier, evolution_time):
     control_eval_count = controls.shape[0]
     
     # define constants
-    evolution_time = 120.
     domega = OMEGA_RAW * domega_multiplier
     omega = (
         OMEGA_RAW
@@ -123,10 +137,14 @@ def run_sweep(save_file_path=None):
 
         # sweep
         fidelities = np.zeros((pulse_count, SWEEP_COUNT))
-        for i, (experiment_name, file_name, controls_idx, _) in enumerate(PULSE_DATA):
-            controls = grab_controls(experiment_name, file_name, controls_idx)
+        for i, pulse_data in enumerate(PULSE_DATA):
+            experiment_name = pulse_data[0]
+            file_name = pulse_data[1]
+            controls_idx = pulse_data[2]
+            pulse_type = pulse_data[3]
+            controls, evolution_time = grab_controls(experiment_name, file_name, controls_idx, pulse_type)
             for j, sweep_multiplier in enumerate(SWEEP_MULTIPLIERS):
-                fidelities[i][j] = run_spin(controls, sweep_multiplier)
+                fidelities[i][j] = run_spin(controls, sweep_multiplier, evolution_time)
             #ENDFOR
         #ENDFOR
         with h5py.File(save_file_path, "a") as save_file:
@@ -143,7 +161,7 @@ def run_sweep(save_file_path=None):
     omegas = (OMEGA_RAW + OMEGA_RAW * SWEEP_MULTIPLIERS) / (2 * np.pi)
     plt.figure()
     for i in range(pulse_count):
-        plt.scatter(omegas, fidelities[i], color=COLORS[i], label=PULSE_DATA[i][3],
+        plt.scatter(omegas, fidelities[i], color=COLORS[i], label=PULSE_DATA[i][4],
                     s=MS, alpha=ALPHA)
     #ENDFOR
     # plt.axhline(1., lw=LINE_WIDTH, alpha=LINE_ALPHA, color=LINE_COLOR)

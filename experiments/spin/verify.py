@@ -36,9 +36,9 @@ def run_spin(experiment_name, controls_file_name, controls_idx):
     save_path = os.path.join(OUT_PATH, experiment_meta, experiment_name)
     controls_file_path = os.path.join(save_path, controls_file_name)
     with h5py.File(controls_file_path, "r") as save_file:
-        # controls = save_file["controls"][0, :]
-        states = save_file["states"][()]
-        controls = states[controls_idx, 0:-1]
+        controls = save_file["controls"][0][()]
+        # states = save_file["states"][()]
+        # controls = states[controls_idx, 0:-1]
         evolution_time = save_file["evolution_time"][()]
         # print(save_file["Q"][()])
     #ENDWITH
@@ -49,7 +49,7 @@ def run_spin(experiment_name, controls_file_name, controls_idx):
     domega = omega_raw * 5e-2
     omega = (
         omega_raw
-        + domega
+        # + domega
     )
     initial_state = np.array([[1], [0]])
     target_state = np.array([[0], [1]])

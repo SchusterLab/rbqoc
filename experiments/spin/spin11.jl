@@ -126,7 +126,7 @@ H_C1 = SIGMA_X / 2
 NEG_I_H_C1 = NEG_I * H_C1
 
 # Define the optimization.
-EVOLUTION_TIME = 120.
+EVOLUTION_TIME = 160.
 COMPLEX_CONTROLS = false
 CONTROL_COUNT = 1
 DT = 1e-2
@@ -265,9 +265,9 @@ function run_traj()
     Z = Traj(X0, U0, dt * ones(N))
 
     Q = Diagonal([
-        @SVector fill(1e-1, STATE_SIZE);
-        @SVector fill(0., STATE_SIZE);
-        @SVector fill(0., STATE_SIZE);
+        @SVector fill(1e-1, STATE_SIZE); # state
+        @SVector fill(1e-7, STATE_SIZE); # dstate_dw
+        @SVector fill(1e-7, STATE_SIZE); # d2state_dw2
         @SVector fill(1e-1, 1); # int_control
         @SVector fill(1e-2, 1); # control
         @SVector fill(1e-2, 1); # dcontrol_dt
