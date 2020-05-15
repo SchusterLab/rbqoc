@@ -30,53 +30,10 @@ EXPERIMENT_NAME = "spin12_hpsweep"
 EXPERIMENT_META = "spin"
 
 # Data constants.
-PULSE_DATA = (
-    ("spin11", PulseType.TRAJ, 13, "derivative",
-     (
-         "00019_spin11.h5", "00020_spin11.h5",
-         "00021_spin11.h5", "00022_spin11.h5",
-         "00023_spin11.h5", "00024_spin11.h5",
-         "00025_spin11.h5", "00026_spin11.h5",
-         "00027_spin11.h5", "00028_spin11.h5",
-         "00029_spin11.h5", "00030_spin11.h5",
-         "00031_spin11.h5",
-     ),
-    ),
-    ("spin12", PulseType.TRAJ, 13, "sample",
-     (
-         "00006_spin12.h5", "00007_spin12.h5",
-         "00008_spin12.h5", "00009_spin12.h5",
-         "00010_spin12.h5", "00011_spin12.h5",
-         "00012_spin12.h5", "00013_spin12.h5",
-         "00014_spin12.h5", "00015_spin12.h5",
-         "00016_spin12.h5", "00017_spin12.h5",
-         "00018_spin12.h5",
-     ),
-    ),
-    ("spin12", PulseType.TRAJ, 21, "sample2",
-     (
-         "00019_spin12.h5", "00020_spin12.h5",
-         "00021_spin12.h5", "00022_spin12.h5",
-         "00023_spin12.h5", "00024_spin12.h5",
-         "00025_spin12.h5", "00026_spin12.h5",
-         "00027_spin12.h5", "00028_spin12.h5",
-         "00029_spin12.h5", "00030_spin12.h5",
-     ),
-    ),
-    ("spin13", PulseType.TRAJ, 5, "vanilla",
-     (
-         "00002_spin13.h5", "00003_spin13.h5",
-         "00004_spin13.h5", "00005_spin13.h5",
-         "00006_spin13.h5", "00007_spin13.h5",
-         "00008_spin13.h5", "00009_spin13.h5",
-         "00010_spin13.h5", "00011_spin13.h5",
-         "00012_spin13.h5", "00013_spin13.h5",
-         "00014_spin13.h5",
-     ),
-    ),
-)
-SPIN14_AF = 0.989004164533118
-
+PULSE_DATA = [
+    ("spin12", "00018_spin12.h5", 13, PulseType.TRAJ, "sample"),
+    ("spin12", "00027_spin12.h5", 21, PulseType.TRAJ, "sample 2"),
+]
 
 # Sweep building.
 SWEEP_COUNT = int(2e2)
@@ -276,7 +233,7 @@ def run_sweep(save_file_path=None):
     # plt.axhline(1., lw=LINE_WIDTH, alpha=LINE_ALPHA, color=LINE_COLOR)
     plt.axvline(OMEGA_PLUS / (np.pi * 2), lw=LINE_WIDTH, alpha=LINE_ALPHA, color=LINE_COLOR)
     plt.axvline(OMEGA_MINUS / (np.pi * 2), lw=LINE_WIDTH, alpha=LINE_ALPHA, color=LINE_COLOR)
-    plt.ylim(top=1., bottom=0.99)
+    plt.ylim(top=1., bottom=0.998)
     plt.ylabel("Fidelity")
     plt.xlabel("$\omega$ (GHz)")
     plt.legend()
@@ -307,3 +264,58 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+PULSE_DATA_6 = (
+    ("spin11", PulseType.TRAJ, 13, "derivative",
+     (
+         "00019_spin11.h5", "00020_spin11.h5",
+         "00021_spin11.h5", "00022_spin11.h5",
+         "00023_spin11.h5", "00024_spin11.h5",
+         "00025_spin11.h5", "00026_spin11.h5",
+         "00027_spin11.h5", "00028_spin11.h5",
+         "00029_spin11.h5", "00030_spin11.h5",
+         "00031_spin11.h5",
+     ),
+    ),
+    ("spin12", PulseType.TRAJ, 13, "sample",
+     (
+         "00006_spin12.h5", "00007_spin12.h5",
+         "00008_spin12.h5", "00009_spin12.h5",
+         "00010_spin12.h5", "00011_spin12.h5",
+         "00012_spin12.h5", "00013_spin12.h5",
+         "00014_spin12.h5", "00015_spin12.h5",
+         "00016_spin12.h5", "00017_spin12.h5",
+         "00018_spin12.h5",
+     ),
+    ),
+    ("spin12", PulseType.TRAJ, 21, "sample2",
+     (
+         "00019_spin12.h5", "00020_spin12.h5",
+         "00021_spin12.h5", "00022_spin12.h5",
+         "00023_spin12.h5", "00024_spin12.h5",
+         "00025_spin12.h5", "00026_spin12.h5",
+         "00027_spin12.h5", "00028_spin12.h5",
+         "00029_spin12.h5", "00030_spin12.h5",
+     ),
+    ),
+    ("spin13", PulseType.TRAJ, 5, "vanilla",
+     (
+         "00002_spin13.h5", "00003_spin13.h5",
+         "00004_spin13.h5", "00005_spin13.h5",
+         "00006_spin13.h5", "00007_spin13.h5",
+         "00008_spin13.h5", "00009_spin13.h5",
+         "00010_spin13.h5", "00011_spin13.h5",
+         "00012_spin13.h5", "00013_spin13.h5",
+         "00014_spin13.h5",
+     ),
+    ),
+)
+SPIN14_AF = 0.989004164533118
+
+PULSE_DATA_5 = [
+    ("spin11", "00023_spin11.h5", 13, PulseType.TRAJ, "derivative"),
+    ("spin12", "00010_spin12.h5", 13, PulseType.TRAJ, "sample"),
+    ("spin12", "00022_spin12.h5", 21, PulseType.TRAJ, "sample 2"),
+    ("spin13", "00006_spin13.h5", 5, PulseType.TRAJ, "vanilla"),
+    ("spin14", "00000_spin14.h5", 0, PulseType.QOC, "analytic"),
+]

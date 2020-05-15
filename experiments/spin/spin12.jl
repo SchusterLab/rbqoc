@@ -43,6 +43,7 @@ end
 
 
 function plot_controls(controls_file_path, save_file_path,
+                       controls_idx,
                        title=nothing)
     # Grab and prep data.
     (
@@ -70,7 +71,7 @@ function plot_controls(controls_file_path, save_file_path,
     if false
         fig = Plots.plot(control_eval_times, controls[:, 1], show=false, dpi=DPI)
     else
-        fig = Plots.plot(control_eval_times, states[1:end-1, CONTROLS_IDX], show=false, dpi=DPI,
+        fig = Plots.plot(control_eval_times, states[1:end-1, controls_idx], show=false, dpi=DPI,
                          label="controls", title=title)
         Plots.xlabel!("Time (ns)")
         Plots.ylabel!("Amplitude (GHz)")
