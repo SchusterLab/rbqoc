@@ -80,27 +80,6 @@ function plot_controls(controls_file_path, save_file_path,
 end
 
 
-"""
-inner_product - take the inner_product of two vectors over the complex isomorphism
-"""
-function inner_product(v1, v2)
-    length, = size(v1)
-    half_length = Int(length/2)
-    r = v1' * v2
-    i = (v1[1:half_length]' * v2[half_length + 1:length]
-         - v1[half_length + 1:length]' * v2[1:half_length])
-    return [r; i]
-end
-
-
-"""
-fidelity - inner product squared
-"""
-function fidelity(v1, v2)
-    ip = inner_product(v1, v2)
-    return ip[1] ^2 + ip[2] ^2
-end
-
 # Define experimental constants.
 OMEGA = 2 * pi * 1.4e-2
 DOMEGA = OMEGA * 5e-2
