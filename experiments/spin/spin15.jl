@@ -3,15 +3,17 @@ spin15.jl - vanilla w/ T1
 """
 
 using HDF5
+using LaTeXStrings
 using LinearAlgebra
-using TrajectoryOptimization
 import Plots
 using Printf
 using StaticArrays
+using TrajectoryOptimization
+
 
 # Construct paths.
 EXPERIMENT_META = "spin"
-EXPERIMENT_NAME = "spin13"
+EXPERIMENT_NAME = "spin15"
 WDIR = ENV["ROBUST_QOC_PATH"]
 SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
@@ -42,7 +44,7 @@ function generate_save_file_path(save_file_name, save_path)
 end
 
 
-function plot_controls(controls_file_path, save_file_path,
+function plot_controls(controls_file_path, save_file_path;
                        title=nothing)
     # Grab and prep data.
     (
@@ -80,18 +82,34 @@ function plot_controls(controls_file_path, save_file_path,
 end
 
 
+"""
+horner - compute the value of a polynomial using Horner's method
+
+Args:
+coeffs :: Array(N) - the coefficients in descending order of degree
+    a_{n - 1}, a_{n - 2}, ..., a_{1}, a_{0}
+val :: T - the value at which the polynomial is computed
+
+Returns:
+polyval :: T - the polynomial evaluated at val
+"""
+function horner(coeffs, val)
+    run = coeffs[1]
+    for i = 2:lastindex(coeffs)
+        run = coeffs[i] + val * run
+    end
+    return run
+end
+
+
 # Define experimental constants.
-OMEGA = 2 * pi * 1.4e-2
+# qubit frequency at flux frustration point
+OMEGA = 2 * pi * 1.4e-2 #GHz
 DOMEGA = OMEGA * 5e-2
 OMEGA_PLUS = OMEGA + DOMEGA
 OMEGA_MINUS = OMEGA - DOMEGA
 MAX_CONTROL_NORM_0 = 2 * pi * 3e-1
-# This is the state count used in the T1 calculations
-FLUXONIUM_STATE_COUNT = 8
-FLUXONIUM_LEVELS = range(start=0, stop=FLUXONIUM_STATE_COUNT,
-                         length=FLUXONIUM_STATE_COUNT)
-CREATE = diagm(1 => sqrt(FLUXONIUM_LEVELS))
-ANNIHILATE = diagm(-1 => sqrt(FLUXONIUM_LEVELS))
+MAX_T1 = 1e-2 #s
 # E / h
 EC = 0.479e9
 EL = 0.132e9
@@ -99,16 +117,30 @@ EJ = 3.395e9
 # Q_CAP = 1 / 8e-6
 Q_CAP = 1.25e5
 T_CAP = 0.042
+H = 6.62607015e-34
+HBAR = 1.05457148e-34
+KB = 1.3806503e-23
 HBAR_BY_KB = 7.63823e-12
-GAMMA_CAP_PREFACTOR = OMEGA^2 * coth(HBAR_BY_KB * OMEGA / (2 * T_CAP)) / (16 * pi * EC * Q_CAP)
-PHI_OSC = (8 * EC / EL)^(0.25)
-PHI_OP = PHI_OSC * 2^(-0.5) * (CREATE + ANNIHILATE)
-# Define the system.
+FBFQ_A = 0.202407
+FBFQ_B = 0.5
+# Sorted from highest order to lowest order.
+FBFQ_T1_COEFFS = [
+    3276.06057; -7905.24414; 8285.24137; -4939.22432;
+    1821.23488; -415.520981; 53.9684414; -3.04500484
+]
 
-function t1(flux :: Float64)
-    gamma_cap = 0
-    
+# Define the system.
+function get_fbfq(amplitude)
+    return -abs(amplitude) * FBFQ_A + FBFQ_B
 end
+
+
+function get_t1_poly(amplitude)
+    fbfq = get_fbfq(amplitude)
+    t1 = horner(FBFQ_T1_COEFFS, fbfq)
+    return t1
+end
+
 
 NEG_I = SA_F64[0   0  1  0 ;
                0   0  0  1 ;
@@ -141,23 +173,26 @@ INITIAL_STATE = SA[1., 0, 0, 0]
 STATE_SIZE, = size(INITIAL_STATE)
 INITIAL_ASTATE = [
     INITIAL_STATE; # state
-    @SVector zeros(1); # int_control
-    @SVector zeros(1); # control
-    @SVector zeros(1); # dcontrol_dt
+    @SVector zeros(CONTROL_COUNT); # int_control
+    @SVector zeros(CONTROL_COUNT); # control
+    @SVector zeros(CONTROL_COUNT); # dcontrol_dt
+    @SVector zeros(1); # int_t1
 ]
 ASTATE_SIZE, = size(INITIAL_ASTATE)
 TARGET_STATE = SA[0, 1., 0, 0]
 TARGET_ASTATE = [
     TARGET_STATE;
-    @SVector zeros(1); # int_control
-    @SVector zeros(1); # control
-    @SVector zeros(1); # dcontrol_dt
+    @SVector zeros(CONTROL_COUNT); # int_control
+    @SVector zeros(CONTROL_COUNT); # control
+    @SVector zeros(CONTROL_COUNT); # dcontrol_dt
+    @SVector [N * DT * MAX_T1]; # int_t1
 ]
 STATE_IDX = 1:STATE_SIZE
-INT_CONTROLS_IDX = 1 * STATE_SIZE + 1:1 * STATE_SIZE + CONTROL_COUNT
-CONTROLS_IDX = 1 * STATE_SIZE + CONTROL_COUNT + 1:1 * STATE_SIZE + 2 * CONTROL_COUNT
-DCONTROLS_DT_IDX = 1 * STATE_SIZE + 2 * CONTROL_COUNT + 1:1 * STATE_SIZE + 3 * CONTROL_COUNT
-
+INT_CONTROLS_IDX = STATE_IDX[end] + 1:STATE_IDX[end] + CONTROL_COUNT
+CONTROLS_IDX = INT_CONTROLS_IDX[end] + 1:INT_CONTROLS_IDX[end] + CONTROL_COUNT
+DCONTROLS_DT_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
+INT_T1_IDX = DCONTROLS_DT_IDX[end] + 1:DCONTROLS_DT_IDX[end] + 1
+    
 
 # Generate initial controls.
 GRAB_CONTROLS = false
@@ -198,11 +233,13 @@ function TrajectoryOptimization.dynamics(model::Model, astate, d2controls_dt2, t
     delta_int_control = astate[CONTROLS_IDX]
     delta_control = astate[DCONTROLS_DT_IDX]
     delta_dcontrol_dt = d2controls_dt2
+    delta_int_t1 = get_t1_poly(astate[CONTROLS_IDX][1] / (2 * pi))
     return [
         delta_state;
         delta_int_control;
         delta_control;
         delta_dcontrol_dt;
+        delta_int_t1;
     ]
 end
 
@@ -218,28 +255,32 @@ function run_traj()
     # control amplitude constraint
     x_max = [
         @SVector fill(Inf, STATE_SIZE);
-        @SVector fill(Inf, 1);
-        @SVector fill(MAX_CONTROL_NORM_0, 1); # control
-        @SVector fill(Inf, 1);
+        @SVector fill(Inf, CONTROL_COUNT);
+        @SVector fill(MAX_CONTROL_NORM_0, CONTROL_COUNT); # control
+        @SVector fill(Inf, CONTROL_COUNT);
+        @SVector fill(Inf, 1)
     ]
     x_min = [
         @SVector fill(-Inf, STATE_SIZE);
-        @SVector fill(-Inf, 1);
-        @SVector fill(-MAX_CONTROL_NORM_0, 1); # control
-        @SVector fill(-Inf, 1);
+        @SVector fill(-Inf, CONTROL_COUNT);
+        @SVector fill(-MAX_CONTROL_NORM_0, CONTROL_COUNT); # control
+        @SVector fill(-Inf, CONTROL_COUNT);
+        @SVector fill(-Inf, 1)
     ]
     # controls start and end at 0
     x_max_boundary = [
         @SVector fill(Inf, STATE_SIZE);
-        @SVector fill(Inf, 1);
-        @SVector fill(0, 1); # control
-        @SVector fill(Inf, 1);
+        @SVector fill(Inf, CONTROL_COUNT);
+        @SVector fill(0, CONTROL_COUNT); # control
+        @SVector fill(Inf, CONTROL_COUNT);
+        @SVector fill(Inf, 1)
     ]
     x_min_boundary = [
         @SVector fill(-Inf, STATE_SIZE);
-        @SVector fill(-Inf, 1);
-        @SVector fill(0, 1); # control
-        @SVector fill(-Inf, 1);
+        @SVector fill(-Inf, CONTROL_COUNT);
+        @SVector fill(0, CONTROL_COUNT); # control
+        @SVector fill(-Inf, CONTROL_COUNT);
+        @SVector fill(-Inf, 1)
     ]
 
     model = Model(n, m)
@@ -251,12 +292,13 @@ function run_traj()
 
     Q = Diagonal([
         @SVector fill(1e-1, STATE_SIZE);
-        @SVector fill(1e-1, 1); # int_control
-        @SVector fill(1e-1, 1); # control
-        @SVector fill(1e-1, 1); # dcontrol_dt
+        @SVector fill(1e-1, CONTROL_COUNT); # int_control
+        @SVector fill(0, CONTROL_COUNT); # control
+        @SVector fill(1e-1, CONTROL_COUNT); # dcontrol_dt
+        @SVector fill(1e-1, 1); # int_t1
     ])
     Qf = Q * N
-    R = Diagonal(@SVector fill(1e-1, m))
+    R = Diagonal(@SVector fill(1e-1, m)) # d2control_dt2
     obj = LQRObjective(Q, R, Qf, xf, N)
 
     # must satisfy control amplitudes
@@ -274,7 +316,7 @@ function run_traj()
     
     prob = Problem{RK4}(model, obj, constraints, x0, xf, Z, N, t0, tf)
     opts = SolverOptions(verbose=VERBOSE)
-    solver = ALTROSolver(prob, opts)
+    solver = AugmentedLagrangianSolver(prob, opts)
     solve!(solver)
 
     controls_raw = controls(solver)
@@ -302,3 +344,4 @@ function run_traj()
         end
     end
 end
+
