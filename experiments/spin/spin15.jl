@@ -161,7 +161,7 @@ H_C1 = SIGMA_X / 2
 NEG_I_H_C1 = NEG_I * H_C1
 
 # Define the optimization.
-EVOLUTION_TIME = 40.
+EVOLUTION_TIME = 60.
 COMPLEX_CONTROLS = false
 CONTROL_COUNT = 1
 DT = 1e-2
@@ -169,26 +169,31 @@ N = Int(EVOLUTION_TIME / DT) + 1
 ITERATION_COUNT = Int(1e3)
 
 # Define the problem.
-INITIAL_STATE = SA[1., 0, 0, 0]
-STATE_SIZE, = size(INITIAL_STATE)
+INITIAL_STATE_0 = SA[1., 0, 0, 0]
+INITIAL_STATE_1 = SA[0, 1., 0, 0]
+STATE_SIZE, = size(INITIAL_STATE_0)
 INITIAL_ASTATE = [
-    INITIAL_STATE; # state
+    INITIAL_STATE_0; # state_0
+    INITIAL_STATE_1;
     @SVector zeros(CONTROL_COUNT); # int_control
     @SVector zeros(CONTROL_COUNT); # control
     @SVector zeros(CONTROL_COUNT); # dcontrol_dt
     @SVector zeros(1); # int_t1
 ]
 ASTATE_SIZE, = size(INITIAL_ASTATE)
-TARGET_STATE = SA[0, 1., 0, 0]
+TARGET_STATE_0 = SA[1., 0, 0, -1.] / sqrt(2)
+TARGET_STATE_1 = SA[0, 1., -1., 0] / sqrt(2)
 TARGET_ASTATE = [
-    TARGET_STATE;
+    TARGET_STATE_0;
+    TARGET_STATE_1;
     @SVector zeros(CONTROL_COUNT); # int_control
     @SVector zeros(CONTROL_COUNT); # control
     @SVector zeros(CONTROL_COUNT); # dcontrol_dt
     @SVector [N * DT * MAX_T1]; # int_t1
 ]
-STATE_IDX = 1:STATE_SIZE
-INT_CONTROLS_IDX = STATE_IDX[end] + 1:STATE_IDX[end] + CONTROL_COUNT
+STATE_0_IDX = 1:STATE_SIZE
+STATE_1_IDX = STATE_0_IDX[end] + 1:STATE_0_IDX[end] + STATE_SIZE
+INT_CONTROLS_IDX = STATE_1_IDX[end] + 1:STATE_1_IDX[end] + CONTROL_COUNT
 CONTROLS_IDX = INT_CONTROLS_IDX[end] + 1:INT_CONTROLS_IDX[end] + CONTROL_COUNT
 DCONTROLS_DT_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
 INT_T1_IDX = DCONTROLS_DT_IDX[end] + 1:DCONTROLS_DT_IDX[end] + 1
@@ -229,13 +234,15 @@ end
 
 function TrajectoryOptimization.dynamics(model::Model, astate, d2controls_dt2, time)
     neg_i_control_hamiltonian = astate[CONTROLS_IDX][1] * NEG_I_H_C1
-    delta_state = (OMEGA_NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_IDX]
+    delta_state_0 = (OMEGA_NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_0_IDX]
+    delta_state_1 = (OMEGA_NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_1_IDX]
     delta_int_control = astate[CONTROLS_IDX]
     delta_control = astate[DCONTROLS_DT_IDX]
     delta_dcontrol_dt = d2controls_dt2
     delta_int_t1 = get_t1_poly(astate[CONTROLS_IDX][1] / (2 * pi))
     return [
-        delta_state;
+        delta_state_0;
+        delta_state_1;
         delta_int_control;
         delta_control;
         delta_dcontrol_dt;
@@ -255,12 +262,14 @@ function run_traj()
     # control amplitude constraint
     x_max = [
         @SVector fill(Inf, STATE_SIZE);
+        @SVector fill(Inf, STATE_SIZE);
         @SVector fill(Inf, CONTROL_COUNT);
         @SVector fill(MAX_CONTROL_NORM_0, CONTROL_COUNT); # control
         @SVector fill(Inf, CONTROL_COUNT);
         @SVector fill(Inf, 1)
     ]
     x_min = [
+        @SVector fill(-Inf, STATE_SIZE);
         @SVector fill(-Inf, STATE_SIZE);
         @SVector fill(-Inf, CONTROL_COUNT);
         @SVector fill(-MAX_CONTROL_NORM_0, CONTROL_COUNT); # control
@@ -270,12 +279,14 @@ function run_traj()
     # controls start and end at 0
     x_max_boundary = [
         @SVector fill(Inf, STATE_SIZE);
+        @SVector fill(Inf, STATE_SIZE);
         @SVector fill(Inf, CONTROL_COUNT);
         @SVector fill(0, CONTROL_COUNT); # control
         @SVector fill(Inf, CONTROL_COUNT);
         @SVector fill(Inf, 1)
     ]
     x_min_boundary = [
+        @SVector fill(-Inf, STATE_SIZE);
         @SVector fill(-Inf, STATE_SIZE);
         @SVector fill(-Inf, CONTROL_COUNT);
         @SVector fill(0, CONTROL_COUNT); # control
@@ -292,10 +303,11 @@ function run_traj()
 
     Q = Diagonal([
         @SVector fill(1e-1, STATE_SIZE);
+        @SVector fill(1e-1, STATE_SIZE);
         @SVector fill(1e-1, CONTROL_COUNT); # int_control
         @SVector fill(0, CONTROL_COUNT); # control
         @SVector fill(1e-1, CONTROL_COUNT); # dcontrol_dt
-        @SVector fill(1e-1, 1); # int_t1
+        @SVector fill(0, 1); # int_t1
     ])
     Qf = Q * N
     R = Diagonal(@SVector fill(1e-1, m)) # d2control_dt2
@@ -306,7 +318,7 @@ function run_traj()
     # must statisfy conrols start and stop at 0
     control_bnd_boundary = BoundConstraint(n, m, x_max=x_max_boundary, x_min=x_min_boundary)
     # must reach target state, must have zero net flux
-    target_astate_constraint = GoalConstraint(xf, [STATE_IDX;INT_CONTROLS_IDX])
+    target_astate_constraint = GoalConstraint(xf, [STATE_0_IDX; STATE_1_IDX; INT_CONTROLS_IDX])
     
     constraints = ConstraintSet(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)

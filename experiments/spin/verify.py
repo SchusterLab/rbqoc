@@ -3,6 +3,7 @@ verify.py - Quitp verification.
 """
 
 from argparse import ArgumentParser
+from functools import reduce
 import os
 
 import h5py
@@ -12,20 +13,35 @@ from qutip import (
     mesolve, Qobj,
 )
 
-# Directory.
+# paths
 WDIR = os.environ.get("ROBUST_QOC_PATH", ".")
 OUT_PATH = os.path.join(WDIR, "out")
 
-# Computational constants.
+# defs
+matmuls = lambda *mats: reduce(np.matmul, mats)
+
+# computational constants
+OMEGA = 2 * np.pi * 1.4e-2
+INV_ROOT_2 = 2 ** (-1/2)
+
 SIGMA_X = np.array([[0, 1],
                     [1, 0]])
 SIGMA_Z = np.array([[1, 0],
                     [0, -1]])
 H_S = SIGMA_Z / 2
 H_C1 = SIGMA_X / 2
+XPIBY2 = np.array([[1.,  -1j],
+                   [-1.j, 1.]]) * INV_ROOT_2
+YPIBY2 = np.array([[1., -1.],
+                   [1.,  1.]]) * INV_ROOT_2
+NEG_YPIBY2 = np.array([[1., 1.],
+                       [-1., 1.]]) * INV_ROOT_2
+ZPIBY2 = np.array([[1. - 1.j, 0],
+                   [0,        1. + 1.j]]) * INV_ROOT_2
+INITIAL_STATE = np.array([[1], [0]])
+TARGET_STATE = np.matmul(XPIBY2, INITIAL_STATE)
 
-
-def fidelity(v1, v2):
+def fidelity_vec(v1, v2):
     ip = np.matmul(conjugate_transpose(v1), v2)[0, 0]
     return np.real(ip) ** 2 + np.imag(ip) ** 2
 
@@ -36,23 +52,16 @@ def run_spin(experiment_name, controls_file_name, controls_idx):
     save_path = os.path.join(OUT_PATH, experiment_meta, experiment_name)
     controls_file_path = os.path.join(save_path, controls_file_name)
     with h5py.File(controls_file_path, "r") as save_file:
-        # controls = save_file["controls"][0][()]
-        states = save_file["states"][()]
-        controls = states[controls_idx, 0:-1]
+        controls = -save_file["controls"][()]
+        # states = save_file["states"][()]
+        # controls = states[controls_idx, 0:-1]
         evolution_time = save_file["evolution_time"][()]
         # print(save_file["Q"][()])
     #ENDWITH
     control_eval_count = controls.shape[0]
     
     # define constants
-    omega_raw = 2 * np.pi * 1.4e-2
-    domega = omega_raw * 5e-2
-    omega = (
-        omega_raw
-        + 2 * domega
-    )
-    initial_state = np.array([[1], [0]])
-    target_state = np.array([[0], [1]])
+    omega = OMEGA
 
     # build simulation
     h_sys = Qobj(omega * H_S)
@@ -61,7 +70,7 @@ def run_spin(experiment_name, controls_file_name, controls_idx):
         [h_sys, np.ones(control_eval_count)],
         [h_c1, controls]
     ]
-    rho0 = Qobj(initial_state)
+    rho0 = Qobj(INITIAL_STATE)
     tlist = np.linspace(0, evolution_time, control_eval_count)
 
     # run simulation
@@ -69,11 +78,11 @@ def run_spin(experiment_name, controls_file_name, controls_idx):
 
     # analysis
     final_state = result.states[-1].full()
-    fidelity_ = fidelity(final_state, target_state)
+    fidelity_ = fidelity_vec(final_state, TARGET_STATE)
 
     # log
-    print("fidelity:\n{}\nfinal_state:\n{}"
-          "".format(fidelity_, final_state))
+    print("fidelity:\n{}\nfinal_state:\n{}\ntarget_state:\n{}"
+          "".format(fidelity_, final_state, TARGET_STATE))
 #ENDDEF
 
     
