@@ -361,7 +361,7 @@ def run_all():
 
 
 def safe_log(arr):
-    return np.where(arr, np.log10(arr), arr)
+    return np.where(arr, np.log(arr), arr)
 #ENDDEF
 
 
@@ -373,27 +373,27 @@ def plot():
 
     # extract fidelity arrays
     with h5py.File(ZPIBY2_DATA_FILE_PATH) as save_file:
-        zpiby2_analytic_fidelities = save_file["analytic_fidelities"][:ZPIBY2_GATE_COUNT]
-        zpiby2_vanilla_fidelities = save_file["vanilla_fidelities"][:ZPIBY2_GATE_COUNT]
-        zpiby2_vanillat1_fidelities = save_file["vanillat1_fidelities"][:ZPIBY2_GATE_COUNT]
-        zpiby2_vanillat1_alt_fidelities = save_file["vanillat1_alt_fidelities"][:ZPIBY2_GATE_COUNT]
+        zpiby2_analytic_fidelities = safe_log(save_file["analytic_fidelities"][:ZPIBY2_GATE_COUNT])
+        zpiby2_vanilla_fidelities = safe_log(save_file["vanilla_fidelities"][:ZPIBY2_GATE_COUNT])
+        zpiby2_vanillat1_fidelities = safe_log(save_file["vanillat1_fidelities"][:ZPIBY2_GATE_COUNT])
+        zpiby2_vanillat1_alt_fidelities = safe_log(save_file["vanillat1_alt_fidelities"][:ZPIBY2_GATE_COUNT])
     #ENDWITH
     with h5py.File(YPIBY2_DATA_FILE_PATH) as save_file:
-        ypiby2_analytic_fidelities = save_file["analytic_fidelities"][:YPIBY2_GATE_COUNT]
-        ypiby2_vanilla_fidelities = save_file["vanilla_fidelities"][:YPIBY2_GATE_COUNT]
-        ypiby2_vanillat1_fidelities = save_file["vanillat1_fidelities"][:YPIBY2_GATE_COUNT]
+        ypiby2_analytic_fidelities = safe_log(save_file["analytic_fidelities"][:YPIBY2_GATE_COUNT])
+        ypiby2_vanilla_fidelities = safe_log(save_file["vanilla_fidelities"][:YPIBY2_GATE_COUNT])
+        ypiby2_vanillat1_fidelities = safe_log(save_file["vanillat1_fidelities"][:YPIBY2_GATE_COUNT])
     #ENDWITH
     with h5py.File(XPIBY2_DATA_FILE_PATH) as save_file:
-        xpiby2_analytic_fidelities = save_file["analytic_fidelities"][:XPIBY2_GATE_COUNT]
-        xpiby2_vanilla_fidelities = save_file["vanilla_fidelities"][:XPIBY2_GATE_COUNT]
-        xpiby2_vanillat1_fidelities = save_file["vanillat1_fidelities"][:XPIBY2_GATE_COUNT]
+        xpiby2_analytic_fidelities = safe_log(save_file["analytic_fidelities"][:XPIBY2_GATE_COUNT])
+        xpiby2_vanilla_fidelities = safe_log(save_file["vanilla_fidelities"][:XPIBY2_GATE_COUNT])
+        xpiby2_vanillat1_fidelities = safe_log(save_file["vanillat1_fidelities"][:XPIBY2_GATE_COUNT])
     #ENDWITH
 
     # extract time arrays
-    xpiby2_times = safe_log(np.arange(0, XPIBY2_GATE_COUNT, 1) * XPIBY2_TIME)
-    ypiby2_times = safe_log(np.arange(0, YPIBY2_GATE_COUNT, 1) * YPIBY2_TIME)
-    zpiby2_times = safe_log(np.arange(0, ZPIBY2_GATE_COUNT, 1) * ZPIBY2_TIME)
-    zpiby2_times_alt = safe_log(np.arange(0, ZPIBY2_GATE_COUNT, 1) * ZPIBY2_TIME_ALT)
+    xpiby2_times = np.arange(0, XPIBY2_GATE_COUNT, 1) * XPIBY2_TIME
+    ypiby2_times = np.arange(0, YPIBY2_GATE_COUNT, 1) * YPIBY2_TIME
+    zpiby2_times = np.arange(0, ZPIBY2_GATE_COUNT, 1) * ZPIBY2_TIME
+    zpiby2_times_alt = np.arange(0, ZPIBY2_GATE_COUNT, 1) * ZPIBY2_TIME_ALT
     
 
     # plot
@@ -431,7 +431,7 @@ def plot():
         title = "X/2 T1 Relaxation"
     
     plt.legend()
-    plt.ylabel("Fidelity")
+    plt.ylabel("log Fidelity")
     plt.xlabel("Time (ns)")
     # plt.ylim(0, 1)
     plt.xlim(0)
