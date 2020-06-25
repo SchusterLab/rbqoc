@@ -8,6 +8,7 @@ using LinearAlgebra
 import Plots
 using Printf
 using StaticArrays
+using Statistics
 using TrajectoryOptimization
 
 
@@ -82,6 +83,31 @@ function plot_controls(controls_file_path, save_file_path;
 end
 
 
+function t1_average(controls_file_path)
+    # Grab and prep data.
+    (
+        controls_,
+        evolution_time,
+        states,
+    ) = h5open(controls_file_path, "r+") do save_file
+        controls_ = read(save_file, "controls")
+        evolution_time = read(save_file, "evolution_time")
+        states = read(save_file, "states")
+        return (
+            controls_,
+            evolution_time,
+            states
+        )
+    end
+    (control_eval_count, control_count) = size(controls_)
+    control_eval_times = Array(0:1:control_eval_count) * DT
+    controls = states[1:end, CONTROLS_IDX]
+    t1s = map(get_t1_poly, controls / (2 * pi))
+    t1_avg = mean(t1s)
+    return t1_avg
+end
+
+
 """
 horner - compute the value of a polynomial using Horner's method
 
@@ -124,6 +150,7 @@ HBAR_BY_KB = 7.63823e-12
 FBFQ_A = 0.202407
 FBFQ_B = 0.5
 # Sorted from highest order to lowest order.
+# Coefficients are in units of seconds.
 FBFQ_T1_COEFFS = [
     3276.06057; -7905.24414; 8285.24137; -4939.22432;
     1821.23488; -415.520981; 53.9684414; -3.04500484
@@ -161,16 +188,17 @@ H_C1 = SIGMA_X / 2
 NEG_I_H_C1 = NEG_I * H_C1
 
 # Define the optimization.
-EVOLUTION_TIME = 60.
+EVOLUTION_TIME = 19.47
 COMPLEX_CONTROLS = false
 CONTROL_COUNT = 1
 DT = 1e-2
-N = Int(EVOLUTION_TIME / DT) + 1
+DT_INV = 1e2
+N = Int(EVOLUTION_TIME * DT_INV) + 1
 ITERATION_COUNT = Int(1e3)
 
 # Define the problem.
 INITIAL_STATE_0 = SA[1., 0, 0, 0]
-INITIAL_STATE_1 = SA[0, 1., 0, 0]
+INITIAL_STATE_1 = SA[0., 1, 0, 0]
 STATE_SIZE, = size(INITIAL_STATE_0)
 INITIAL_ASTATE = [
     INITIAL_STATE_0; # state_0
@@ -181,8 +209,8 @@ INITIAL_ASTATE = [
     @SVector zeros(1); # int_t1
 ]
 ASTATE_SIZE, = size(INITIAL_ASTATE)
-TARGET_STATE_0 = SA[1., 0, 0, -1.] / sqrt(2)
-TARGET_STATE_1 = SA[0, 1., -1., 0] / sqrt(2)
+TARGET_STATE_0 = SA[1., 1, 0, 0] / sqrt(2)
+TARGET_STATE_1 = SA[-1., 1, 0, 0] / sqrt(2)
 TARGET_ASTATE = [
     TARGET_STATE_0;
     TARGET_STATE_1;

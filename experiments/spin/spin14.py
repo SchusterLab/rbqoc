@@ -47,6 +47,7 @@ H_C1 = SIGMA_X / 2
 
 AMP_0 = 2 * np.pi * 1.25e-1
 DT = 1e-2
+DT_INV = 1e2
 T_ZPI = 35.714285714285715
 
 # XPI pulse parameters
@@ -164,6 +165,14 @@ def gen_controls_ypiby2(t, shape=Shape.TRIANGLE):
         else:
             c1 = 2 * amp / T_XZ_YPIBY2 * (t - T4_YPIBY2) - amp
         #ENDIF
+    elif shape == Shape.SQUARE:
+        amp = AMP_0
+        if t <= T2_YPIBY2:
+            c1 = amp
+        elif t <= T3_YPIBY2:
+            c1 = 0
+        else:
+            c1 = -amp
     #ENDIF
 
     return [c1]
@@ -173,9 +182,10 @@ def gen_controls_ypiby2(t, shape=Shape.TRIANGLE):
 def save_controls_ypiby2():
     # generate
     shape = Shape.TRIANGLE
-    control_eval_times = np.linspace(0, T_TOT_YPIBY2, N_TOT_YPIBY2)
+    evolution_time = np.round(T_TOT_YPIBY2, 2)
+    control_eval_count = int(evolution_time * DT_INV)
+    control_eval_times = np.arange(0, control_eval_count, 1) * DT
     controls = np.array([gen_controls_ypiby2(t, shape=shape) for t in control_eval_times])
-    evolution_time = controls.shape[0] * DT
 
     # save
     save_file_path = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
@@ -198,15 +208,10 @@ def save_controls_ypiby2():
     plt.savefig(plot_file_path, dpi=DPI)
 #ENDDEF
 
-
-T_TOT_ZPIBY2 = 17.85714285714286
-N_TOT_ZPIBY2 = int(T_TOT_ZPIBY2 / DT)
-
     
 def main():
     # save_controls_xpi()
     save_controls_ypiby2()
-    # save_controls_zpiby2()
 
 
 if __name__ == "__main__":

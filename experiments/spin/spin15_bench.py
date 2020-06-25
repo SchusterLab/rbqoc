@@ -8,6 +8,7 @@ from enum import Enum
 import os
 
 import h5py
+import matplotlib.pyplot as plt
 import numpy as np
 from qoc.standard import (
     conjugate_transpose, generate_save_file_path,
@@ -27,6 +28,18 @@ SAVE_PATH = os.path.join(META_PATH, EXPERIMENT_NAME)
 # comp. onstants
 OMEGA = 2 * np.pi * 1.4e-2
 INV_ROOT_2 = 2 ** (-1/2)
+DT = 1e-2
+DT_INV = 1e2
+CONTROL_COUNT = 1
+CONTROLS_ZERO = np.zeros((1, CONTROL_COUNT))
+FBFQ_A = 0.202407
+FBFQ_B = 0.5
+# Sorted from highest order to lowest order.
+# These coeffecients are in units of s.
+FBFQ_T1_COEFFS = np.array([
+    3276.06057, -7905.24414, 8285.24137, -4939.22432,
+    1821.23488, -415.520981, 53.9684414, -3.04500484
+]) * 1e5
 
 INITIAL_STATE = np.array([[1.], [0.]])
 INITIAL_DENSITY = np.matmul(INITIAL_STATE, conjugate_transpose(INITIAL_STATE))
@@ -42,82 +55,159 @@ YPIBY2 = np.array([[1., -1.],
                    [1.,  1.]]) * INV_ROOT_2
 ZPIBY2 = np.array([[1. - 1.j, 0],
                    [0,        1. + 1.j]]) * INV_ROOT_2
+C_G_TO_E = np.array([[0., 1.],
+                     [0., 0.]])
+C_E_TO_G = np.array([[0., 0.],
+                     [1., 0.]])
 
 # data constants
 PULSE_DATA = {
+    # "vanillat1_alt": {
+    #   "zpiby2": {
+    #       "experiment_name": "spin15",
+    #       "controls_file_name": "00008_spin15.h5"
+    #   }  
+    # },
     "vanillat1": {
-        "xpiby2": {
-            "experiment_name": "spin15",
-            "controls_file_name": "00010_spin15.h5"
-        },
-        "ypiby2": {
-            "experiment_name": "spin15",
-            "controls_file_name": "00006_spin15.h5"
-        },
-        "zpiby2": {
-            "experiment_name": "spin15",
-            "controls_file_name": "00008_spin15.h5"
-        },
-    },
-    "vanilla": {
         "xpiby2": {
             "experiment_name": "spin15",
             "controls_file_name": "00011_spin15.h5"
         },
         "ypiby2": {
             "experiment_name": "spin15",
-            "controls_file_name": "00007_spin15.h5"
+            "controls_file_name": "00015_spin15.h5"
         },
         "zpiby2": {
             "experiment_name": "spin15",
-            "controls_file_name": "00009_spin15.h5"
+            "controls_file_name": "00014_spin15.h5"
+        },
+    },
+    "vanilla": {
+        "xpiby2": {
+            "experiment_name": "spin15",
+            "controls_file_name": "00012_spin15.h5"
+        },
+        "ypiby2": {
+            "experiment_name": "spin15",
+            "controls_file_name": "00016_spin15.h5"
+        },
+        "zpiby2": {
+            "experiment_name": "spin15",
+            "controls_file_name": "00013_spin15.h5"
         },
     },
     "analytic": {
         "xpiby2": {
             "experiment_name": "spin14",
-            "controls_file_name": "00004_spin14.h5"
+            "controls_file_name": "00002_spin14.h5"
         },
         "ypiby2": {
             "experiment_name": "spin14",
-            "controls_file_name": "00002_spin14.h5"
+            "controls_file_name": "00001_spin14.h5"
         },
         "zpiby2": {
             "experiment_name": "spin14",
-            "controls_file_name": "00003_spin14.h5"
+            "controls_file_name": "00000_spin14.h5"
         },
     }
 }
 
+ZPIBY2_DATA_FILE_PATH = os.path.join(SAVE_PATH, "00004_spin15_bench.h5")
+ZPIBY2_PLOT_FILE_PATH = os.path.join(SAVE_PATH, "00004_spin15_bench.png")
+YPIBY2_DATA_FILE_PATH = os.path.join(SAVE_PATH, "00005_spin15_bench.h5")
+YPIBY2_PLOT_FILE_PATH = os.path.join(SAVE_PATH, "00005_spin15_bench.png")
+XPIBY2_DATA_FILE_PATH = os.path.join(SAVE_PATH, "00006_spin15_bench.h5")
+XPIBY2_PLOT_FILE_PATH = os.path.join(SAVE_PATH, "00006_spin15_bench.png")
+
 
 # misc constants
 SEED = 0
-GATE_COUNT = 1000
+GATE_COUNT = 1
+CONTROLS_IDX = 9
+DPI = 700
+ZPIBY2_TIME = 17.86
+ZPIBY2_TIME_ALT = 20.0
+YPIBY2_TIME = 19.47
+XPIBY2_TIME = 56.80
+ZPIBY2_GATE_COUNT = 300
+YPIBY2_GATE_COUNT = 300
+XPIBY2_GATE_COUNT = 100
+
+
+COLORS = [
+    "yellow", "pink", "orange",
+    "blue", "green", "purple",
+    "black", "grey", "brown",
+    "red"
+]
 
 
 class GateType(Enum):
-    XPIBY2 = 0
+    ZPIBY2 = 0
     YPIBY2 = 1
-    ZPIBY2 = 2
+    XPIBY2 = 2
 #ENDDEF
 
 
-def fidelity_vec(v1, v2):
-    ip = np.matmul(conjugate_transpose(v1), v2)[0, 0]
-    return np.real(ip) ** 2 + np.imag(ip) ** 2
+def horner(coeffs, val):
+    run = coeffs[0]
+    for i in range(1, coeffs.shape[0]):
+        run = coeffs[i] + val * run
+    #ENDFOR
+    return run
+#ENDDEF
+
+
+def get_fbfq(amplitude):
+    return -abs(amplitude) * FBFQ_A + FBFQ_B
+#ENDDEF
+
+
+def get_t1_poly(amplitude):
+    fbfq = get_fbfq(amplitude)
+    t1 = horner(FBFQ_T1_COEFFS, fbfq)
+    return t1
+#ENDDEF
+
+
+def rms_norm(x1, x2):
+    diff = x1 - x2
+    return np.sqrt(np.sum(np.real(diff * np.conjugate(diff))) / np.prod(x1.shape))
+#ENDDEF
 
 
 def fidelity_mat(m1, m2):
-    ip = np.matmul(conjugate_transpose(m1), m2)[0, 0]
-    return np.real(ip) ** 2 + np.imag(ip) ** 2
+    ip = np.trace(np.matmul(conjugate_transpose(m1), m2))
+    fidelity_ = np.real(ip) ** 2 + np.imag(ip) ** 2
+    ip_self = np.trace(np.matmul(conjugate_transpose(m2), m2))
+    fidelity_self = np.real(ip_self) ** 2 + np.imag(ip_self) ** 2
+    # print("fidelity_: {}, fidelity_self: {}, f/f_self: {}"
+    #       "".format(fidelity_, fidelity_self, fidelity_/fidelity_self))
+
+    return fidelity_ / fidelity_self
+#ENDDEF
 
 
-def run_sim(class_data, gate_sequence):
+def t1_average(experiment_name, controls_file_name):
+    save_file_path = os.path.join(META_PATH, experiment_name, controls_file_name)
+    with h5py.File(save_file_path) as save_file:
+        controls = save_file["controls"][()]
+    #ENDWITH
+    t1s = get_t1_poly(controls / (2 * np.pi))
+    t1_average = np.mean(t1s)
+    return t1_average
+#ENDDEF
+
+
+def run_sim(class_key, pulse_data, gate_sequence):
+    class_data = pulse_data[class_key]
+    
     # build controls and matrices from gate sequence
     gate_count = gate_sequence.shape[0]
     controls_list = list()
     running_state = INITIAL_STATE
     running_time = 0.
+    running_ccount = 0
     state_array = np.zeros((gate_count, 2, 1), dtype=np.complex128)
     time_array = np.zeros(gate_count, dtype=np.float64)
     for i, gate_id in enumerate(gate_sequence):
@@ -133,11 +223,16 @@ def run_sim(class_data, gate_sequence):
             controls_list.append(class_data["zpiby2"]["controls"])
             running_time = running_time + class_data["zpiby2"]["evolution_time"]
             running_state = np.matmul(ZPIBY2, running_state)
-        #ENDIF
         state_array[i] = running_state
         time_array[i] = running_time
+        # running_ccount = running_ccount + controls_list[-1].shape[0]
+        # print("rt: {}, rc: {}"
+        #       "".format(running_time, running_ccount))
     #ENDFOR
     controls = np.concatenate(controls_list)
+    # extrude to match tlist shape
+    # if class_key == "vanillat1" or class_key == "vanilla":
+    #     controls = np.vstack((controls, CONTROLS_ZERO))
     
     # build simulation
     control_eval_count = controls.shape[0]
@@ -150,8 +245,19 @@ def run_sim(class_data, gate_sequence):
         [h_c1, controls[:, 0]]
     ]
     rho0 = Qobj(INITIAL_DENSITY)
-    tlist = np.linspace(0, evolution_time, control_eval_count)
-    c_ops = []
+    tlist = np.arange(0, control_eval_count, 1) * DT
+    t1_array = get_t1_poly(controls[:, 0] / (2 * np.pi))
+    gamma_t1_array = t1_array ** -1
+    # print("t1_array:\n{}\ngamma_t1_array:\n{}"
+    #       "".format(t1_array, gamma_t1_array))
+    # print("time_array:\n{}\ntlist:\n{}"
+    #       "".format(time_array, tlist))
+    # print("controls:\n{}\nt1:\n{}"
+    #       "".format(controls[:50], t1_array[:50]))
+    c_ops = [
+        [Qobj(C_G_TO_E), gamma_t1_array],
+        [Qobj(C_E_TO_G), gamma_t1_array],
+    ]
     e_ops = []
 
     # run simulation
@@ -162,19 +268,27 @@ def run_sim(class_data, gate_sequence):
     fidelity_array = np.zeros(time_array.shape[0])
     j = 0
     for i, t in enumerate(tlist):
-        if t == time_array[j]:
+        if np.round(t, 2) == np.round(time_array[j], 2):
             density = densities[i].full()
             target_state = state_array[j]
             target_density = np.matmul(target_state, conjugate_transpose(target_state))
-            fidelity_ = fidelity_mat(density, target_density)
-            print("tlist[{}]: {}, time_array[{}]: {}\n"
-                  "density:\n{}\ntarget_density:\n{}\nfidelity: {}"
-                  "".format(i, t, j, time_array[j],
-                            density, target_density, fidelity_))
-            fidelity_array[j] = fidelity_
+            fidelity_array[j] = fidelity_mat(density, target_density)
+            # fidelity_array[j] = 1 - rms_norm(density, target_density)
+            # print("tlist[{}]: {}, time_array[{}]: {}, fidelity: {}"
+            #       "".format(i, t, j, time_array[j], fidelity_array[j]))
+            # print("density:\n{}\ntarget_density:\n{}"
+            #       "".format(density, target_density))
+            # print("np.round(tlist[{}], 2): {}, np.round(time_array[{}], 2): {}"
+            #       "".format(i, t, j, time_array[j]))
             j = j + 1
         #ENDIF
     #ENDFOR
+
+    # do last check, which is missed
+    density = densities[-1].full()
+    target_state = state_array[-1]
+    target_density = np.matmul(target_state, conjugate_transpose(target_state))
+    fidelity_array[-1] = fidelity_mat(density, target_density)
     
     return fidelity_array
 #ENDDEF
@@ -186,7 +300,8 @@ def run_all():
     # np.random.seed(SEED)
     # gate_sequence = np.random.randint(GateType.XPIBY2.value,
     #                                   GateType.ZPIBY2.value + 1, GATE_COUNT)
-    gate_sequence = np.array([1])
+
+    gate_sequence = np.repeat(0, 300)
     
     # # perform initial save
     # save_file_path = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
@@ -203,9 +318,12 @@ def run_all():
     #         #ENDFOR
     #     #ENDFOR
     # #ENDWITH
-    
+
+    save_file_path = os.path.join(SAVE_PATH, "00004_spin15_bench.h5")    
     # grab controls
     for class_key in pulse_data.keys():
+        # if class_key != "vanillat1_alt":
+        #     continue
         for gate_key in pulse_data[class_key].keys():
             gate_dict = pulse_data[class_key][gate_key]
             controls_save_file_path = os.path.join(
@@ -213,25 +331,127 @@ def run_all():
             )
             with h5py.File(controls_save_file_path, "r") as save_file:
                 gate_dict["evolution_time"] = save_file["evolution_time"][()]
-                gate_dict["controls"] = save_file["controls"][()]
+                if class_key == "analytic":
+                    gate_dict["controls"] = save_file["controls"][()]
+                if (class_key == "vanillat1" or class_key == "vanilla"
+                    or class_key == "vanillat1_alt"):
+                    controls = save_file["states"][CONTROLS_IDX, 0:-1]
+                    controls = np.reshape(controls, (controls.shape[0], 1))
+                    gate_dict["controls"] = controls
             #ENDWITH
         #ENDFOR
     #ENDFOR
 
-    fidelity_array = run_sim(pulse_data["analytic"], gate_sequence)
+    fidelity_array = run_sim("analytic", pulse_data, gate_sequence)
+    print(fidelity_array)
 
     # # run sim
     # for class_key in pulse_data.keys():
-    #     fidelity_array = run_sim(pulse_data[class_key], gate_sequence)
+    #     # if class_key != "vanillat1_alt":
+    #     #     continue
+    #     fidelity_array = run_sim(class_key, pulse_data, gate_sequence)
     #     with h5py.File(save_file_path, "a") as save_file:
     #         save_file["{}_fidelities".format(class_key)] = fidelity_array
     #     #ENDWITH
     # #ENDFOR
+
+    # print("Saved bench to {}"
+    #       "".format(save_file_path))
+#ENDDEF
+
+
+def safe_log(arr):
+    return np.where(arr, np.log10(arr), arr)
+#ENDDEF
+
+
+def plot():
+    class_keys = PULSE_DATA.keys()
+    zpiby2 = False
+    ypiby2 = False
+    xpiby2 = True
+
+    # extract fidelity arrays
+    with h5py.File(ZPIBY2_DATA_FILE_PATH) as save_file:
+        zpiby2_analytic_fidelities = save_file["analytic_fidelities"][:ZPIBY2_GATE_COUNT]
+        zpiby2_vanilla_fidelities = save_file["vanilla_fidelities"][:ZPIBY2_GATE_COUNT]
+        zpiby2_vanillat1_fidelities = save_file["vanillat1_fidelities"][:ZPIBY2_GATE_COUNT]
+        zpiby2_vanillat1_alt_fidelities = save_file["vanillat1_alt_fidelities"][:ZPIBY2_GATE_COUNT]
+    #ENDWITH
+    with h5py.File(YPIBY2_DATA_FILE_PATH) as save_file:
+        ypiby2_analytic_fidelities = save_file["analytic_fidelities"][:YPIBY2_GATE_COUNT]
+        ypiby2_vanilla_fidelities = save_file["vanilla_fidelities"][:YPIBY2_GATE_COUNT]
+        ypiby2_vanillat1_fidelities = save_file["vanillat1_fidelities"][:YPIBY2_GATE_COUNT]
+    #ENDWITH
+    with h5py.File(XPIBY2_DATA_FILE_PATH) as save_file:
+        xpiby2_analytic_fidelities = save_file["analytic_fidelities"][:XPIBY2_GATE_COUNT]
+        xpiby2_vanilla_fidelities = save_file["vanilla_fidelities"][:XPIBY2_GATE_COUNT]
+        xpiby2_vanillat1_fidelities = save_file["vanillat1_fidelities"][:XPIBY2_GATE_COUNT]
+    #ENDWITH
+
+    # extract time arrays
+    xpiby2_times = safe_log(np.arange(0, XPIBY2_GATE_COUNT, 1) * XPIBY2_TIME)
+    ypiby2_times = safe_log(np.arange(0, YPIBY2_GATE_COUNT, 1) * YPIBY2_TIME)
+    zpiby2_times = safe_log(np.arange(0, ZPIBY2_GATE_COUNT, 1) * ZPIBY2_TIME)
+    zpiby2_times_alt = safe_log(np.arange(0, ZPIBY2_GATE_COUNT, 1) * ZPIBY2_TIME_ALT)
+    
+
+    # plot
+    fig = plt.figure()
+
+    if zpiby2:
+        plt.plot(zpiby2_times, zpiby2_analytic_fidelities,
+                 label="$Z/2$ Analytic", color=COLORS[0])
+        plt.plot(zpiby2_times, zpiby2_vanilla_fidelities,
+                 label="$Z/2$ Vanilla", color=COLORS[1])
+        plt.plot(zpiby2_times, zpiby2_vanillat1_fidelities,
+                 label="$Z/2$ T1 Sense", color=COLORS[2])
+        plt.plot(zpiby2_times_alt, zpiby2_vanillat1_alt_fidelities,
+                 label="$Z/2$ T1 Sense Alt", color=COLORS[9])
+        plot_save_file_path = ZPIBY2_PLOT_FILE_PATH
+        title = "Z/2 T1 Relaxation"
+    if ypiby2:
+        plt.plot(ypiby2_times, ypiby2_analytic_fidelities,
+                 label="$Y/2$ Analytic", color=COLORS[3])
+        plt.plot(ypiby2_times, ypiby2_vanilla_fidelities,
+                 label="$Y/2$ Vanilla", color=COLORS[4])
+        plt.plot(ypiby2_times, ypiby2_vanillat1_fidelities,
+                 label="$Y/2$ T1 Sense", color=COLORS[5])
+        plot_save_file_path = YPIBY2_PLOT_FILE_PATH
+        title = "Y/2 T1 Relaxation"
+
+    if xpiby2:
+        plt.plot(xpiby2_times, xpiby2_analytic_fidelities,
+                 label="$X/2$ Analytic", color=COLORS[6])
+        plt.plot(xpiby2_times, xpiby2_vanilla_fidelities,
+                 label="$X/2$ Vanilla", color=COLORS[7])
+        plt.plot(xpiby2_times, xpiby2_vanillat1_fidelities,
+                 label="$X/2$ T1 Sense", color=COLORS[8])
+        plot_save_file_path = XPIBY2_PLOT_FILE_PATH
+        title = "X/2 T1 Relaxation"
+    
+    plt.legend()
+    plt.ylabel("Fidelity")
+    plt.xlabel("Time (ns)")
+    # plt.ylim(0, 1)
+    plt.xlim(0)
+    plt.title(title)
+    plt.savefig(plot_save_file_path, dpi=DPI)
 #ENDDEF
 
     
 def main():
-    run_all()
+    parser = ArgumentParser()
+    parser.add_argument("--run", action="store_true")
+    parser.add_argument("--plot", action="store_true")
+    args = vars(parser.parse_args())
+    do_run = args["run"]
+    do_plot = args["plot"]
+
+    if do_run:
+        run_all()
+    if do_plot:
+        plot()
 
 
 if __name__ == "__main__":

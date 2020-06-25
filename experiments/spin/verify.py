@@ -23,6 +23,8 @@ matmuls = lambda *mats: reduce(np.matmul, mats)
 # computational constants
 OMEGA = 2 * np.pi * 1.4e-2
 INV_ROOT_2 = 2 ** (-1/2)
+DT = 1e-2
+DT_INV = 1e2
 
 SIGMA_X = np.array([[0, 1],
                     [1, 0]])
@@ -52,7 +54,7 @@ def run_spin(experiment_name, controls_file_name, controls_idx):
     save_path = os.path.join(OUT_PATH, experiment_meta, experiment_name)
     controls_file_path = os.path.join(save_path, controls_file_name)
     with h5py.File(controls_file_path, "r") as save_file:
-        controls = -save_file["controls"][()]
+        controls = save_file["controls"][()]
         # states = save_file["states"][()]
         # controls = states[controls_idx, 0:-1]
         evolution_time = save_file["evolution_time"][()]
@@ -71,7 +73,7 @@ def run_spin(experiment_name, controls_file_name, controls_idx):
         [h_c1, controls]
     ]
     rho0 = Qobj(INITIAL_STATE)
-    tlist = np.linspace(0, evolution_time, control_eval_count)
+    tlist = np.arange(0, control_eval_count, 1) * DT
 
     # run simulation
     result = mesolve(hlist, rho0, tlist)
