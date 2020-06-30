@@ -39,7 +39,7 @@ FBFQ_B = 0.5
 FBFQ_T1_COEFFS = np.array([
     3276.06057, -7905.24414, 8285.24137, -4939.22432,
     1821.23488, -415.520981, 53.9684414, -3.04500484
-]) * 1e5
+]) * 1e9
 
 INITIAL_STATE = np.array([[1.], [0.]])
 INITIAL_DENSITY = np.matmul(INITIAL_STATE, conjugate_transpose(INITIAL_STATE))
@@ -247,7 +247,8 @@ def run_sim(class_key, pulse_data, gate_sequence):
     rho0 = Qobj(INITIAL_DENSITY)
     tlist = np.arange(0, control_eval_count, 1) * DT
     t1_array = get_t1_poly(controls[:, 0] / (2 * np.pi))
-    gamma_t1_array = t1_array ** -1
+    sqrt_gamma_array = t1_array ** -0.5
+    print(sqrt_gamma_array)
     # print("t1_array:\n{}\ngamma_t1_array:\n{}"
     #       "".format(t1_array, gamma_t1_array))
     # print("time_array:\n{}\ntlist:\n{}"
@@ -255,8 +256,8 @@ def run_sim(class_key, pulse_data, gate_sequence):
     # print("controls:\n{}\nt1:\n{}"
     #       "".format(controls[:50], t1_array[:50]))
     c_ops = [
-        [Qobj(C_G_TO_E), gamma_t1_array],
-        [Qobj(C_E_TO_G), gamma_t1_array],
+        [Qobj(C_G_TO_E), sqrt_gamma_array],
+        [Qobj(C_E_TO_G), sqrt_gamma_array],
     ]
     e_ops = []
 
@@ -289,6 +290,10 @@ def run_sim(class_key, pulse_data, gate_sequence):
     target_state = state_array[-1]
     target_density = np.matmul(target_state, conjugate_transpose(target_state))
     fidelity_array[-1] = fidelity_mat(density, target_density)
+
+    densities = np.array([density.full() for density in densities])
+    print("d[3]:\n{}\nd[7]:\n{}"
+          "".format(densities[3], densities[7]))
     
     return fidelity_array
 #ENDDEF
@@ -301,7 +306,7 @@ def run_all():
     # gate_sequence = np.random.randint(GateType.XPIBY2.value,
     #                                   GateType.ZPIBY2.value + 1, GATE_COUNT)
 
-    gate_sequence = np.repeat(0, 300)
+    gate_sequence = np.repeat(0, 8)
     
     # # perform initial save
     # save_file_path = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
@@ -319,7 +324,7 @@ def run_all():
     #     #ENDFOR
     # #ENDWITH
 
-    save_file_path = os.path.join(SAVE_PATH, "00004_spin15_bench.h5")    
+    # save_file_path = os.path.join(SAVE_PATH, "00004_spin15_bench.h5")    
     # grab controls
     for class_key in pulse_data.keys():
         # if class_key != "vanillat1_alt":

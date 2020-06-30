@@ -149,12 +149,12 @@ KB = 1.3806503e-23
 HBAR_BY_KB = 7.63823e-12
 FBFQ_A = 0.202407
 FBFQ_B = 0.5
-# Sorted from highest order to lowest order.
-# Coefficients are in units of seconds.
+# coefficients are listed in descending order
+# raw coefficients are in units of seconds
 FBFQ_T1_COEFFS = [
     3276.06057; -7905.24414; 8285.24137; -4939.22432;
     1821.23488; -415.520981; 53.9684414; -3.04500484
-]
+] * 1e9
 
 # Define the system.
 function get_fbfq(amplitude)
@@ -188,7 +188,7 @@ H_C1 = SIGMA_X / 2
 NEG_I_H_C1 = NEG_I * H_C1
 
 # Define the optimization.
-EVOLUTION_TIME = 19.47
+EVOLUTION_TIME = 56.80
 COMPLEX_CONTROLS = false
 CONTROL_COUNT = 1
 DT = 1e-2
@@ -206,25 +206,25 @@ INITIAL_ASTATE = [
     @SVector zeros(CONTROL_COUNT); # int_control
     @SVector zeros(CONTROL_COUNT); # control
     @SVector zeros(CONTROL_COUNT); # dcontrol_dt
-    @SVector zeros(1); # int_t1
+    @SVector zeros(1); # int_gamma
 ]
 ASTATE_SIZE, = size(INITIAL_ASTATE)
-TARGET_STATE_0 = SA[1., 1, 0, 0] / sqrt(2)
-TARGET_STATE_1 = SA[-1., 1, 0, 0] / sqrt(2)
+TARGET_STATE_0 = SA[1., 0, 0, -1] / sqrt(2)
+TARGET_STATE_1 = SA[0., 1, -1, 0] / sqrt(2)
 TARGET_ASTATE = [
     TARGET_STATE_0;
     TARGET_STATE_1;
     @SVector zeros(CONTROL_COUNT); # int_control
     @SVector zeros(CONTROL_COUNT); # control
     @SVector zeros(CONTROL_COUNT); # dcontrol_dt
-    @SVector [N * DT * MAX_T1]; # int_t1
+    @SVector zeros(1); # int_gamma
 ]
 STATE_0_IDX = 1:STATE_SIZE
 STATE_1_IDX = STATE_0_IDX[end] + 1:STATE_0_IDX[end] + STATE_SIZE
 INT_CONTROLS_IDX = STATE_1_IDX[end] + 1:STATE_1_IDX[end] + CONTROL_COUNT
 CONTROLS_IDX = INT_CONTROLS_IDX[end] + 1:INT_CONTROLS_IDX[end] + CONTROL_COUNT
 DCONTROLS_DT_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
-INT_T1_IDX = DCONTROLS_DT_IDX[end] + 1:DCONTROLS_DT_IDX[end] + 1
+INT_GAMMA_IDX = DCONTROLS_DT_IDX[end] + 1:DCONTROLS_DT_IDX[end] + 1
     
 
 # Generate initial controls.
@@ -267,14 +267,14 @@ function TrajectoryOptimization.dynamics(model::Model, astate, d2controls_dt2, t
     delta_int_control = astate[CONTROLS_IDX]
     delta_control = astate[DCONTROLS_DT_IDX]
     delta_dcontrol_dt = d2controls_dt2
-    delta_int_t1 = get_t1_poly(astate[CONTROLS_IDX][1] / (2 * pi))
+    delta_int_gamma = get_t1_poly(astate[CONTROLS_IDX][1] / (2 * pi))^(-1)
     return [
         delta_state_0;
         delta_state_1;
         delta_int_control;
         delta_control;
         delta_dcontrol_dt;
-        delta_int_t1;
+        delta_int_gamma;
     ]
 end
 
@@ -335,7 +335,7 @@ function run_traj()
         @SVector fill(1e-1, CONTROL_COUNT); # int_control
         @SVector fill(0, CONTROL_COUNT); # control
         @SVector fill(1e-1, CONTROL_COUNT); # dcontrol_dt
-        @SVector fill(0, 1); # int_t1
+        @SVector fill(1e6, 1); # int_gamma
     ])
     Qf = Q * N
     R = Diagonal(@SVector fill(1e-1, m)) # d2control_dt2
@@ -384,4 +384,3 @@ function run_traj()
         end
     end
 end
-
