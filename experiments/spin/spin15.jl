@@ -135,18 +135,6 @@ DOMEGA = OMEGA * 5e-2
 OMEGA_PLUS = OMEGA + DOMEGA
 OMEGA_MINUS = OMEGA - DOMEGA
 MAX_CONTROL_NORM_0 = 2 * pi * 3e-1
-MAX_T1 = 1e-2 #s
-# E / h
-EC = 0.479e9
-EL = 0.132e9
-EJ = 3.395e9
-# Q_CAP = 1 / 8e-6
-Q_CAP = 1.25e5
-T_CAP = 0.042
-H = 6.62607015e-34
-HBAR = 1.05457148e-34
-KB = 1.3806503e-23
-HBAR_BY_KB = 7.63823e-12
 FBFQ_A = 0.202407
 FBFQ_B = 0.5
 # coefficients are listed in descending order
@@ -188,12 +176,15 @@ H_C1 = SIGMA_X / 2
 NEG_I_H_C1 = NEG_I * H_C1
 
 # Define the optimization.
-EVOLUTION_TIME = 56.80
+EVOLUTION_TIME = 17.86
 COMPLEX_CONTROLS = false
 CONTROL_COUNT = 1
-DT = 1e-2
-DT_INV = 1e2
-N = Int(EVOLUTION_TIME * DT_INV) + 1
+DT_INTEGRATOR = 1
+DT_MIN = 1e-3
+DT_INIT = 5e-3
+DT_INIT_INV = 2e2
+DT_MAX = 1e-2
+N = Int(EVOLUTION_TIME * DT_INIT_INV) + 1
 ITERATION_COUNT = Int(1e3)
 
 # Define the problem.
@@ -209,8 +200,8 @@ INITIAL_ASTATE = [
     @SVector zeros(1); # int_gamma
 ]
 ASTATE_SIZE, = size(INITIAL_ASTATE)
-TARGET_STATE_0 = SA[1., 0, 0, -1] / sqrt(2)
-TARGET_STATE_1 = SA[0., 1, -1, 0] / sqrt(2)
+TARGET_STATE_0 = SA[1., 1, 0, 0] / sqrt(2)
+TARGET_STATE_1 = SA[-1., 1, 0, 0] / sqrt(2)
 TARGET_ASTATE = [
     TARGET_STATE_0;
     TARGET_STATE_1;
@@ -219,31 +210,37 @@ TARGET_ASTATE = [
     @SVector zeros(CONTROL_COUNT); # dcontrol_dt
     @SVector zeros(1); # int_gamma
 ]
+# state indices
 STATE_0_IDX = 1:STATE_SIZE
 STATE_1_IDX = STATE_0_IDX[end] + 1:STATE_0_IDX[end] + STATE_SIZE
 INT_CONTROLS_IDX = STATE_1_IDX[end] + 1:STATE_1_IDX[end] + CONTROL_COUNT
 CONTROLS_IDX = INT_CONTROLS_IDX[end] + 1:INT_CONTROLS_IDX[end] + CONTROL_COUNT
 DCONTROLS_DT_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
 INT_GAMMA_IDX = DCONTROLS_DT_IDX[end] + 1:DCONTROLS_DT_IDX[end] + 1
-    
+
 
 # Generate initial controls.
 GRAB_CONTROLS = false
-INITIAL_CONTROLS = nothing
+INITIAL_ACONTROLS = nothing
 if GRAB_CONTROLS
     controls_file_path = joinpath(SAVE_PATH, "00000_spin12.h5")
-    INITIAL_CONTROLS = h5open(controls_file_path, "r") do save_file
+    INITIAL_ACONTROLS = h5open(controls_file_path, "r") do save_file
         controls = Array(save_file["controls"])
         return [
-            SVector{CONTROL_COUNT}(controls[i]) for i = 1:N-1
+            SVector{CONTROL_COUNT + 1}(controls[i, :]) for i = 1:N-1
         ]
     end
 else
     # INIITAL_CONTROLS should be small if optimizing over derivatives.
-    INITIAL_CONTROLS = [
-        @SVector fill(1e-4, CONTROL_COUNT) for k = 1:N-1
+    INITIAL_ACONTROLS = [
+        SVector{CONTROL_COUNT + 1}([fill(1e-4, CONTROL_COUNT); DT_INIT]) for k = 1:N-1
     ]
 end
+ACONTROLS_SIZE, = size(INITIAL_ACONTROLS[1])
+# control indices
+D2CONTROLS_DT2_IDX = 1:CONTROL_COUNT
+DT_IDX = D2CONTROLS_DT2_IDX[end] + 1:D2CONTROLS_DT2_IDX[end] + 1
+
 
 # Specify logging.
 VERBOSE = true
@@ -254,19 +251,15 @@ struct Model <: AbstractModel
     m :: Int
 end
 
+Base.size(model::Model) = (model.n, model.m)
 
-function Base.size(model::Model)
-    return model.n, model.m
-end
-
-
-function TrajectoryOptimization.dynamics(model::Model, astate, d2controls_dt2, time)
+function TrajectoryOptimization.dynamics(model::Model, astate, acontrols, time)
     neg_i_control_hamiltonian = astate[CONTROLS_IDX][1] * NEG_I_H_C1
     delta_state_0 = (OMEGA_NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_0_IDX]
     delta_state_1 = (OMEGA_NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_1_IDX]
     delta_int_control = astate[CONTROLS_IDX]
     delta_control = astate[DCONTROLS_DT_IDX]
-    delta_dcontrol_dt = d2controls_dt2
+    delta_dcontrol_dt = acontrols[D2CONTROLS_DT2_IDX]
     delta_int_gamma = get_t1_poly(astate[CONTROLS_IDX][1] / (2 * pi))^(-1)
     return [
         delta_state_0;
@@ -275,14 +268,14 @@ function TrajectoryOptimization.dynamics(model::Model, astate, d2controls_dt2, t
         delta_control;
         delta_dcontrol_dt;
         delta_int_gamma;
-    ]
+    ] * acontrols[DT_IDX][1]
 end
 
 
 function run_traj()
-    dt = DT
+    dt = DT_INTEGRATOR
     n = ASTATE_SIZE
-    m = CONTROL_COUNT
+    m = ACONTROLS_SIZE
     t0 = 0.
     tf = EVOLUTION_TIME
     x0 = INITIAL_ASTATE
@@ -321,9 +314,18 @@ function run_traj()
         @SVector fill(-Inf, CONTROL_COUNT);
         @SVector fill(-Inf, 1)
     ]
+    # dt constraint
+    u_min = [
+        @SVector fill(-Inf, CONTROL_COUNT);
+        @SVector fill(DT_MIN, 1);
+    ]
+    u_max = [
+        @SVector fill(Inf, CONTROL_COUNT);
+        @SVector fill(DT_MAX, 1);
+    ]
 
     model = Model(n, m)
-    U0 = INITIAL_CONTROLS
+    U0 = INITIAL_ACONTROLS
     X0 = [
         @SVector fill(NaN, n) for k = 1:N
     ]
@@ -335,26 +337,34 @@ function run_traj()
         @SVector fill(1e-1, CONTROL_COUNT); # int_control
         @SVector fill(0, CONTROL_COUNT); # control
         @SVector fill(1e-1, CONTROL_COUNT); # dcontrol_dt
-        @SVector fill(1e6, 1); # int_gamma
+        @SVector fill(0, 1); # int_gamma
     ])
     Qf = Q * N
-    R = Diagonal(@SVector fill(1e-1, m)) # d2control_dt2
+    R = Diagonal(SVector{m}([
+        fill(1e-1, CONTROL_COUNT); # d2control_dt2
+        0; # dt
+    ])) 
     obj = LQRObjective(Q, R, Qf, xf, N)
 
     # must satisfy control amplitudes
     control_bnd = BoundConstraint(n, m, x_max=x_max, x_min=x_min)
     # must statisfy conrols start and stop at 0
     control_bnd_boundary = BoundConstraint(n, m, x_max=x_max_boundary, x_min=x_min_boundary)
+    # must satisfy dt constraint
+    dt_bnd = BoundConstraint(n, m, u_max=u_max, u_min=u_min)
     # must reach target state, must have zero net flux
-    target_astate_constraint = GoalConstraint(xf, [STATE_0_IDX; STATE_1_IDX; INT_CONTROLS_IDX])
+    target_astate_constraint = GoalConstraint(xf, [STATE_0_IDX; STATE_1_IDX; INT_CONTROLS_IDX]);
     
     constraints = ConstraintSet(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)
     add_constraint!(constraints, control_bnd_boundary, 1:1)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
-    add_constraint!(constraints, target_astate_constraint, N:N)
+    add_constraint!(constraints, dt_bnd, 1:N-1)
+    constraints.constraints[4].params.ϕ = 1e1
+    constraints.constraints[4].params.μ0 = 1e5
+    add_constraint!(constraints, target_astate_constraint, N:N);
     
-    prob = Problem{RK4}(model, obj, constraints, x0, xf, Z, N, t0, tf)
+    prob = Problem{RK3}(model, obj, constraints, x0, xf, Z, N, t0, tf)
     opts = SolverOptions(verbose=VERBOSE)
     solver = AugmentedLagrangianSolver(prob, opts)
     solve!(solver)

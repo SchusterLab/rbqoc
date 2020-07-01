@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from qoc.standard import (
     conjugate_transpose, generate_save_file_path,
+    matmuls
 )
 from qutip import (
     mesolve, Qobj, basis
@@ -68,10 +69,10 @@ PULSE_DATA = {
     #       "controls_file_name": "00008_spin15.h5"
     #   }  
     # },
-    "vanillat1": {
+    "t1_m1": {
         "xpiby2": {
             "experiment_name": "spin15",
-            "controls_file_name": "00011_spin15.h5"
+            "controls_file_name": "00024_spin15.h5"
         },
         "ypiby2": {
             "experiment_name": "spin15",
@@ -79,7 +80,7 @@ PULSE_DATA = {
         },
         "zpiby2": {
             "experiment_name": "spin15",
-            "controls_file_name": "00014_spin15.h5"
+            "controls_file_name": "00023_spin15.h5"
         },
     },
     "vanilla": {
@@ -112,6 +113,18 @@ PULSE_DATA = {
     }
 }
 
+GT_TO_GATE = {
+    "zpiby2": ZPIBY2,
+    "ypiby2": YPIBY2,
+    "xpiby2": XPIBY2,
+}
+
+PT_TO_CIDX = {
+    "t1_m1": 9,
+    "vanilla": 9,
+    "analytic": -1,
+}
+
 ZPIBY2_DATA_FILE_PATH = os.path.join(SAVE_PATH, "00004_spin15_bench.h5")
 ZPIBY2_PLOT_FILE_PATH = os.path.join(SAVE_PATH, "00004_spin15_bench.png")
 YPIBY2_DATA_FILE_PATH = os.path.join(SAVE_PATH, "00005_spin15_bench.h5")
@@ -124,6 +137,7 @@ XPIBY2_PLOT_FILE_PATH = os.path.join(SAVE_PATH, "00006_spin15_bench.png")
 SEED = 0
 GATE_COUNT = 1
 CONTROLS_IDX = 9
+CIDX_PY = -1
 DPI = 700
 ZPIBY2_TIME = 17.86
 ZPIBY2_TIME_ALT = 20.0
@@ -444,19 +458,110 @@ def plot():
     plt.savefig(plot_save_file_path, dpi=DPI)
 #ENDDEF
 
+
+def gen_rand_density_iso(seed):
+    np.random.seed(seed)
+    rands = np.random.rand(4)
+    state = np.array([[rands[0] + 1j * rands[1]],
+                      [rands[2] + 1j * rands[3]]])
+    density = np.matmul(state, conjugate_transpose(state))
+    return density
+#ENDDEF
+
+
+def grab_controls(gate_type, pulse_type):
+    pulse_data = PULSE_DATA[pulse_type][gate_type]
+    controls_file_path = os.path.join(
+        META_PATH, pulse_data["experiment_name"], pulse_data["controls_file_name"]
+    )
+    controls_idx = PT_TO_CIDX[pulse_type]
+    with h5py.File(controls_file_path) as save_file:
+        if controls_idx == CIDX_PY:
+            controls = save_file["controls"][:, 0]
+        else:
+            controls = save_file["states"][controls_idx, :-1]
+        #ENDIF
+        gate_time = save_file["evolution_time"][()]
+    #ENDWITH
+    return (controls, gate_time)
+#ENDDEF
+
+
+def run_verify(gate_count, gate_type, pulse_type, seed):
+    (controls, gate_time) = grab_controls(gate_type, pulse_type)
+    control_knot_count = controls.shape[0]
+    density = initial_density = gen_rand_density_iso(seed)
+    evolution_time = gate_time * gate_count
+    knot_count = int(evolution_time * DT_INV)
+    gate = GT_TO_GATE[gate_type]
+    target_density = (
+        matmuls(
+            *([gate] * gate_count),
+            initial_density,
+            *([conjugate_transpose(gate)] * gate_count),
+        )
+    )
+    
+    controls = np.concatenate([controls] * gate_count)
+    h_sys = Qobj(OMEGA * H_S)
+    h_c1 = Qobj(H_C1)
+    hlist = [
+        [h_sys, np.ones(control_knot_count * gate_count)],
+        [h_c1, controls],
+    ]
+    rho0 = Qobj(initial_density)
+    tlist = np.arange(0, knot_count, 1) * DT
+    t1_array = get_t1_poly(controls / (2 * np.pi))
+    sqrt_gamma_array = t1_array ** -0.5
+    # print("t1_array:\n{}\ngamma_t1_array:\n{}"
+    #       "".format(t1_array, gamma_t1_array))
+    # print("time_array:\n{}\ntlist:\n{}"
+    #       "".format(time_array, tlist))
+    # print("controls:\n{}\nt1:\n{}"
+    #       "".format(controls[:50], t1_array[:50]))
+    c_ops = [
+        # [Qobj(C_G_TO_E), sqrt_gamma_array],
+        # [Qobj(C_E_TO_G), sqrt_gamma_array],
+    ]
+    e_ops = []
+
+    result = mesolve(hlist, rho0, tlist, c_ops, e_ops)
+    densities = result.states
+    density = densities[-1].full()
+    fidelity = fidelity_mat(density, target_density)
+
+    print("fidelity:\n{}\ninitial_density:\n{}\ndensity:\n{}\ntarget_density:\n{}"
+          "".format(fidelity, initial_density, density, target_density))
+    
+    return
+#ENDDEF
+
     
 def main():
     parser = ArgumentParser()
     parser.add_argument("--run", action="store_true")
     parser.add_argument("--plot", action="store_true")
+    parser.add_argument("--verify", action="store_true")
+    parser.add_argument("--gate", action="store", type=str, default="zpiby2")
+    parser.add_argument("--pulse", action="store", type=str, default="analytic")
+    parser.add_argument("--seed", action="store", type=int, default=0)
+    parser.add_argument("--gc", action="store", type=int, default=1)
     args = vars(parser.parse_args())
     do_run = args["run"]
     do_plot = args["plot"]
+    do_verify = args["verify"]
+    pulse_type = args["pulse"]
+    gate_type = args["gate"]
+    seed = args["seed"]
+    gate_count = args["gc"]
 
     if do_run:
         run_all()
     if do_plot:
         plot()
+    if do_verify:
+        run_verify(gate_count, gate_type, pulse_type, seed)
+    #ENDIF
 
 
 if __name__ == "__main__":

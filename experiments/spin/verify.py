@@ -8,7 +8,7 @@ import os
 
 import h5py
 import numpy as np
-from qoc.standard import conjugate_transpose
+from qoc.standard import conjugate_transpose, matmuls
 from qutip import (
     mesolve, Qobj,
 )
@@ -17,8 +17,17 @@ from qutip import (
 WDIR = os.environ.get("ROBUST_QOC_PATH", ".")
 OUT_PATH = os.path.join(WDIR, "out")
 
+
 # defs
-matmuls = lambda *mats: reduce(np.matmul, mats)
+def gen_initial_state(seed):
+    np.random.rand(0)
+    rands = np.random.rand(4)
+    state = np.array([[rands[0] + 1j * rands[1],],
+                      [rands[2] + 1j * rands[3],]])
+    state = state / np.sqrt(np.abs(np.matmul(conjugate_transpose(state), state)[0, 0]))
+    return state
+#ENDDEF
+
 
 # computational constants
 OMEGA = 2 * np.pi * 1.4e-2
@@ -40,12 +49,25 @@ NEG_YPIBY2 = np.array([[1., 1.],
                        [-1., 1.]]) * INV_ROOT_2
 ZPIBY2 = np.array([[1. - 1.j, 0],
                    [0,        1. + 1.j]]) * INV_ROOT_2
-INITIAL_STATE = np.array([[1], [0]])
-TARGET_STATE = np.matmul(XPIBY2, INITIAL_STATE)
+INITIAL_STATE = gen_initial_state(2)
+TARGET_STATE = np.matmul(YPIBY2, INITIAL_STATE)
+INITIAL_DENSITY = np.matmul(INITIAL_STATE, conjugate_transpose(INITIAL_STATE))
+TARGET_DENSITY = np.matmul(TARGET_STATE, conjugate_transpose(TARGET_STATE))
+
+# other constants
+CIDX_PY = -1
+
 
 def fidelity_vec(v1, v2):
     ip = np.matmul(conjugate_transpose(v1), v2)[0, 0]
     return np.real(ip) ** 2 + np.imag(ip) ** 2
+
+
+def fidelity_mat(m1, m2):
+    return (
+        np.abs(np.trace(np.matmul(conjugate_transpose(m1), m2)))
+        / np.abs(np.trace(np.matmul(conjugate_transpose(m2), m2)))
+    )
 
 
 def run_spin(experiment_name, controls_file_name, controls_idx):
@@ -54,11 +76,12 @@ def run_spin(experiment_name, controls_file_name, controls_idx):
     save_path = os.path.join(OUT_PATH, experiment_meta, experiment_name)
     controls_file_path = os.path.join(save_path, controls_file_name)
     with h5py.File(controls_file_path, "r") as save_file:
-        controls = save_file["controls"][()]
-        # states = save_file["states"][()]
-        # controls = states[controls_idx, 0:-1]
+        if controls_idx == CIDX_PY:
+            controls = save_file["controls"][()]
+        else:
+            states = save_file["states"][()]
+            controls = states[controls_idx, 0:-1]
         evolution_time = save_file["evolution_time"][()]
-        # print(save_file["Q"][()])
     #ENDWITH
     control_eval_count = controls.shape[0]
     
@@ -72,7 +95,7 @@ def run_spin(experiment_name, controls_file_name, controls_idx):
         [h_sys, np.ones(control_eval_count)],
         [h_c1, controls]
     ]
-    rho0 = Qobj(INITIAL_STATE)
+    rho0 = Qobj(INITIAL_DENSITY)
     tlist = np.arange(0, control_eval_count, 1) * DT
 
     # run simulation
@@ -80,11 +103,14 @@ def run_spin(experiment_name, controls_file_name, controls_idx):
 
     # analysis
     final_state = result.states[-1].full()
-    fidelity_ = fidelity_vec(final_state, TARGET_STATE)
+    # fidelity_ = fidelity_vec(final_state, TARGET_STATE)
+    fidelity_ = fidelity_mat (final_state, TARGET_DENSITY)
 
     # log
-    print("fidelity:\n{}\nfinal_state:\n{}\ntarget_state:\n{}"
-          "".format(fidelity_, final_state, TARGET_STATE))
+    # print("fidelity:\n{}\nfinal_state:\n{}\ntarget_state:\n{}"
+    #       "".format(fidelity_, final_state, TARGET_STATE))
+    print("fidelity:\n{}\nfinal_density:\n{}\ntarget_density:\n{}\ninitial_density:\n{}"
+          "".format(fidelity_, final_state, TARGET_DENSITY, INITIAL_DENSITY))
 #ENDDEF
 
     
