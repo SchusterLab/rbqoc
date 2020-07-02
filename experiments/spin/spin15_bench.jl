@@ -79,7 +79,7 @@ NEG_E_E_BY2 = SA_F64[0 0 0 0;
                      0 0 0 1;] * -0.5
 
 STATE_SIZE = 2
-DENSITY_SIZE_ISO = 2 * STATE_SIZE
+STATE_SIZE_ISO = 2 * STATE_SIZE
 
 ZPIBY2 = SA_F64[1  0 1  0;
                 0  1 0 -1;
@@ -150,6 +150,7 @@ OUT_DATA = Dict(
     ),
 )
 
+# dissipation
 OUT_DATA_1 = Dict(
     analytic => Dict(
         zpiby2 => joinpath(SAVE_PATH, "00026_spin15_bench.h5"),
@@ -165,6 +166,87 @@ OUT_DATA_1 = Dict(
         zpiby2 => joinpath(SAVE_PATH, "00025_spin15_bench.h5"),
         ypiby2 => joinpath(SAVE_PATH, "00029_spin15_bench.h5"),
         xpiby2 => joinpath(SAVE_PATH, "00032_spin15_bench.h5"),
+    ),
+)
+
+# no dissipation
+OUT_DATA_2 = Dict(
+    analytic => Dict(
+        zpiby2 => joinpath(SAVE_PATH, "00022_spin15_bench.h5"),
+        ypiby2 => joinpath(SAVE_PATH, "00033_spin15_bench.h5"),
+        xpiby2 => joinpath(SAVE_PATH, "00036_spin15_bench.h5"),
+    ),
+    vanilla => Dict(
+    ),
+    t1_m1 => Dict(
+        zpiby2 => joinpath(SAVE_PATH, "00021_spin15_bench.h5"),
+        ypiby2 => joinpath(SAVE_PATH, "00034_spin15_bench.h5"),
+        xpiby2 => joinpath(SAVE_PATH, "00035_spin15_bench.h5"),
+    ),
+)
+
+# schroed
+OUT_DATA_3 = Dict(
+    analytic => Dict(
+        zpiby2 => joinpath(SAVE_PATH, "00037_spin15_bench.h5"),
+        ypiby2 => joinpath(SAVE_PATH, "00038_spin15_bench.h5"),
+        xpiby2 => joinpath(SAVE_PATH, "00039_spin15_bench.h5"),
+    ),
+    vanilla => Dict(
+    ),
+    t1_m1 => Dict(
+        zpiby2 => joinpath(SAVE_PATH, "00040_spin15_bench.h5"),
+        ypiby2 => joinpath(SAVE_PATH, "00041_spin15_bench.h5"),
+        xpiby2 => joinpath(SAVE_PATH, "00042_spin15_bench.h5"),
+    ),
+)
+
+
+# schroed, shave down
+OUT_DATA_4 = Dict(
+    analytic => Dict(
+        zpiby2 => joinpath(SAVE_PATH, "00043_spin15_bench.h5"),
+        ypiby2 => joinpath(SAVE_PATH, "00044_spin15_bench.h5"),
+        xpiby2 => joinpath(SAVE_PATH, "00045_spin15_bench.h5"),
+    ),
+    vanilla => Dict(
+    ),
+    t1_m1 => Dict(
+        zpiby2 => joinpath(SAVE_PATH, "00046_spin15_bench.h5"),
+        ypiby2 => joinpath(SAVE_PATH, "00047_spin15_bench.h5"),
+        xpiby2 => joinpath(SAVE_PATH, "00048_spin15_bench.h5"),
+    ),
+)
+
+# schroed, shave up
+OUT_DATA_5 = Dict(
+    analytic => Dict(
+        zpiby2 => joinpath(SAVE_PATH, "00049_spin15_bench.h5"),
+        ypiby2 => joinpath(SAVE_PATH, "00050_spin15_bench.h5"),
+        xpiby2 => joinpath(SAVE_PATH, "00051_spin15_bench.h5"),
+    ),
+    vanilla => Dict(
+    ),
+    t1_m1 => Dict(
+        zpiby2 => joinpath(SAVE_PATH, "00052_spin15_bench.h5"),
+        ypiby2 => joinpath(SAVE_PATH, "00053_spin15_bench.h5"),
+        xpiby2 => joinpath(SAVE_PATH, "00054_spin15_bench.h5"),
+    ),
+)
+
+# lindblad no dis, all gates
+OUT_DATA_6 = Dict(
+    analytic => Dict(
+        zpiby2 => joinpath(SAVE_PATH, "00055_spin15_bench.h5"),
+        ypiby2 => joinpath(SAVE_PATH, "00056_spin15_bench.h5"),
+        xpiby2 => joinpath(SAVE_PATH, "00057_spin15_bench.h5"),
+    ),
+    vanilla => Dict(
+    ),
+    t1_m1 => Dict(
+        zpiby2 => joinpath(SAVE_PATH, "00058_spin15_bench.h5"),
+        ypiby2 => joinpath(SAVE_PATH, "00059_spin15_bench.h5"),
+        xpiby2 => joinpath(SAVE_PATH, "00060_spin15_bench.h5"),
     ),
 )
 
@@ -189,16 +271,10 @@ COMPARISON_DATA = Dict(
 DPI = 500
 MARKER_ALPHA = 0.2
 MARKER_SIZE = 10
-GT_TO_PLOT_FILE_PATH = Dict(
-    zpiby2 => joinpath(SAVE_PATH, "zpiby2_spin15_bench.png"),
-    ypiby2 => joinpath(SAVE_PATH, "ypiby2_spin15_bench.png"),
-    xpiby2 => joinpath(SAVE_PATH, "xpiby2_spin15_bench.png"),
-)
-
-GT_TO_PLOT_FILE_PATH_1 = Dict(
-    zpiby2 => joinpath(SAVE_PATH, "00001_zpiby2_spin15_bench.png"),
-    ypiby2 => joinpath(SAVE_PATH, "00001_ypiby2_spin15_bench.png"),
-    xpiby2 => joinpath(SAVE_PATH, "00001_xpiby2_spin15_bench.png"),
+GT_TO_PLOT_FILE = Dict(
+    zpiby2 => "zpiby2_spin15_bench",
+    ypiby2 => "ypiby2_spin15_bench",
+    xpiby2 => "xpiby2_spin15_bench",
 )
 
 PT_TO_STR = Dict(
@@ -234,7 +310,7 @@ end
 show_nice(x) = show(IOContext(stdout), "text/plain", x)
 
 
-function generate_save_file_path(save_file_name, save_path)
+function generate_save_file_path(extension, save_file_name, save_path)
     # Ensure the path exists.
     mkpath(save_path)
 
@@ -243,16 +319,25 @@ function generate_save_file_path(save_file_name, save_path)
     max_numeric_prefix = -1
     for (_, _, files) in walkdir(save_path)
         for file_name in files
-            if occursin("_$save_file_name.h5", file_name)
+            if occursin("_$save_file_name.$(extension)", file_name)
                 max_numeric_prefix = max(parse(Int, split(file_name, "_")[1]))
             end
         end
     end
 
-    save_file_name = "_$save_file_name.h5"
+    save_file_name = "_$save_file_name.$(extension)"
     save_file_name = @sprintf("%05d%s", max_numeric_prefix + 1, save_file_name)
 
     return joinpath(save_path, save_file_name)
+end
+
+
+function gen_rand_state_iso(seed_)
+    Random.seed!(seed_)
+    state = rand(STATE_SIZE) + 1im * rand(STATE_SIZE)
+    return SVector{STATE_SIZE_ISO}(
+        [real(state); imag(state)]
+    )
 end
 
 
@@ -262,11 +347,11 @@ in the complex to real isomorphism
 """
 function gen_rand_density_iso(seed_)
     Random.seed!(seed_)
-    state = rand(STATE_SIZE)
-    density = (state * state') / real(state' * state)
+    state = rand(STATE_SIZE) + 1im * rand(STATE_SIZE)
+    density = (state * state') / abs(state' * state)
     density_r = real(density)
     density_i = imag(density)
-    density_iso = SMatrix{DENSITY_SIZE_ISO, DENSITY_SIZE_ISO}([
+    density_iso = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}([
         density_r -density_i;
         density_i density_r;
     ])
@@ -309,13 +394,21 @@ function get_t1_poly(amplitude)
 end
 
 
-function dynamics(density, controls)
+function dynamics_schroed(state, controls)
+    neg_i_hamiltonian = OMEGA_NEG_I_H_S + controls[1] * NEG_I_2_PI_H_C1
+    return (
+        neg_i_hamiltonian * state
+    )
+end
+
+
+function dynamics_lindblad(density, controls)
     gamma = (get_t1_poly(controls[1]))^(-1)
     neg_i_hamiltonian = OMEGA_NEG_I_H_S + controls[1] * NEG_I_2_PI_H_C1
-    delta_density = (
+    return (
         neg_i_hamiltonian * density - density * neg_i_hamiltonian
-        + gamma * (G_E * density * E_G + NEG_E_E_BY2 * density + density * NEG_E_E_BY2)
-        + gamma * (E_G * density * G_E + NEG_G_G_BY2 * density + density * NEG_G_G_BY2)
+        # + gamma * (G_E * density * E_G + NEG_E_E_BY2 * density + density * NEG_E_E_BY2)
+        # + gamma * (E_G * density * G_E + NEG_G_G_BY2 * density + density * NEG_G_G_BY2)
     )
 end
 
@@ -334,7 +427,7 @@ GATE_CYCLE_CONSTANT = 4
 DT = 1e-2
 DT_INV = 1e2
 
-function rk4_step(x, u)
+function rk4_step(dynamics, x, u)
     k1 = dynamics(x, u) * DT
 	k2 = dynamics(x + k1 / 2, u) * DT
 	k3 = dynamics(x + k2 / 2, u) * DT
@@ -367,7 +460,11 @@ function run_verify(gate_count, gate_type, pulse_type, seed)
     # grab controls
     (controls, gate_time) = grab_controls(gate_type, pulse_type)
     control_knot_count = size(controls)[1]
-    density = initial_density = gen_rand_density_iso(seed)
+    # density = initial_density = gen_rand_density_iso(seed)
+    density = initial_density = SA_F64[1 0 0 0;
+                                       0 0 0 0;
+                                       0 0 1 0;
+                                       0 0 0 0;]
     gate = GT_TO_GATE[gate_type]
     target_density = gate^gate_count * initial_density * gate'^gate_count
 
@@ -389,7 +486,7 @@ function run_verify(gate_count, gate_type, pulse_type, seed)
 end
 
 
-function run_sim(controls, evolution_time, gate_time, trial_count)
+function run_sim_schroed(controls, evolution_time, gate_time, trial_count)
     # set variables
     if MP
         my_rank = MPI.Comm_rank(COMM)
@@ -402,8 +499,49 @@ function run_sim(controls, evolution_time, gate_time, trial_count)
     end
     knot_count = Int(evolution_time * DT_INV)
     gate_knot_count = Int(gate_time * DT_INV)
-    gate_count = Int(floor(evolution_time / (4 * gate_time)))
-    densities = zeros(my_trial_count, gate_count + 1, DENSITY_SIZE_ISO, DENSITY_SIZE_ISO)
+    gate_count = Int(floor(evolution_time / (gate_time)))
+    states = zeros(my_trial_count, gate_count + 1, STATE_SIZE_ISO)
+    fidelities = zeros(my_trial_count, gate_count + 1)
+
+    for trial_index = 1:my_trial_count
+        # generate initial density
+        state = initial_state = gen_rand_state_iso((my_rank + 1) * trial_index)
+        states[trial_index, 1, :] = Array(initial_state)
+        # integrate and save state
+        for gate_index = 2:gate_count + 1
+            for k = 1:gate_knot_count
+                state = rk4_step(dynamics_schroed, state, controls[k])
+            end
+            # Save the state every gate
+            states[trial_index, gate_index, :, :] = Array(state)
+        end
+        # compute fidelity on all states
+        initial_state_h = initial_state'
+        fidelity_(state_) = abs(initial_state_h * state_)
+        fidelities[trial_index, :] = mapslices(fidelity_, states[trial_index, :, :], dims=[2])
+    end
+    gate_error_avgf = mapslices(x -> 1 - mean(x), fidelities, dims=[1])
+
+
+    return states, gate_error_avgf
+end
+
+
+function run_sim_lindblad(controls, evolution_time, gate_time, trial_count)
+    # set variables
+    if MP
+        my_rank = MPI.Comm_rank(COMM)
+    else
+        my_rank = ROOT_RANK
+    end
+    my_trial_count, over = divrem(trial_count, MAX_RANK + 1)
+    if my_rank + 1 <= over
+        my_trial_count = my_trial_count + 1
+    end
+    knot_count = Int(evolution_time * DT_INV)
+    gate_knot_count = Int(gate_time * DT_INV)
+    gate_count = Int(floor(evolution_time / gate_time))
+    densities = zeros(my_trial_count, gate_count + 1, STATE_SIZE_ISO, STATE_SIZE_ISO)
     fidelities = zeros(my_trial_count, gate_count + 1)
 
     for trial_index = 1:my_trial_count
@@ -413,28 +551,27 @@ function run_sim(controls, evolution_time, gate_time, trial_count)
         # integrate and save density
         for gate_index = 2:gate_count + 1
             # Advance the integration by 4 gates.
-            for j = 1:4
-                for k = 1:gate_knot_count
-                    density = rk4_step(density, controls[k])
-                end
+            for k = 1:gate_knot_count
+                density = rk4_step(dynamics_lindblad, density, controls[k])
             end
-            # Save the density every 4 gates.
+            # Save the density every gate.
             densities[trial_index, gate_index, :, :] = Array(density)
         end
-        # compute fidelity on all densities
-        initial_density_h = initial_density'
-        initial_density_fnorm = abs(tr(initial_density_h * initial_density))
-        fidelity_(density_) = abs(tr(initial_density_h * density_)) / initial_density_fnorm
-        fidelities[trial_index, :] = mapslices(fidelity_, densities[trial_index, :, :, :], dims=[2, 3])
+        # # compute fidelity on all densities
+        # initial_density_h = initial_density'
+        # initial_density_fnorm = abs(tr(initial_density_h * initial_density))
+        # fidelity_(density_) = abs(tr(initial_density_h * density_)) / initial_density_fnorm
+        # fidelities[trial_index, :] = mapslices(fidelity_, densities[trial_index, :, :, :], dims=[2, 3])
     end
-    gate_error_avgf = mapslices(x -> 1 - mean(x), fidelities, dims=[1])
+    # gate_error_avgf = mapslices(x -> 1 - mean(x), fidelities, dims=[1])
+    gate_error_avgf = zeros(gate_count + 1)
 
 
     return densities, gate_error_avgf
 end
 
 
-function run_all(evolution_time, gate_type, pulse_type, trial_count)
+function run_all(evolution_time, gate_type, pulse_type, sim, trial_count)
     if MP
         my_rank = MPI.Comm_rank(COMM)
     else
@@ -455,7 +592,7 @@ function run_all(evolution_time, gate_type, pulse_type, trial_count)
         end
         
         # run
-        densities, gate_error_avgf = run_sim(controls, evolution_time, gate_time, trial_count)
+        densities, gate_error_avgf = sim(controls, evolution_time, gate_time, trial_count)
         # println("densities")
         # show_nice(densities)
         # println("\ngate_error_avgf")
@@ -474,7 +611,7 @@ function run_all(evolution_time, gate_type, pulse_type, trial_count)
         # save all trials
         end_time = Dates.now()
         run_time = end_time - start_time
-        save_file_path = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
+        save_file_path = generate_save_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
         h5open(save_file_path, "cw") do save_file
             write(save_file, "densities", densities)
             write(save_file, "gate_error_avgf", gate_error_avgf)
@@ -497,20 +634,21 @@ function run_all(evolution_time, gate_type, pulse_type, trial_count)
 end
 
 
-function plot_single(fig, gate_type, pulse_type)
+function plot_fidelity_by_gate_single(fig, gate_type, out_data, pulse_type)
     # grab fidelities
-    (gate_error_avgf,) = h5open(OUT_DATA_1[pulse_type][gate_type], "r") do save_file
+    (gate_error_avgf,) = h5open(out_data[pulse_type][gate_type], "r") do save_file
         gate_error_avgf = read(save_file, "gate_error_avgf")[1, :]
         return (gate_error_avgf,)
     end
     fidelities = map(x -> 1 - x, gate_error_avgf)
     # construct xaxis
-    gate_count = size(gate_error_avgf)[1] - 1
-    gate_count_axis = Array(0:4:4 * gate_count)
+    # gate_count = size(gate_error_avgf)[1]
+    gate_count = 100
+    gate_count_axis = Array(0:1:gate_count - 1)
     label = PT_TO_STR[pulse_type]
     title = GT_TO_STR[gate_type]
     Plots.plot!(
-        fig, gate_count_axis, fidelities,
+        fig, gate_count_axis, fidelities[1:100],
         label=label, title=title, dpi=DPI,
         ylims=(0, 1), yticks=(0:0.1:1),
         # markeralpha=MARKER_ALPHA, ms=MARKER_SIZE
@@ -518,7 +656,7 @@ function plot_single(fig, gate_type, pulse_type)
 end
 
 
-function plot_all()
+function plot_fidelity_by_gate(out_data)
     # fig = Plots.plot()
     # plot_single(fig, zpiby2, analytic)
     # plot_single(fig, zpiby2, vanilla)
@@ -530,12 +668,56 @@ function plot_all()
     for gate_type in instances(GateType)
         fig = Plots.plot()
         for pulse_type in instances(PulseType)
-            plot_single(fig, gate_type, pulse_type)
+            if pulse_type == vanilla
+                continue
+            end
+            plot_fidelity_by_gate_single(fig, gate_type, out_data, pulse_type)
         end
+        plot_file_path = generate_save_file_path("png", GT_TO_PLOT_FILE[gate_type], SAVE_PATH)
         Plots.ylabel!(fig, "Fidelity")
         Plots.xlabel!(fig, "Gate Count")
-        Plots.savefig(fig, GT_TO_PLOT_FILE_PATH_1[gate_type])
+        Plots.savefig(fig, plot_file_path)
+        println("Saving $(gate_type) to $(plot_file_path)")
     end
+end
+
+
+function plot_pop_by_gate_single(fig, gate_type, out_data, pulse_type)
+    # grab fidelities
+    (densities,) = h5open(out_data[pulse_type][gate_type], "r") do save_file
+        densities = read(save_file, "densities")[1, :, :, :]
+        return (densities,)
+    end
+    # construct xaxis
+    # gate_count = size(densities)[1]
+    gate_count = 100
+    gate_count_axis = Array(0:1:gate_count - 1)
+    label1 = "$(PT_TO_STR[pulse_type]) P11"
+    label2 = "$(PT_TO_STR[pulse_type]) P22"
+    Plots.plot!(fig, gate_count_axis, densities[1:100, 1, 1], label=label1)
+    # Plots.plot!(fig, gate_count_axis, densities[:, 2, 2], label=label2)
+end
+
+
+function plot_pop_by_gate(out_data)
+    for gate_type in instances(GateType)
+        title = GT_TO_STR[gate_type]
+        fig = Plots.plot(
+            dpi=DPI, title=title, ylims=(0, 1), yticks=(0:0.1:1),
+            # markeralpha=MARKER_ALPHA, ms=MARKER_SIZE
+        )
+        for pulse_type in instances(PulseType)
+            if pulse_type == vanilla
+                continue
+            end
+            plot_pop_by_gate_single(fig, gate_type, out_data, pulse_type)
+        end
+        plot_file_path = generate_save_file_path("png", GT_TO_PLOT_FILE[gate_type], SAVE_PATH)
+        Plots.ylabel!(fig, "Pop")
+        Plots.xlabel!(fig, "Gate Count")
+        Plots.savefig(fig, plot_file_path)
+        println("Saving $(gate_type) to $(plot_file_path)")
+        end
 end
 
 
@@ -552,7 +734,7 @@ function initial_density_and_gate_error_avgf_update()
             trial_count = size(densities_old)[1]
             gate_count = size(densities_old)[2]
             fidelities = zeros(trial_count, gate_count + 1)
-            densities = zeros(trial_count, gate_count + 1, DENSITY_SIZE_ISO, DENSITY_SIZE_ISO)
+            densities = zeros(trial_count, gate_count + 1, STATE_SIZE_ISO, STATE_SIZE_ISO)
             densities[:, 2:gate_count + 1, :, :] = densities_old
             for trial_index in 1:trial_count
                 densities[trial_index, 1, :, :] = initial_density = gen_rand_density_iso(trial_index)
