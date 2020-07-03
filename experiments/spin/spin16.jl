@@ -161,7 +161,7 @@ PULSE_DATA = Dict(
 )
 
 # other constants
-MAXITERS = 1e8
+MAXITERS = 1e10
 DPI = 500
 
 
@@ -236,6 +236,8 @@ end
 fidelity_mat(m1, m2) = abs(tr(m1' * m2)) / abs(tr(m2' * m2))
 
 # Define integration.
+DT_CONTROLS = 1e-2
+DT_CONTROLS_INV = 1e2
 DT = 1e-2
 DT_INV = 1e2
 
@@ -471,7 +473,7 @@ function ve_hb(gate_count; seed=0)
 end
 
 
-function plot_fidelity_by_gate_count_single(fig, path)
+function plot_fidelity_by_gate_count_single(fig, path; inds=nothing)
     (dissipation_type, fidelities, gate_type,
      pulse_type) = h5open(path) do data_file
          dissipation_type = DissipationType(read(data_file, "dissipation_type"))
@@ -483,15 +485,18 @@ function plot_fidelity_by_gate_count_single(fig, path)
     gate_count = size(fidelities)[1] - 1
     gate_count_axis = Array(0:1:gate_count)
     label = "$(GT_TO_STR[gate_type]) $(PT_TO_STR[pulse_type]) $(DT_TO_STR[dissipation_type])"
-    Plots.plot!(fig, gate_count_axis, fidelities, label=label)
+    if isnothing(inds)
+        inds = 1:gate_count + 1
+    end
+    Plots.plot!(fig, gate_count_axis[inds], fidelities[inds], label=label, legend=:bottomleft)
 end
 
 
-function plot_fidelity_by_gate_count(paths;title=nothing)
+function plot_fidelity_by_gate_count(paths; inds=nothing, title=nothing)
     plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     fig = Plots.plot(dpi=DPI, ylims=(0, 1), yticks=(0:0.1:1))
     for path in paths
-        plot_fidelity_by_gate_count_single(fig, path)
+        plot_fidelity_by_gate_count_single(fig, path; inds=inds)
     end
     Plots.ylabel!("Fidelity")
     Plots.xlabel!("Gate Count")
@@ -524,11 +529,12 @@ end
 
 
 function run_sim_deqjl(dissipation_type, gate_count, gate_type, pulse_type;
-                       save=true, seed=0, plot=false)
+                       save=true, seed=0)
+    start_time = Dates.now()
     # grab
     data = grab_controls(gate_type, pulse_type)
     (controls, controls_file_path, gate_time) = data
-    gate_knot_count = Int(gate_time * DT_INV)
+    gate_knot_count = Int(gate_time * DT_CONTROLS_INV)
     gate_times = Array(0:1:gate_count) * gate_time
     
     # integrate
@@ -541,12 +547,12 @@ function run_sim_deqjl(dissipation_type, gate_count, gate_type, pulse_type;
     tspan = (0., gate_time * gate_count)
     p = (controls, gate_knot_count)
     prob = ODEProblem(f, initial_density, tspan, p)
-    result = solve(prob, DifferentialEquations.RK4(), dt=DT, saveat=gate_times, maxiters=MAXITERS)
+    result = solve(prob, DifferentialEquations.Tsit5(), dt=DT, saveat=gate_times,
+                   maxiters=MAXITERS, adaptive=false)
 
     # compute fidelity
     densities = zeros(gate_count + 1, STATE_SIZE_ISO, STATE_SIZE_ISO)
     fidelities = zeros(gate_count + 1)
-    gate_knot_count = Int(gate_time * DT_INV)
     g = GT_TO_GATE[gate_type]
     g2 = g^2
     g3 = g^3
@@ -591,6 +597,8 @@ function run_sim_deqjl(dissipation_type, gate_count, gate_type, pulse_type;
         # show_nice(target)
         # println("")
     end
+    end_time = Dates.now()
+    run_time = end_time - start_time
 
     # save data
     if save
@@ -605,24 +613,15 @@ function run_sim_deqjl(dissipation_type, gate_count, gate_type, pulse_type;
             write(data_file, "seed", seed)
             write(data_file, "densities", densities)
             write(data_file, "fidelities", fidelities)
+            write(data_file, "run_time", string(run_time))
         end
         println("Saved to $(data_file_path)")
     end
+end
 
-    # plot
-    if plot
-        plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
-        gate_axis = Array(0:1:gate_count)
-        fig = Plots.plot(
-            dpi=DPI, title="$(GT_TO_STR[gate_type]) $(PT_TO_STR[pulse_type])",
-            ylims=(0, 1), yticks=(0:0.1:1),
-        )
-        Plots.plot!(gate_axis, fidelities, label=nothing)
-        Plots.xlabel!("Gate Count")
-        Plots.ylabel!("Fidelity")
-        Plots.savefig(fig, plot_file_path)
-        println("Plotted to $(plot_file_path)")
-    end
+
+function dynamics_ve_deqjl(u, p, t)
+    return OMEGA_NEG_I_H_S * u - u * OMEGA_NEG_I_H_S
 end
 
 
@@ -631,12 +630,10 @@ function ve_deqjl(gate_count; seed=0, data_file_path=nothing)
     if isnothing(data_file_path)
         initial_density = u0 = gen_rand_density_iso(seed)
         tspan = (0., ZPIBY2_GATE_TIME * gate_count)
-        prob = ODEProblem(dynamics_lindblad_deqjl, u0, tspan)
-        result = solve(prob, DifferentialEquations.RK4(), dt=1e-3, saveat=gate_times)
+        prob = ODEProblem(dynamics_ve_deqjl, u0, tspan)
+        result = solve(prob, DifferentialEquations.TsitPap8(), dt=1e-3, saveat=gate_times, adaptive=false)
     end
     densities = zeros(gate_count + 1, STATE_SIZE_ISO, STATE_SIZE_ISO)
-    gate_knot_count = Int(ZPIBY2_GATE_TIME * DT_INV)
-    gate_knot_count_4 = 4 * gate_knot_count
     fidelities = zeros(gate_count + 1)
     z = ZPIBY2
     z2 = z^2
