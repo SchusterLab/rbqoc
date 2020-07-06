@@ -12,6 +12,8 @@ using Random
 using StaticArrays
 using Statistics
 
+include(joinpath(ENV["ROBUST_QOC_PATH"], "spin.jl"))
+
 EXPERIMENT_META = "spin"
 EXPERIMENT_NAME = "spin16"
 WDIR = ENV["ROBUST_QOC_PATH"]
@@ -23,116 +25,19 @@ VE_SAVE_FILE_NAME = "ve_spin16"
 ENV["GKSwstype"] = "nul"
 Plots.gr()
 
-# experimental constants
-# qubit frequency at flux frustration point
-OMEGA = 2 * pi * 1.4e-2 #GHz
-FBFQ_A = 0.202407
-FBFQ_B = 0.5
-# coefficients are listed in descending order
-# raw coefficients are in units of seconds
-FBFQ_T1_COEFFS = [
-    3276.06057; -7905.24414; 8285.24137; -4939.22432;
-    1821.23488; -415.520981; 53.9684414; -3.04500484
-] * 1e9
-
-# Define the system.
-NEG_I = SA_F64[0  0 1 0;
-               0  0 0 1;
-               -1 0 0 0;
-               0 -1 0 0;]
-SIGMA_X = SA_F64[0   1   0   0;
-                 1   0   0   0;
-                 0   0   0   1;
-                 0   0   1   0;]
-SIGMA_Z = SA_F64[1   0   0   0;
-                 0  -1   0   0;
-                 0   0   1   0;
-                 0   0   0  -1;]
-H_S = SIGMA_Z / 2
-OMEGA_NEG_I_H_S = OMEGA * NEG_I * H_S
-H_C1 = SIGMA_X / 2
-NEG_I_2_PI_H_C1 = 2 * pi * NEG_I * H_C1
-# dissipation ops
-# L_{0} = |g> <e|
-# L_{0}^{\dagger} = |e> <g|
-# L_{0}^{\dagger} L_{0} = |e> <e|
-# L_{1} = L_{0}^{\dagger} = |e> <g|
-# L_{1}^{\dagger} = L_{0} = |g> <e|
-# L_{1}^{\dagger} L_{1} = |g> <g|
-G_E = SA_F64[0 1 0 0;
-             0 0 0 0;
-             0 0 0 1;
-             0 0 0 0;]
-E_G = SA_F64[0 0 0 0;
-             1 0 0 0;
-             0 0 0 0;
-             0 0 1 0;]
-NEG_G_G_BY2 = SA_F64[1 0 0 0;
-                     0 0 0 0;
-                     0 0 1 0;
-                     0 0 0 0] * -0.5
-NEG_E_E_BY2 = SA_F64[0 0 0 0;
-                     0 1 0 0;
-                     0 0 0 0;
-                     0 0 0 1;] * -0.5
-# gates
-ZPIBY2 = SA_F64[1  0 1  0;
-                0  1 0 -1;
-                -1 0 1  0;
-                0  1 0  1;] / sqrt(2)
-YPIBY2 = SA_F64[1 -1 0  0;
-                1  1 0  0;
-                0  0 1 -1;
-                0  0 1  1;] / sqrt(2)
-XPIBY2 = SA_F64[1   0 0 1;
-                0   1 1 0;
-                0  -1 1 0;
-                -1  0 0 1;] / sqrt(2)
-# system constants
-STATE_SIZE = 2
-STATE_SIZE_ISO = 2 * STATE_SIZE
-ZPIBY2_GATE_TIME = 17.86
-
-# types
-@enum DissipationType begin
-    dissipation = 1
-    nodissipation = 2
-end
-
-@enum GateType begin
-    zpiby2 = 1
-    ypiby2 = 2
-    xpiby2 = 3
-end
-
-@enum PulseType begin
-    analytic = 1
-    vanilla = 2
-    t1_m1 = 3
-end
-
-DT_TO_STR = Dict(
-    dissipation => "Dissipation",
-    nodissipation => "No Dissipation",
-)
-
-GT_TO_STR = Dict(
-    zpiby2 => "Z/2",
-    ypiby2 => "Y/2",
-    xpiby2 => "X/2",
-)
-
-GT_TO_GATE = Dict(
-    xpiby2 => XPIBY2,
-    ypiby2 => YPIBY2,
-    zpiby2 => ZPIBY2,
-)
-
 PT_TO_STR = Dict(
     analytic => "Analytic",
     vanilla => "Vanilla QOC",
     t1_m1 => "T1 QOC"
 )
+
+
+# types
+@enum PulseType begin
+    analytic = 1
+    vanilla = 2
+    t1_m1 = 3
+end
 
 
 # data constants
@@ -165,31 +70,6 @@ MAXITERS = 1e10
 DPI = 500
 
 
-show_nice(x) = show(IOContext(stdout), "text/plain", x)
-
-
-function generate_save_file_path(extension, save_file_name, save_path)
-    # Ensure the path exists.
-    mkpath(save_path)
-
-    # Create a save file name based on the one given; ensure it will
-    # not conflict with others in the directory.
-    max_numeric_prefix = -1
-    for (_, _, files) in walkdir(save_path)
-        for file_name in files
-            if occursin("_$save_file_name.$(extension)", file_name)
-                max_numeric_prefix = max(parse(Int, split(file_name, "_")[1]))
-            end
-        end
-    end
-
-    save_file_name = "_$save_file_name.$(extension)"
-    save_file_name = @sprintf("%05d%s", max_numeric_prefix + 1, save_file_name)
-
-    return joinpath(save_path, save_file_name)
-end
-
-
 function grab_controls(gate_type, pulse_type)
     controls_file_path = PULSE_DATA[pulse_type][gate_type]
     controls_idx = PULSE_DATA[pulse_type][CIDX_KEY]
@@ -210,31 +90,6 @@ function grab_controls(gate_type, pulse_type)
 end
 
 
-function gen_rand_state_iso(seed_)
-    Random.seed!(seed_)
-    state = rand(STATE_SIZE) + 1im * rand(STATE_SIZE)
-    return SVector{STATE_SIZE_ISO}(
-        [real(state); imag(state)]
-    )
-end
-
-
-function gen_rand_density_iso(seed_)
-    Random.seed!(seed_)
-    state = rand(STATE_SIZE) + 1im * rand(STATE_SIZE)
-    density = (state * state') / abs(state' * state)
-    density_r = real(density)
-    density_i = imag(density)
-    density_iso = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}([
-        density_r -density_i;
-        density_i density_r;
-    ])
-    return density_iso
-end
-
-
-fidelity_mat(m1, m2) = abs(tr(m1' * m2)) / abs(tr(m2' * m2))
-
 # Define integration.
 DT_CONTROLS = 1e-2
 DT_CONTROLS_INV = 1e2
@@ -247,27 +102,6 @@ function rk4_step(dynamics, x, u)
 	k3 = dynamics(x + k2 / 2, u) * DT
 	k4 = dynamics(x + k3, u) * DT
 	return x + (k1 + 2 * k2 + 2 * k3 + k4)/6
-end
-
-
-function horner(coeffs, val)
-    run = coeffs[1]
-    for i = 2:lastindex(coeffs)
-        run = coeffs[i] + val * run
-    end
-    return run
-end
-
-
-function get_fbfq(amplitude)
-    return -abs(amplitude) * FBFQ_A + FBFQ_B
-end
-
-
-function get_t1_poly(amplitude)
-    fbfq = get_fbfq(amplitude)
-    t1 = horner(FBFQ_T1_COEFFS, fbfq)
-    return t1
 end
 
 

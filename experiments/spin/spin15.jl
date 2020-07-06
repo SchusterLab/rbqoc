@@ -7,9 +7,7 @@ using LinearAlgebra
 using StaticArrays
 using TrajectoryOptimization
 
-include("qoclib.jl")
-using QOCLib
-using SpinLib
+include(joinpath(ENV["ROBUST_QOC_PATH"], "rbqoc.jl"))
 
 # paths
 EXPERIMENT_META = "spin"
@@ -167,12 +165,12 @@ function run_traj(;sample=false)
         fill(1e-1, CONTROL_COUNT); # int_control
         fill(0, CONTROL_COUNT); # control
         fill(1e-1, CONTROL_COUNT); # dcontrol_dt
-        fill(1e-1, 1); # int_gamma
+        fill(1e6, 1); # int_gamma
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([
         fill(1e-1, CONTROL_COUNT); # d2control_dt2
-        fill(1e-1, 1); # dt
+        fill(1e-2, 1); # dt
     ])) 
     obj = LQRObjective(Q, R, Qf, xf, N)
 
@@ -217,7 +215,7 @@ function run_traj(;sample=false)
         println("Saving this optimization to $(save_file_path)")
         h5open(save_file_path, "cw") do save_file
             write(save_file, "controls", controls_arr)
-            write(savE_file, "controls_idx", cidx_arr)
+            write(save_file, "controls_idx", cidx_arr)
             write(save_file, "evolution_time", tf)
             write(save_file, "states", states_arr)
             write(save_file, "Q", Q_arr)
