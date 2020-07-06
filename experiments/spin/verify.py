@@ -18,7 +18,29 @@ WDIR = os.environ.get("ROBUST_QOC_PATH", ".")
 OUT_PATH = os.path.join(WDIR, "out")
 
 
+# types
+class SaveType(Enum):
+    QOCJL = 1
+    QOCPY = 2
+    SAMPLEJL = 3
+#ENDCLASS
+
+
 # defs
+def fidelity_vec(v1, v2):
+    ip = np.matmul(conjugate_transpose(v1), v2)[0, 0]
+    return np.real(ip) ** 2 + np.imag(ip) ** 2
+#ENDDEF
+
+
+def fidelity_mat(m1, m2):
+    return (
+        np.abs(np.trace(np.matmul(conjugate_transpose(m1), m2)))
+        / np.abs(np.trace(np.matmul(conjugate_transpose(m2), m2)))
+    )
+#ENDDEF
+
+
 def gen_initial_state(seed):
     np.random.rand(0)
     rands = np.random.rand(4)
@@ -26,6 +48,22 @@ def gen_initial_state(seed):
                       [rands[2] + 1j * rands[3],]])
     state = state / np.sqrt(np.abs(np.matmul(conjugate_transpose(state), state)[0, 0]))
     return state
+#ENDDEF
+
+
+def grab_controls(controls_file_path, save_type=SaveType.QOCJL):
+    with h5py.File(controls_file_path, "r") as save_file:
+        if save_type == SaveType.QOCJL:
+            x = 0
+        elif save_type == SaveType.SAMPLEJL:
+            x = 0
+        elif save_type == SaveType.QOCPY:
+            x = 0
+        #ENDIF
+        controls = save_file["controls"][()]
+    #ENDWITH
+
+    return (controls, evolution_time)
 #ENDDEF
 
 
@@ -56,18 +94,6 @@ TARGET_DENSITY = np.matmul(TARGET_STATE, conjugate_transpose(TARGET_STATE))
 
 # other constants
 CIDX_PY = -1
-
-
-def fidelity_vec(v1, v2):
-    ip = np.matmul(conjugate_transpose(v1), v2)[0, 0]
-    return np.real(ip) ** 2 + np.imag(ip) ** 2
-
-
-def fidelity_mat(m1, m2):
-    return (
-        np.abs(np.trace(np.matmul(conjugate_transpose(m1), m2)))
-        / np.abs(np.trace(np.matmul(conjugate_transpose(m2), m2)))
-    )
 
 
 def run_spin(experiment_name, controls_file_name, controls_idx):
@@ -120,6 +146,7 @@ def main():
     parser.add_argument("--ename", action="store", type=str)
     parser.add_argument("--cname", action="store", type=str)
     parser.add_argument("--cidx", action="store", type=int)
+    parser.add_argument("--cidx", action="store", type=str)
     args = vars(parser.parse_args())
     do_spin = args["spin"]
     experiment_name = args["ename"]
