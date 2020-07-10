@@ -8,6 +8,153 @@
   twocolumn,
 ]{revtex4-2}
 
+\input{preamble}
+
 \begin{document}
+
+%% TITLE
+\title{Robust Quantum Optimal Control}
+
+\author{Thomas Propson}
+\email{tcpropson@uchicago.edu}
+\affiliation{
+  Department of Physics, University of Chicago, Chicago, Illinois 60637, USA
+}
+
+\date{\today}
+
+\maketitle
+
+
+%% ABSTRACT
+\begin{abstract}
+  This is a paper about robust quantum optimal control.
+\end{abstract}
+
+
+%% SECTION 1
+\section{Introduction}
+[Existing work] The leading model of universal quantum computation is gate-based. There are analytic
+techniques to construct gates \cite{huang2020engineering}
+\cite{merrill2014progress} \cite{han2020experimental} \cite{wang2007nonadiabatic}.
+Most methods focus on optimizing a few aspects of the gate, but not all
+experimentally relevant aspects. There is a growing literature on numerical
+techniques to construct gates \cite{leung2017speedup} \cite{abdelhafez2019gradient}.
+%% TODO: Cite CRAB, GOAT, KROTOV, etc.
+These methods formulate the quantum optimal control problem as unconstrained.
+They typically rely on zeroth-order or first-order optimizers. They are not
+sofisticated enough to handle all of the relevant constraints simultaneously.
+Although some analytic techniques exist to design pulses robust
+to decoherence, no numerical techniques have been presented to
+design pulses robust to decoherence (as far as the author is aware).
+
+[This work] We employ the trajectory optimization literature to formulate the quantum
+optimal control problem as a constrained optimization problem.
+We study the quantum optimal control problem on the fluxonium.
+We outline experimentally realistic constraints and map them to
+the trajectory optimization framework. For the device we study
+we achieve a 2x increase in $T_{1}$ times.
+We present two methods for achieving robustness to system parameter deviations,
+and compare to existing dynamic decoupling methods. We find that 
+our methods beat dynamic decoupling and mitigate dephasing by order X.
+
+
+[Outline]  First we formulate the quantum optimal control problem
+in the trajectory optimization framework. Then, we introduce the dynamics
+of the fluxonium device and outline experimental considerations
+relevant to gate construction. Next we outline a method for
+making the optimization $T_{1}$ aware. Finally, we present
+some methods for engineering robustness to decoherence and
+compare them to existing techniques.
+
+
+%% SECTION 2
+\section{QOC + AL-iLQR}
+[QOC Problem Statement] I have some initial
+configuration and I want to reach some target configuration,
+either single- or multi-state transfer, subject to the dynamics
+\begin{align}
+  \frac{\partial \ket{\psi}(t)}{\partial t} &= -/frac{i}{\hbar} H(t) \ket{\psi}(t)
+\end{align}
+Common numerical techniques include approximating the analytic unitary propagator solution,
+or employing explicit/implicit Runge-Kutta methods of the form
+\begin{align}
+  \ket{\psi_{k + 1}} &= \ket{\psi_{k}} + \frac{\partial \ket{\psi_{k}}}{\partial t} \cdot dt
+\end{align}
+The interesting part is that your hamiltonian $H(t)$ has a time-dependent
+control parameter $u(t)$ that the experimentalist gets to control, e.g. flux threading
+a superconducting junction.
+\begin{align}
+  H(t) &= H_{0} + \sum_{i = 1}^{m} a_{m}(u_{m}(t)) H_{m}\\
+\end{align}
+Most often $a_{m}(u) = u$ but any arbitrary dependence is allowed.
+The technique of adjusting $\ket{\psi_{N}}$ based on $\textbf{u}(t)$
+is the goal of the quantum optimal control optimizer. This domain is
+know as sensitivity analysis. GRAPE does
+\begin{align}
+  \min_{U:N-1 \times m} &1 - {\lvert \braket{\psi_{N}(U)}{\psi_{t}} \lvert}^{2}\\
+\end{align}
+with
+\begin{align}
+  U^{(k + 1)} &= U^{(k)} - \alpha \textbf{\nabla_{\textbf{U}}} (1 - {\lvert \braket{\psi_{N}(U)}{\psi_{t}} \lvert}^{2})\\
+\end{align}
+In general they add more cost functions than target fidelity.
+%% TOOD: Other update procedures might differ, e.g. Krotov does some sequential updates
+%% and Houck, Google use black box optimizers.
+
+[AL-iLQR Problem Statement] Trajectory optimization gives us gaurantees
+about our updates via Ricatti recursion
+and allows us to put constraints on our cost functions.
+\begin{align}
+  %% This is e.q. 2 from ALTRO paper
+  \min_{U:N-1 \times m} &\mathcal{L}_{N}(X_{N}, \lambda_{N}, \mu_{N}) + \sum_{k = 1}^{N - 1} \mathcal{L}_{k}(X_{k}, U_{k}, \lambda_{k}, \mu_{k})\\
+  \mathcal{L}_{k}(X_{k}, U_{k}, \lambda_{k}, \mu_{k}) &= (\lambda_{k} + \frac{1}{2}I_{\mu_{k}} c_{k}(X_{k}, U_{k}))^{T} c_{k}(X_{K}, U_{K})
+  &+ (X_{k} - X_{f})^{T} Q (X_{k} - X_{f}) + U^{T} R U\\
+\end{align}
+The important point is that there is an update step (e.q. 17 from ALTRO paper) where we send \lambda -> \infty
+and get all of the nice convergence properties. The weights are adjusted dynamically between iterations until
+all of our constraints are satisfied. The Markovian decision structure of the problem allows
+us to apply differentiable dynamic programming to garauntee that the update for each control $U_{k}$ is
+opimal, as apposed to the greedy updates of first-order optimizers like the naive gradient descent.
+
+%% TODO: (?) Figure comparing update procedures
+
+
+%% SECTION 3
+\section{Our Problem}
+[Fluxonium + Device Characterization] In the two-level
+approximation we have
+\begin{align}
+  H/h &= \omega_{q} \frac{\sigma_{z}}{2} + A(\Phi_{ext}) \frac{\sigma_{x}}{2}\\
+\end{align}
+This approximation is good up to the avoided crossing at 0.35 $\Phi_{0}$. We get $A$
+by converting via $\bra{g} \hat{\phi} \ket{e}$.
+%% TODO: list device parameters
+
+[Constraints] We want constraints on our pulses. We want pulses start and end at zero
+for concatenation. We want pulses to have zero net flux to mitigate
+hysteresis in flux bias lines.
+%% TODO: See ref. 28 in Helin paper
+We want the amplitude to be constrained
+$\delta \Phi_{\textrm{ext}} \sim 0.06 \Phi_{0}$
+so the two-level approximation stays valid.
+We want our state to obey normalization conditions,
+mitigating numerical error in simulaiton.
+
+We test on the basis gates $X/2, Y/2, Z/2$. Universal
+up to arbitrary Z rotation.
+
+
+%% SECTION 4
+\section{Robustness to $T_{1}$-type Noise}
+
+
+
+%% SECTION 5
+\section{Robustness to $T_{\phi}$-type Noise}
+
+
+
+\bibliography{refs}
 
 \end{document}
