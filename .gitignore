@@ -1,6 +1,6 @@
 # ignore text editor files
 *~
-*#
+*\#
 
 # ignore binaries and raw data
 out
@@ -15,6 +15,7 @@ __pycache__
 *.pyc
 *.DS_Store
 !report/report.pdf
+!paper/paper.pdf
 
 # ignore local files
 _test

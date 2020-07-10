@@ -3,6 +3,7 @@ rbqoc.jl - common definitions for the rbqoc repo
 """
 
 # imports
+using Dierckx
 using DifferentialEquations
 using HDF5
 using Plots
@@ -86,14 +87,13 @@ function generate_save_file_path(extension, save_file_name, save_path)
 end
 
 
-function grab_controls(controls_file_path; mode="r", save_type=jl)
-    data = h5open(controls_file_path, mode) do save_file
+function grab_controls(save_file_path; save_type=jl)
+    data = h5open(save_file_path, "r") do save_file
         if save_type == jl
             cidx = read(save_file, "controls_idx")
-            controls = read(save_file, "states")[:, cidx]
+            controls = read(save_file, "astates")[:, cidx]
             evolution_time = read(save_file, "evolution_time")
-        end
-        if save_type == samplejl
+        elseif save_type == samplejl
             controls = read(save_file, "controls_sample")
             evolution_time = read(save_file, "evolution_time_sample")
         end
@@ -103,6 +103,18 @@ function grab_controls(controls_file_path; mode="r", save_type=jl)
     return data
 end
 
+
+function read_save(save_file_path)
+    dict = h5open(save_file_path, "r") do save_file
+        dict = Dict()
+        for key in names(save_file)
+            dict[key] = read(save_file, key)
+        end
+        return dict
+    end
+
+    return dict
+end
 
 """
 horner - compute the value of a polynomial using Horner's method
@@ -122,24 +134,28 @@ function horner(coeffs, val)
 end
 
 
-function plot_controls(controls_file_path, save_file_path;
+function plot_controls(save_file_path, plot_file_path;
                        save_type=jl, title=nothing)
     # Grab and prep data.
-    (controls, evolution_time) = grab_controls(controls_file_path; save_type=save_type)
+    (controls, evolution_time) = grab_controls(save_file_path; save_type=save_type)
     controls = controls ./ (2 * pi)
-    (control_eval_count,) = size(controls)
+    (control_eval_count, control_count) = size(controls)
     control_eval_times = Array(1:1:control_eval_count) * DT_PREF
-    file_name = split(basename(controls_file_path), ".h5")[1]
+    file_name = split(basename(save_file_path), ".h5")[1]
     if isnothing(title)
         title = file_name
     end
 
     # Plot.
-    fig = Plots.plot(control_eval_times, controls, dpi=DPI,
-                     label="controls", title=title)
+    fig = Plots.plot(dpi=DPI, title=title)
+    for i = 1:control_count
+        Plots.plot!(control_eval_times, controls[:, i],
+                    label="controls $(i)")
+    end
     Plots.xlabel!("Time (ns)")
     Plots.ylabel!("Amplitude (GHz)")
-    Plots.savefig(fig, save_file_path)
+    Plots.savefig(fig, plot_file_path)
+    println("Plotted to $(plot_file_path)")
     return
 end
 
@@ -301,11 +317,11 @@ amplitude :: Array(N) - amplitude in units of GHz (no 2 pi)
 get_t1_poly(amplitude) = horner(FBFQ_T1_COEFFS, get_fbfq(amplitude))
 
 
-function run_sim_deqjl_single(controls_file_path, gate_type; dt=DT_PREF,
+function run_sim_deqjl_single(gate_type, save_file_path; dt=DT_PREF,
                               dt_inv=DT_PREF_INV, dissipation_type=nodissipation,
                               save_type=jl, seed=0)
     # Grab data.
-    (controls, evolution_time) = grab_controls(controls_file_path; save_type=save_type)
+    (controls, evolution_time) = grab_controls(save_file_path)
     control_knot_count = Int(floor(evolution_time * dt_inv))
     save_times = [0; evolution_time]
 
@@ -341,84 +357,47 @@ end
 
 
 """
-sample_polynomial - Fit a polynomial to arbitrary data
-for a variable dt optimization. Sample
-the polynomial at a given time step dt.
+sample_controls - Sample controls and d2controls_dt2
+on the preferred time axis using a spline.
 """
-function sample_polynomial(controls_file_path; plot=false, plot_file_path=nothing)
-    # Grab data.
-    (
-        acontrols,
-        evolution_time,
-        astates,
-    ) = h5open(controls_file_path, "r+") do save_file
-        acontrols = read(save_file, "controls")
-        evolution_time = read(save_file, "evolution_time")
-        astates = read(save_file, "states")
-        return (
-            acontrols,
-            evolution_time,
-            astates
-        )
-    end
-    controls = astates[1:end - 1, CONTROLS_IDX[1]]
-    d2controls_dt2 = acontrols[1:end, D2CONTROLS_DT2_IDX[1]]
-    dts = acontrols[1:end, DT_IDX]
-    knot_count = size(dts)[1]
+function sample_controls(save_file_path; dt=DT_PREF, dt_inv=DT_PREF_INV,
+                         plot=false, plot_file_path=nothing)
+    # Grab data to sample from.
+    save = read_save(save_file_path)
+    controls = save["astates"][1:end - 1, (save["controls_idx"])]
+    d2controls_dt2 = save["acontrols"][1:end, save["d2controls_dt2_idx"]]
+    (control_knot_count, control_count) = size(controls)
+    dts = save["acontrols"][1:end, save["dt_idx"]]
     time_axis = [0; cumsum(dts, dims=1)[1:end-1]]
-    
+
+    # Construct time axis to sample over.
     final_time_sample = sum(dts)
-    knot_count_sample = Int(floor(final_time_sample * DT_PREF_INV))
+    knot_count_sample = Int(floor(final_time_sample * dt_inv))
     # The last control should be DT_PREF before final_time_sample.
-    time_axis_sample = Array(0:1:knot_count_sample - 1) * DT_PREF
+    time_axis_sample = Array(0:1:knot_count_sample - 1) * dt
 
-    # Fit a quadratic polynomial to each knot point. Ends use their inner-neighbor's polynomial
-    # astates has one more knot point than acontrols.
-    controls_polynomials = []
-    d2controls_dt2_polynomials = []
-    append!(controls_polynomials, fit(time_axis[1:3], controls[1:3]))
-    append!(d2controls_dt2_polynomials, fit(time_axis[1:3], d2controls_dt2[1:3]))
-    for i = 2:knot_count - 1
-        inds = i - 1:i + 1
-        ts = time_axis[inds]
-        append!(controls_polynomials, fit(ts, controls[inds]))
-        append!(d2controls_dt2_polynomials, fit(ts, d2controls_dt2[inds]))
+    # Sample time_axis_sample via spline.
+    controls_sample = zeros(knot_count_sample, control_count)
+    d2controls_dt2_sample = zeros(knot_count_sample, control_count)
+    for i = 1:control_count
+        controls_spline = Spline1D(time_axis, controls[:, i])
+        controls_sample[:, i] = map(controls_spline, time_axis_sample)
+        d2controls_dt2_spline = Spline1D(time_axis, d2controls_dt2[:, i])
+        d2controls_dt2_sample[:, i] = map(d2controls_dt2_spline, time_axis_sample)
     end
-    append!(controls_polynomials, controls_polynomials[end])
-    append!(d2controls_dt2_polynomials, d2controls_dt2_polynomials[end])
-
-    # Sample the new time axis using the polynomials.
-    controls_sample = zeros(knot_count_sample)
-    d2controls_dt2_sample = zeros(knot_count_sample)
-    time_axis_index = 1
-    for i = 1:knot_count_sample
-        now = time_axis_sample[i]
-        # Advance the time axis to the nearest point.
-        while ((time_axis_index != knot_count)
-               && (abs(time_axis[time_axis_index] - now)
-                   >= abs(time_axis[time_axis_index + 1] - now)))
-            time_axis_index = time_axis_index + 1
-        end
-        controls_sample[i] = controls_polynomials[time_axis_index](now)
-        d2controls_dt2_sample[i] = d2controls_dt2_polynomials[time_axis_index](now)
-        # println("tas[$(i)]: $(now), ta[$(time_axis_index)]: $(time_axis[time_axis_index]) "
-        #         * "sval: $(controls_sample[i]), val: $(controls[time_axis_index])")
-    end
-
 
     # Plot.
     if plot
         fig = Plots.plot(dpi=DPI)
-        Plots.scatter!(time_axis, controls, label="controls data", markersize=MS, alpha=ALPHA)
-        Plots.scatter!(time_axis_sample, controls_sample, label="controls fit", markersize=MS, alpha=ALPHA)
-        # Plots.scatter!(time_axis, d2controls_dt2, label="d2_controls_dt2 data")
-        # Plots.scatter!(time_axis_sample, d2controls_dt2_sample, label="d2_controls_dt2 fit")
+        Plots.scatter!(time_axis, controls[:, 1], label="controls data", markersize=MS, alpha=ALPHA)
+        Plots.scatter!(time_axis_sample, controls_sample[:, 1], label="controls fit", markersize=MS, alpha=ALPHA)
+        Plots.scatter!(time_axis, d2controls_dt2[:, 1], label="d2_controls_dt2 data")
+        Plots.scatter!(time_axis_sample, d2controls_dt2_sample[:, 1], label="d2_controls_dt2 fit")
         Plots.xlabel!("Time (ns)")
         Plots.ylabel!("Amplitude (GHz)")
         Plots.savefig(fig, plot_file_path)
         println("Plotted to $(plot_file_path)")
     end
-    # return (controls_sample, d2controls_dt2_sample, final_time_sample)
     return (controls_sample, d2controls_dt2_sample, final_time_sample)
 end
 
@@ -426,10 +405,15 @@ end
 """
 t1_average - Compute the average t1 time for a control pulse.
 """
-function t1_average(controls_file_path; save_type=jl)
+function t1_average(save_file_path; save_type=jl)
     # Grab and prep data.
-    (controls, evolution_time) = grab_controls(controls_file_path; save_type=save_type)
-    t1s = map(get_t1_poly, controls / (2 * pi))
-    t1_avg = mean(t1s)
-    return t1_avg
+    (controls, evolution_time) = grab_controls(save_file_path; save_type=save_type)
+    (control_knot_count, control_count) = size(controls)
+    t1_avgs = zeros(control_count)
+    for i = 1:control_count
+        t1s = map(get_t1_poly, controls[:, i] / (2 * pi))
+        t1_avgs[i] = mean(t1s)
+    end
+    
+    return t1_avgs
 end
