@@ -23,13 +23,13 @@
 
 \date{\today}
 
-\maketitle
-
 
 %% ABSTRACT
 \begin{abstract}
   This is a paper about robust quantum optimal control.
 \end{abstract}
+
+\maketitle
 
 
 %% SECTION 1
@@ -96,7 +96,7 @@ know as sensitivity analysis. GRAPE does
 \end{align}
 with
 \begin{align}
-  U^{(k + 1)} &= U^{(k)} - \alpha \textbf{\nabla_{\textbf{U}}} (1 - {\lvert \braket{\psi_{N}(U)}{\psi_{t}} \lvert}^{2})\\
+  U^{(k + 1)} &= U^{(k)} - \alpha \textbf{\nabla}_{\textbf{U}} (1 - {\lvert \braket{\psi_{N}(U)}{\psi_{t}} \lvert}^{2})\\
 \end{align}
 In general they add more cost functions than target fidelity.
 %% TOOD: Other update procedures might differ, e.g. Krotov does some sequential updates
@@ -111,7 +111,7 @@ and allows us to put constraints on our cost functions.
   \mathcal{L}_{k}(X_{k}, U_{k}, \lambda_{k}, \mu_{k}) &= (\lambda_{k} + \frac{1}{2}I_{\mu_{k}} c_{k}(X_{k}, U_{k}))^{T} c_{k}(X_{K}, U_{K})
   &+ (X_{k} - X_{f})^{T} Q (X_{k} - X_{f}) + U^{T} R U\\
 \end{align}
-The important point is that there is an update step (e.q. 17 from ALTRO paper) where we send \lambda -> \infty
+The important point is that there is an update step (e.q. 17 from ALTRO paper) where we send $\lambda \rightarrow \infty$
 and get all of the nice convergence properties. The weights are adjusted dynamically between iterations until
 all of our constraints are satisfied. The Markovian decision structure of the problem allows
 us to apply differentiable dynamic programming to garauntee that the update for each control $U_{k}$ is
@@ -144,6 +144,9 @@ mitigating numerical error in simulaiton.
 We test on the basis gates $X/2, Y/2, Z/2$. Universal
 up to arbitrary Z rotation.
 
+[$T_{1}$ and $T_{\phi}$ sensitivity] There is a tradeoff between
+
+
 
 %% SECTION 4
 \section{Robustness to $T_{1}$-type Noise}
@@ -152,8 +155,6 @@ up to arbitrary Z rotation.
 
 %% SECTION 5
 \section{Robustness to $T_{\phi}$-type Noise}
-
-
 
 \bibliography{refs}
 

@@ -8,6 +8,7 @@ __pycache__
 *.aux
 *.bbl
 *.blg
+*Notes.bib
 *.egg-info
 *.log
 *.out
