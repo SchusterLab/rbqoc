@@ -36,86 +36,140 @@
 %% SECTION 1
 \section{Introduction}
 (Existing work) The leading model of universal
-quantum computation is gate-based. Analytic methods
-have been demonstrated to construct gates.
-Some focus on solving the TDSE analytically
-\cite{}Analytic methods have
-been demonstrated to construct gates
-\cite{zhang2020universal, huang2020engineering,
-  han2020experimental, xu2020nonadiabatic}.
-Most methods focus on optimizing a few aspects of the gate, but not all
-experimentally relevant aspects. There is a growing literature
-on numerical
-techniques to construct gates \cite{leung2017speedup,
-  goerz2019krotov, doria2011optimal, abdelhafez2019gradient,
-  machnes2015gradient}.
-%% TODO: Cite CRAB, GOAT, KROTOV, etc.
-These methods formulate the quantum optimal
-control problem as unconstrained.
-They typically rely on zeroth-order or first-order optimizers.
-They are not
-sofisticated enough to handle all of the relevant
-constraints simultaneously.
-Although some analytic techniques exist to design pulses robust
-to decoherence, no numerical techniques have been presented to
-design pulses robust to decoherence (as far as the author is aware).
+quantum computation is gate-based. The Quantum Optimal Control (QOC)
+literature has saught to answer the question "What is the best way to construct a quantum gate?".
+Analytic methods
+have been demonstrated to construct quantum gates
+\cite{zhang2020universal, huang2020engineering, han2020experimental,
+  xu2020nonadiabatic, carlini2005quantum}.
+Most methods rely on solving the time-dependent
+Schroedinger equation analytically or deriving equations of motion
+from a suitable Lagrangian.
+
+Some analytical methods
+have been presented to address realistic experimental constraints.
+Considering the dynamical and geometric phases of state
+evolution has led to methods for achieving
+robustness to pure dephasing in quantum systems
+\cite{xu2020nonadiabitc, han2020experimental, merrill2014progress}.
+Additionally, suitable choices of bases have been demonstrated that
+allow the experimentalist to infer tradeoffs in longitudinal
+and pure dephasing coherence times \cite{huang2020engineering}.
+To date, however, no analytical method has been presented
+to construct a gate while satisfying all relevant experimental
+constraints. Furthermore, most analytic methods have only
+been demonstrated in the two-level approximation and become
+cumbersome to solve for larger Hilbert space sizes.
+
+Numerical quantum control techniques have developed in parallel
+with the analytic frameworks. Numerical quantum control
+techniques integrate the time-dependent Schroedinger
+equation and use sensitivity analysis to optimize target metrics
+of the quantum gate, such as fidelity
+\cite{leung2017speedup,  goerz2019krotov, doria2011optimal,
+  abdelhafez2019gradient, machnes2015gradient, leng2019robust}.
+These techniques typically employ zeroth- or first-order
+optimizers and make no garauntees of optimality.
+Further, they formulate the quantum control
+problem as unconstrained or use
+projective gradient methods \cite{machnes2015gradient}.
+The latter approach relies on constructing
+bases for constraint spaces--which is not always feasible--and
+may hinder convergence.
 
 (This work) We employ the trajectory optimization
 literature to formulate the quantum
 optimal control problem as a constrained optimization problem.
-We study the quantum optimal control problem on the fluxonium.
+The trajectory optimization framework allows us to handle arbitrary
+constraints on the evolution of the quantum state. Additionally,
+we introduce methods for constructing gates robust to longitudinal
+relaxation and pure dephasing, the dominant barrier to experimentally
+realizing practical quantum computing.
+
+We study the quantum optimal control problem on the fluxonium qubit.
 We outline experimentally realistic constraints and map them to
 the trajectory optimization framework. For the device we study
-we achieve a 2x increase in $T_{1}$ times.
-We present two methods for achieving robustness to system parameter deviations,
-and compare to existing dynamic decoupling methods. We find that 
-our methods beat dynamic decoupling and mitigate dephasing by order X.
-
+we achieve a 1.5x increase in $T_{1}$ times.
+We present two methods for achieving robustness to pure dephasing,
+and compare them to existing dynamic decoupling methods. We find that 
+our methods mitigate dephasing by order X over dynamic decoupling.
 
 (Outline)  First we formulate the quantum optimal control problem
 in the trajectory optimization framework. Then, we introduce the dynamics
 of the fluxonium device and outline experimental considerations
 relevant to gate construction. Next we outline a method for
 making the optimization $T_{1}$ aware. Finally, we present
-some methods for engineering robustness to decoherence and
+some methods for engineering robustness to pure dephasing and
 compare them to existing techniques.
 
 
 %% SECTION 2
 \section{QOC + AL-iLQR}
-(QOC Problem Statement) I have some initial
-configuration and I want to reach some target configuration,
-either single- or multi-state transfer, subject to the dynamics
+(QOC Problem Statement) Here we introduce the notation
+we will use throughout the paper,
+review the quantum optimal control problem statement,
+and introduce the trajectory optimization framework.
+Quantum optimal control concerns the evolution of
+a state $\ket{\psi(t)}$ governed by the time-dependent
+Schroedinger equation
 \begin{align}
-  \partial_{t} \ket{\psi(t)} &= -\frac{i}{\hbar} H(t) \ket{\psi(t)}
+  \partial_{t} \ket{\psi(t)} &= -\frac{i}{\hbar} H(\textbf{u}(t), t) \ket{\psi(t)}
 \end{align}
-Common numerical techniques include approximating the analytic unitary propagator solution,
-or employing explicit/implicit Runge-Kutta methods of the form
-\begin{align}
-  \ket{\psi^{(k + 1)}} &= \ket{\psi^{(k)}} + \partial_{t} \ket{\psi^{(k)}} \cdot dt
-\end{align}
-The interesting part is that your hamiltonian $H(t)$ has a time-dependent
-control parameter $u(t)$ that the experimentalist gets to control, e.g. flux threading
-a superconducting junction.
-\begin{align}
-  H(t) &= H_{0} + \sum_{i = 1}^{m} a_{m}(u_{m}(t)) H_{m}
-\end{align}
-Most often $a_{m}(u) = u$ but any arbitrary dependence is allowed.
-The technique of adjusting $\ket{\psi_{N}}$ based on $\textbf{u}(t)$
-is the goal of the quantum optimal control optimizer. This domain is
-know as sensitivity analysis. GRAPE does
-\begin{align}
-  \min_{U:N-1 \times m} &1 - {\lvert \braket{\psi_{N}(U) \lvert \psi_{t}} \lvert}^{2}
-\end{align}
-subject to the gradient descent update procedure
-\begin{align}
-  U^{'} &= U - \alpha \nabla_{U} (1 - {\lvert \braket{\psi_{N}(U) \lvert \psi_{t}} \lvert}^{2})
-\end{align}
-In general they add more cost functions than target fidelity.
-%% TOOD: Other update procedures might differ, e.g. Krotov does some sequential updates
-%% and Houck, Google use black box optimizers.
+The evolution is sometimes cast with $\rho(t) = \ket{\psi(t)}\bra{\psi(t)}$
+and the Lindblad master equation to model the decoherence of the
+state explicitly. The Hamiltonian
+depends arbitrarily on the controls $\textbf{u}(t)$.
 
-(AL-iLQR Problem Statement) Trajectory optimization gives us gaurantees
+Numerical quantum optimal control techniques make
+the problem tractable by discretizing the problem into $N$
+time steps. Typical integration techniques rely on approximating
+the analytical solution to the time-dependent Schroedinger equation
+or using explicit integration methods, e.g. Runge-Kutta, of the form
+\begin{align}
+  \ket{\psi_{k + 1}} \approx \ket{\psi_{k}} + \partial_{t} \ket{\psi_{k}} \cdot \Delta t_{k}
+\end{align}
+
+Quantum optimal control seeks the control
+parameters that minimize a functional $J(u, \ket{\psi_{N}(u)})$.
+In the simplest case the functional
+$J = 1 - {\lvert \braket{\psi_{f} \lvert \psi_{N}(u)} \rvert}^{2}$
+which is the infidelity between the inital state evolved
+to the final time step ($\ket{\psi_{N}(u)}$)
+and the target state ($\ket{\psi_{f}}$). In general
+$J$ is a linear combinaion of cost functions on $\ket{\psi_{N}(u)}$, e.g.
+forbidden-state occupation, as well as
+cost functions on $u$, e.g. the norm of the control amplitudes
+\cite{leung2017speedup}.
+
+(AL-iLQR Problem Statement) The trajectory optimization
+literature solves a more general class of non-linear programs that resemble
+the quantum optimal control problem. The quantum optimal control
+problem is a specific case of the linear quadratic regulator (LQR).
+LQR is so called because the dynamics are linear in the state and
+the cost function is quadratic in the state. In the LQR formulation
+the same functional is evaluated at each time step
+\begin{equation}
+  \begin{aligned}
+    J_{\textrm{LQR}} = \tilde{x}_{N}^{T} Q_{N} \tilde{x}_{N}
+    &+ \sum_{k = 0}^{N - 1} \tilde{x}_{k}^{T} Q_{k} \tilde{x}_{k} + u_{k}^{T} R_{k} u_{k}
+  \end{aligned}
+\end{equation}
+where $\tilde{x}_{k} = x_{k} - x_{f}$ is the difference between the current
+and final state and $Q_{k}, R_{k}$ are matrices that define the penalty metric.
+
+The advantage of the LQR formulation
+is that there exists a dynamic programming algorithm to compute the
+optimal update to the controls $u_{k}$ at each time step.
+This algorithm employs the Ricatti recursion (see Appendix).
+
+In order to incorporate constraints into the problem we employ
+the augmented lagrangian method. This method adaptively
+updates the penalty of constraints
+%% LEFT OFF HERE
+
+
+
+Trajectory optimization gives us gaurantees
 about our updates via Ricatti recursion
 and allows us to put constraints on our cost functions.
 %% This is e.q. 2 from ALTRO paper
@@ -142,7 +196,7 @@ opimal, as apposed to the greedy updates of first-order optimizers like the naiv
 
 
 %% SECTION 3
-\section{Our Problem}
+\section{QOC on the Fluxonium}
 (Fluxonium Device) In the two-level
 approximation we have
 \begin{align}
@@ -272,15 +326,15 @@ of time as shown in Fig. 1.
 %% spline T1 and use smaller sim times.
 \begin{figure}[ht]
   \begin{subfigure}{.33\textwidth}
-    \includegraphics[width=\linewidth]{assets/00045_spin16.png}
+    %% \includegraphics[width=\linewidth]{assets/00045_spin16.png}
     \label{fig:sub-first}
   \end{subfigure}
   \begin{subfigure}{.33\textwidth}
-    \includegraphics[width=\linewidth]{assets/00047_spin16.png}
+    %% \includegraphics[width=\linewidth]{assets/00047_spin16.png}
     \label{fig:sub-second}
   \end{subfigure}
   \begin{subfigure}{.33\textwidth}
-    \includegraphics[width=\linewidth]{assets/00049_spin16.png}
+    %% \includegraphics[width=\linewidth]{assets/00049_spin16.png}
     \label{fig:sub-third}
   \end{subfigure}
   \caption{Master equation simulation with $T_{1}$ dissipation for all basis gates.}
