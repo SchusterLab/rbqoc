@@ -1,6 +1,7 @@
 \documentclass[
   amsfonts,
   amsmath,
+  tbtags,
   amssymb,
   aps,
   nobibnotes,
@@ -34,21 +35,33 @@
 
 %% SECTION 1
 \section{Introduction}
-[Existing work] The leading model of universal quantum computation is gate-based. There are analytic
-techniques to construct gates \cite{huang2020engineering}
-\cite{merrill2014progress} \cite{han2020experimental} \cite{wang2007nonadiabatic}.
+(Existing work) The leading model of universal
+quantum computation is gate-based. Analytic methods
+have been demonstrated to construct gates.
+Some focus on solving the TDSE analytically
+\cite{}Analytic methods have
+been demonstrated to construct gates
+\cite{zhang2020universal, huang2020engineering,
+  han2020experimental, xu2020nonadiabatic}.
 Most methods focus on optimizing a few aspects of the gate, but not all
-experimentally relevant aspects. There is a growing literature on numerical
-techniques to construct gates \cite{leung2017speedup} \cite{abdelhafez2019gradient}.
+experimentally relevant aspects. There is a growing literature
+on numerical
+techniques to construct gates \cite{leung2017speedup,
+  goerz2019krotov, doria2011optimal, abdelhafez2019gradient,
+  machnes2015gradient}.
 %% TODO: Cite CRAB, GOAT, KROTOV, etc.
-These methods formulate the quantum optimal control problem as unconstrained.
-They typically rely on zeroth-order or first-order optimizers. They are not
-sofisticated enough to handle all of the relevant constraints simultaneously.
+These methods formulate the quantum optimal
+control problem as unconstrained.
+They typically rely on zeroth-order or first-order optimizers.
+They are not
+sofisticated enough to handle all of the relevant
+constraints simultaneously.
 Although some analytic techniques exist to design pulses robust
 to decoherence, no numerical techniques have been presented to
 design pulses robust to decoherence (as far as the author is aware).
 
-[This work] We employ the trajectory optimization literature to formulate the quantum
+(This work) We employ the trajectory optimization
+literature to formulate the quantum
 optimal control problem as a constrained optimization problem.
 We study the quantum optimal control problem on the fluxonium.
 We outline experimentally realistic constraints and map them to
@@ -59,7 +72,7 @@ and compare to existing dynamic decoupling methods. We find that
 our methods beat dynamic decoupling and mitigate dephasing by order X.
 
 
-[Outline]  First we formulate the quantum optimal control problem
+(Outline)  First we formulate the quantum optimal control problem
 in the trajectory optimization framework. Then, we introduce the dynamics
 of the fluxonium device and outline experimental considerations
 relevant to gate construction. Next we outline a method for
@@ -70,47 +83,55 @@ compare them to existing techniques.
 
 %% SECTION 2
 \section{QOC + AL-iLQR}
-[QOC Problem Statement] I have some initial
+(QOC Problem Statement) I have some initial
 configuration and I want to reach some target configuration,
 either single- or multi-state transfer, subject to the dynamics
 \begin{align}
-  \frac{\partial \ket{\psi}(t)}{\partial t} &= -/frac{i}{\hbar} H(t) \ket{\psi}(t)
+  \partial_{t} \ket{\psi(t)} &= -\frac{i}{\hbar} H(t) \ket{\psi(t)}
 \end{align}
 Common numerical techniques include approximating the analytic unitary propagator solution,
 or employing explicit/implicit Runge-Kutta methods of the form
 \begin{align}
-  \ket{\psi_{k + 1}} &= \ket{\psi_{k}} + \frac{\partial \ket{\psi_{k}}}{\partial t} \cdot dt
+  \ket{\psi^{(k + 1)}} &= \ket{\psi^{(k)}} + \partial_{t} \ket{\psi^{(k)}} \cdot dt
 \end{align}
 The interesting part is that your hamiltonian $H(t)$ has a time-dependent
 control parameter $u(t)$ that the experimentalist gets to control, e.g. flux threading
 a superconducting junction.
 \begin{align}
-  H(t) &= H_{0} + \sum_{i = 1}^{m} a_{m}(u_{m}(t)) H_{m}\\
+  H(t) &= H_{0} + \sum_{i = 1}^{m} a_{m}(u_{m}(t)) H_{m}
 \end{align}
 Most often $a_{m}(u) = u$ but any arbitrary dependence is allowed.
 The technique of adjusting $\ket{\psi_{N}}$ based on $\textbf{u}(t)$
 is the goal of the quantum optimal control optimizer. This domain is
 know as sensitivity analysis. GRAPE does
 \begin{align}
-  \min_{U:N-1 \times m} &1 - {\lvert \braket{\psi_{N}(U)}{\psi_{t}} \lvert}^{2}\\
+  \min_{U:N-1 \times m} &1 - {\lvert \braket{\psi_{N}(U) \lvert \psi_{t}} \lvert}^{2}
 \end{align}
-with
+subject to the gradient descent update procedure
 \begin{align}
-  U^{(k + 1)} &= U^{(k)} - \alpha \textbf{\nabla}_{\textbf{U}} (1 - {\lvert \braket{\psi_{N}(U)}{\psi_{t}} \lvert}^{2})\\
+  U^{'} &= U - \alpha \nabla_{U} (1 - {\lvert \braket{\psi_{N}(U) \lvert \psi_{t}} \lvert}^{2})
 \end{align}
 In general they add more cost functions than target fidelity.
 %% TOOD: Other update procedures might differ, e.g. Krotov does some sequential updates
 %% and Houck, Google use black box optimizers.
 
-[AL-iLQR Problem Statement] Trajectory optimization gives us gaurantees
+(AL-iLQR Problem Statement) Trajectory optimization gives us gaurantees
 about our updates via Ricatti recursion
 and allows us to put constraints on our cost functions.
-\begin{align}
-  %% This is e.q. 2 from ALTRO paper
-  \min_{U:N-1 \times m} &\mathcal{L}_{N}(X_{N}, \lambda_{N}, \mu_{N}) + \sum_{k = 1}^{N - 1} \mathcal{L}_{k}(X_{k}, U_{k}, \lambda_{k}, \mu_{k})\\
-  \mathcal{L}_{k}(X_{k}, U_{k}, \lambda_{k}, \mu_{k}) &= (\lambda_{k} + \frac{1}{2}I_{\mu_{k}} c_{k}(X_{k}, U_{k}))^{T} c_{k}(X_{K}, U_{K})
-  &+ (X_{k} - X_{f})^{T} Q (X_{k} - X_{f}) + U^{T} R U\\
-\end{align}
+%% This is e.q. 2 from ALTRO paper
+\begin{equation}
+\begin{aligned}[b]
+  \min_{U:N-1 \times m} &\mathcal{L}_{N}(x_{N}, \lambda_{N}, \mu_{N})\\
+  &+ \sum_{k = 1}^{N - 1} \mathcal{L}_{k}(x_{k}, u_{k}, \lambda_{k}, \mu_{k})\\
+\end{aligned}
+\end{equation}
+\begin{equation}
+\begin{aligned}[b]
+  \mathcal{L}_{k}(x_{k}, &u_{k}, \lambda_{k}, \mu_{k}) =\\
+  &(\lambda_{k} + \frac{1}{2}I_{\mu_{k}} c_{k}(x_{k}, u_{k}))^{T} c_{k}(x_{k}, u_{k})\\
+  &+ (x_{k} - x_{f})^{T} Q (x_{k} - x_{f}) + u_{k}^{T} R u_{k}\\
+\end{aligned}
+\end{equation}
 The important point is that there is an update step (e.q. 17 from ALTRO paper) where we send $\lambda \rightarrow \infty$
 and get all of the nice convergence properties. The weights are adjusted dynamically between iterations until
 all of our constraints are satisfied. The Markovian decision structure of the problem allows
@@ -122,16 +143,18 @@ opimal, as apposed to the greedy updates of first-order optimizers like the naiv
 
 %% SECTION 3
 \section{Our Problem}
-[Fluxonium + Device Characterization] In the two-level
+(Fluxonium Device) In the two-level
 approximation we have
 \begin{align}
-  H/h &= \omega_{q} \frac{\sigma_{z}}{2} + A(\Phi_{ext}) \frac{\sigma_{x}}{2}\\
+  H/h &= \omega_{q} \frac{\sigma_{z}}{2} + A(\Phi_{ext}) \frac{\sigma_{x}}{2}
 \end{align}
-This approximation is good up to the avoided crossing at 0.35 $\Phi_{0}$. We get $A$
+This approximation is good up to the avoided crossing at $\Phi_{\textrm{ext}} = 0.35 \Phi_{0}$. We get $A$
 by converting via $\bra{g} \hat{\phi} \ket{e}$.
+We use the gates $X/2, Y/2, Z/2$. $X/2, Y/2$ are universal
+up to an arbitrary Z rotation.
 %% TODO: list device parameters
 
-[Constraints] We want constraints on our pulses. We want pulses start and end at zero
+(Constraints) We want constraints on our pulses. We want pulses start and end at zero
 for concatenation. We want pulses to have zero net flux to mitigate
 hysteresis in flux bias lines.
 %% TODO: See ref. 28 in Helin paper
@@ -140,21 +163,265 @@ $\delta \Phi_{\textrm{ext}} \sim 0.06 \Phi_{0}$
 so the two-level approximation stays valid.
 We want our state to obey normalization conditions,
 mitigating numerical error in simulaiton.
+%% TODO: mention pulse smoothing via optimizing over 2nd derivative
+%% of pulses
+%% TODO: probably want to list equations for the constraints
 
-We test on the basis gates $X/2, Y/2, Z/2$. Universal
-up to arbitrary Z rotation.
-
-[$T_{1}$ and $T_{\phi}$ sensitivity] There is a tradeoff between
-
+($T_{1}$ and $T_{\phi}$ noise)
+Dissipation to the thermal bath via longitudinal
+relaxation ($T_{1}$) is an irreversible process
+that results in information loss.
+Pure dephasing ($T_{\phi}$) is a reversible process.
+Dielectric loss, etc. contribute
+to $T_{1}$. $1/f$ flux noise, etc. contribute to $T_{\phi}$
+There is a tradeoff between $T_{1}$ and $T_{\phi}$. In the case of white
+noise we have that the sum of the noise weights $W_{1}$ and $W_{\phi}$
+is constant \cite{huang2020engineering}.
+In our case $T_{\phi}$ is saturated at the flux
+frustration point $\Phi_{\textrm{ext}} = 0.5 \Phi_{0}$
+$T_{\phi}$ decreases as we move away from the flux
+frustration point. Conversely, $T_{1}$ is at a minimum
+around the flux frustration point $T_{1}(0.5 \Phi_{0}) = 0.315$ms,
+and increases away from the flux frustration point
+$T_{1}(0.43 \Phi_{0}) = 4.3$ms. Given the nature
+of the decay processes and the tradeoff, we choose
+to optimize the flux bias to have high time-averaged
+$T_{1}$ times and employ some techniques to mitigate
+$T_{\phi}$ dephasing.
+%% TODO: See fig. 3 in Helin paper
 
 
 %% SECTION 4
 \section{Robustness to $T_{1}$-type Noise}
+(Strategy) We seek to minimize the probability
+that the qubit relaxes longitudinally.
+To this end we augment the state vector $x_{k}$ with the
+longitudinal relaxation probability
+\begin{align}
+  P_{1}(t_{k}) = \int_{0}^{t_{k}}
+  \gamma_{1}(\Phi_{\textrm{ext}}(t)) dt
+\end{align}
+where $\gamma_{1} = T_{1}^{-1}$. Setting the target
+longitudinal relaxation probability to 0 results in
+a quadratic cost at each knot point
+of the form ${\lvert P_{1}(t_{k}) \rvert}^{2}$.
 
+The value $T_{1}(\Phi_{\textrm{ext}}(t_{k}))$
+is obtained at each knot point by evaluating
+a spline interpolant fit to
+experimentally obtained data of the form
+$\{(\Phi_{\textrm{ext}}, T_{1})\}$.
+Calculating $T_{1}$ directly from theoretical
+considerations requires many high-dimensional
+eigendecompositions, which
+is computationally expensive. Additionally,
+$T_{1}$ values are known to fluctuate greatly
+with laboratory temperatures \cite{klimov2018fluctuations}.
+Interpolating $T_{1}$ from experimental data increases
+the fridge truth of the simulation.
+
+Furthermore, the probability of longitudinal 
+relaxation is dependent on the gate duration $t_{N}$.
+We allow the optimizer to tune the gate duration by
+augmenting the control vector $u_{k}$ with
+the time step between knot points $\Delta t_{k}$.
+Promoting $\Delta t_{k}$ to a decision variable, rather
+than the number of knot points $N$, preserves the
+Markovian decision structure of the trajectory
+optimization problem. To ensure numerical
+integration accuracy is maintained we add a bound
+constraint at each knot point
+$5\textrm{e-}3 \ \textrm{ns} \le
+\Delta t_{k} \le 2\textrm{e-}2 \ \textrm{ns}$.
+Note that this bound constraint is allowed to be
+broken for intermediate iterations of the optimization,
+so we use the absolute value of the time step
+$\lvert \Delta t_{k} \rvert$ to ensure that it is non-negative.
+
+(Results) We achieve a factor of 1.5 decrease in the probability
+of longitudinal relaxation from the analytic gates we benchmark
+against. We simulate the performance of the gates using the
+lindblad master equation (see Appendix X). We repeatedly apply the basis gates
+and measure the fidelity of the resulting state as a function
+of time as shown in Fig. 1.
+
+%% T4.1
+%% TODO: Update this table with spline T1 optimizations and calculations.
+%% TODO: Maybe best for appendix.
+%% TOOD: Maybe add some commentary about why we see more speedup
+%% for Z/2 and X/2 than Y/2. In particular I think this is because of the
+%% long idle times at the flux frustration point for Z/2 and X/2. It
+%% might be a more fair comparison to show gates that have better T1s
+%% and as good flux noise mitigation.
+\begin{table}
+  \begin{tabular}{c | c | c | c}
+    & Analytic  & QOC &\\
+    Gate & $P_{1}\ (10^{-5})$ & $P_{1}\ (10^{-5})$ & Speedup\\
+    \hline
+    Z/2 & 4.615 & 2.576 & 1.792\\
+    Y/2 & 2.826 & 1.888 & 1.496\\
+    X/2 & 9.562 & 5.080 & 1.882\\
+  \end{tabular}
+  \caption{Probability of longitudinal relaxation for each gate
+    evaluated at the gate's duration.}
+\end{table}
+
+
+%% F4.1
+%% TODO: Update images. Use new gates constructed with
+%% spline T1 and use smaller sim times.
+\begin{figure}[ht]
+  \begin{subfigure}{.33\textwidth}
+    \includegraphics[width=\linewidth]{assets/00045_spin16.png}
+    \label{fig:sub-first}
+  \end{subfigure}
+  \begin{subfigure}{.33\textwidth}
+    \includegraphics[width=\linewidth]{assets/00047_spin16.png}
+    \label{fig:sub-second}
+  \end{subfigure}
+  \begin{subfigure}{.33\textwidth}
+    \includegraphics[width=\linewidth]{assets/00049_spin16.png}
+    \label{fig:sub-third}
+  \end{subfigure}
+  \caption{Master equation simulation with $T_{1}$ dissipation for all basis gates.}
+  \label{fig:fig}
+\end{figure}
 
 
 %% SECTION 5
 \section{Robustness to $T_{\phi}$-type Noise}
+(Strategy) System parameter deviations arise due to
+measurement error and noise injection. For example,
+we might measure $\omega_{q}$ inaccurately,
+which leads to a deviation from
+the the drive frequency $\omega_{d}$.
+Further, we may have some temperature dependent gain
+in the lines leading to the device, or 1/$f$ noise
+and $A(\Phi_{\textrm{ext}})$ comes out with some
+$\delta A$ on the flux axis.
+Both of these effects lead to dephasing,
+uncertain dynamics, and thus erroneous computation.
+
+These problems are typically attacked with dynamic decoupling
+sequence where an erroneous rotation is compensated for with
+one that cancels the $\delta$. However, we can do better
+than the first order variants of these pulses.
+
+We propose two methods for engineering robustness
+to system parameter deviations. The first we call the
+derivative method. We use the intuition that
+making the final state insensitive to changes
+in the system parameter is encoded in the derivative
+$\partial_{\omega}^{l} \ket{\psi_{N}}$.
+In particular, we find that going to the second
+derivative is good. The first derivative is already
+small, especially for the $\delta A$ time, because,
+near the end of optimization, the
+optimizer is unable to improve the final state by
+changing the flux bias.
+The dynamics for propgating the derivative of the state
+are found by differentiating the schroedinger equation
+dynamics with respect to the parameter of interest.
+The scheme boils down to propagating sequential
+derivatives of the parameter you want to be
+robust to $\partial_{\omega}^{l}$ and penalizing thier norm
+${\lvert \partial_{\omega}^{l} \lvert}^{2}$.
+
+The other scheme we call the sampling method. This method
+is well-known in the trajectory optimiztion. In this scheme
+we propgate an array of states whose dynamics differ
+in that the parameter of interest is altered slightly
+for each state. In the 3-point sampling method we
+propagate $\psi_{\pm}$, $\psi$ where
+$\omega_{\pm} = \omega \pm \delta \omega$. Here $\delta$ is
+typically taken at standard deviations of the parameter
+of interest.
+
+(Results) We compare the simplest schemes
+for the derivative and sampling methods to
+the CORPSE dynamic decoupling sequence.
+They perform X better by Y metric.
+
+We also find that longer gate durations allow for
+greater robustness.
+
+%% F5.1
+%% TODO: Update this and make sure it is for X/2.
+%% I'm not sure if we should include all gates Z/2, Y/2, X/2
+%% because I don't know what the dynamic decoupling analogy
+%% for Z/2 and Y/2 are. On the other hand we would
+%% want to include all of them to show that the benefit
+%% is not uniform across gates.
+\begin{figure}
+  %% \includegraphics[width=\linewidth]{assets/00005_spin12_hpsweep.png}
+  \caption{fidelity v.s. $\omega$ for the $X/2$ gate via
+    analytic, 3-sample, 2-derivative (maybe add 5-sample and 3-derivative)}
+\end{figure}
+
+%% F5.2
+%% TODO: Update this and make sure it is for X/2.
+%% Add inset to show high-performing variants at large time steps.
+\begin{figure}
+  %% \includegraphics[width=\linewidth]{assets/00006_spin12_hpsweep.png}
+  \caption{fidelity at $\omega \pm \sigma_{\omega}$ v.s. time for the
+    $X/2$ gate via analytic, 3-sample, 2-derivative
+    (maybe add 5-sample and 3-derivative)}
+\end{figure}
+
+%% F5.3
+%% TODO: Make this figure. My guess is we want a 5-sample, with 2 at \omega_{\pm}
+%% and 2 at A_{\pm} as well as 2-derivative of both parameters separately.
+\begin{figure}
+  %% \includegraphics[width=\linewidth]{assets/t2_temp.jpg}
+  \caption{Master equation simulation with $T_{2}$ dissipation
+    comparing the gates robust to $\delta \omega_{q}$ and $\delta A$ against
+    the analytic gate.}
+\end{figure}
+
+
+%% TODO: Fig: Full ME simulation for best T1 and T\phi pulses
+%% v.s. analytic
+
+%% SECTION 6
+\section{Discussion}
+We have proposed some schemes and they work well.
+
+
+\appendix
+%% APPENDIX 1
+\section{Ricatti Recursion}
+This will give the reader unfamiliar with trajectory
+optimization intuition for how the trajectory optimization
+update scheme works and why it is better than
+a more naive method.
+
+
+%% APPENDIX 2
+\section{Measurements}
+We measure $T_{1}$ using the standard experiment
+and $T_{2}$ using te Ramsey experiment. We fit with splines
+and the data looks like fig. 3 in Helin's paper \cite{zhang2020universal}.
+We measure $\omega_{q}$ and $\sigma_{\omega_{q}}$ using X method.
+
+
+%% APPENDIX 3
+\section{ME Simulation}
+We model dissipation using the lindblad master
+equation and standard collapse operators for
+longitudinal relaxation and dephasing
+of a two-level system.
+
+
+%% APPENDIX 4
+\section{Derivative Method}
+\begin{equation}
+  \begin{aligned}
+    \partial_{\omega}^{2} \partial_{t} \psi
+    = \frac{-i}{h} [&2 \cdot \frac{\sigma_{z}}{2} \partial_{\omega} \psi\\
+      &+ (\omega \frac{\sigma_{z}}{2} + A \frac{\sigma_{x}}{2}) \partial_{\omega}^{2} \psi]
+  \end{aligned}
+\end{equation}
+
 
 \bibliography{refs}
 

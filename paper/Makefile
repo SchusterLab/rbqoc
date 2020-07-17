@@ -15,5 +15,8 @@ paper:
 	$(PDF) $(PSRCS)
 	$(PDF) $(PSRCS)
 
+paper-no-bib:
+	$(PDF) $(PSRCS)
+
 clean:
 	rm -rf $(LATEXOBJS)
