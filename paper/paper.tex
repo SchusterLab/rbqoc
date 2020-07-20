@@ -72,7 +72,8 @@ These techniques typically employ zeroth- or first-order
 optimizers and make no garauntees of optimality.
 Further, they formulate the quantum control
 problem as unconstrained or use
-projective gradient methods \cite{machnes2015gradient}.
+projective gradient methods to enforce constraints
+\cite{machnes2015gradient}.
 The latter approach relies on constructing
 bases for constraint spaces--which is not always feasible--and
 may hinder convergence.
@@ -110,141 +111,190 @@ we will use throughout the paper,
 review the quantum optimal control problem statement,
 and introduce the trajectory optimization framework.
 Quantum optimal control concerns the evolution of
-a state $\ket{\psi(t)}$ governed by the time-dependent
-Schroedinger equation
+a quantum state $\ket{\psi(t)}$ governed by the time-dependent
+Schroedinger equation (TDSE)
 \begin{align}
-  \partial_{t} \ket{\psi(t)} &= -\frac{i}{\hbar} H(\textbf{u}(t), t) \ket{\psi(t)}
+  \frac{d}{dt} \ket{\psi(t)} &= -\frac{i}{\hbar} H(\textbf{u}(t), t) \ket{\psi(t)}
 \end{align}
-The evolution is sometimes cast with $\rho(t) = \ket{\psi(t)}\bra{\psi(t)}$
-and the Lindblad master equation to model the decoherence of the
-state explicitly. The Hamiltonian
-depends arbitrarily on the controls $\textbf{u}(t)$.
+The evolution is sometimes cast with the evolution
+of a density matrix under the Lindblad master equation to
+model the decoherence of the state explicitly. The Hamiltonian
+depends arbitrarily on the controls ($\textbf{u}(t)$). The controls
+are so called because they are the means the experimentalist has to
+act on the system.
 
 Numerical quantum optimal control techniques make
 the problem tractable by discretizing the problem into $N$
-time steps. Typical integration techniques rely on approximating
-the analytical solution to the time-dependent Schroedinger equation
-or using explicit integration methods, e.g. Runge-Kutta, of the form
+time steps. Typical integration techniques for the TDSE include
+approximating unitary propagators as well as explicit integration methods,
+such as Runge-Kutta, of the form
+\label{step-approx}
 \begin{align}
-  \ket{\psi_{k + 1}} \approx \ket{\psi_{k}} + \partial_{t} \ket{\psi_{k}} \cdot \Delta t_{k}
+  \ket{\psi_{k + 1}} \approx \ket{\psi_{k}} + \frac{d}{dt} \ket{\psi_{k}} \cdot \Delta t_{k}
 \end{align}
 
 Quantum optimal control seeks the control
-parameters that minimize a functional $J(u, \ket{\psi_{N}(u)})$.
-In the simplest case the functional
-$J = 1 - {\lvert \braket{\psi_{f} \lvert \psi_{N}(u)} \rvert}^{2}$
-which is the infidelity between the inital state evolved
-to the final time step ($\ket{\psi_{N}(u)}$)
+parameters that minimize a functional $J(\textbf{u}(t))$.
+In the simplest case the functional is
+$J = 1 - {\lvert \braket{\psi_{f} \lvert \psi_{N}(\textbf{u}(t))} \rvert}^{2}$
+the infidelity between the inital state evolved
+to the final time step ($\ket{\psi_{N}(\textbf{u}(t))}$)
 and the target state ($\ket{\psi_{f}}$). In general
-$J$ is a linear combinaion of cost functions on $\ket{\psi_{N}(u)}$, e.g.
+$J$ is a linear combinaion of cost functions on the state, e.g.
 forbidden-state occupation, as well as
-cost functions on $u$, e.g. the norm of the control amplitudes
-\cite{leung2017speedup}.
+cost functions on the controls, e.g. the norm of the control amplitudes
+\cite{leung2017speedup}. Typical quantum optimal control
+algorithms employ automatic differentiation
+to compute first order information for the functional ($\nabla_{u} J(u)$).
+They employ a first-order optimizer to minimize $J$ with respect to $u$.
 
 (AL-iLQR Problem Statement) The trajectory optimization
 literature solves a more general class of non-linear programs that resemble
 the quantum optimal control problem. The quantum optimal control
 problem is a specific case of the linear quadratic regulator (LQR).
 LQR is so called because the dynamics are linear in the state and
-the cost function is quadratic in the state. In the LQR formulation
+the functional is quadratic in the state. In the LQR formulation
 the same functional is evaluated at each time step
 \begin{equation}
-  \begin{aligned}
-    J_{\textrm{LQR}} = \tilde{x}_{N}^{T} Q_{N} \tilde{x}_{N}
-    &+ \sum_{k = 0}^{N - 1} \tilde{x}_{k}^{T} Q_{k} \tilde{x}_{k} + u_{k}^{T} R_{k} u_{k}
-  \end{aligned}
+  J_{\textrm{iLQR}} = \tilde{x}_{N}^{T} Q_{N} \tilde{x}_{N}
+  + \sum_{k = 0}^{N - 1} \tilde{x}_{k}^{T} Q_{k} \tilde{x}_{k} + u_{k}^{T} R_{k} u_{k}
 \end{equation}
-where $\tilde{x}_{k} = x_{k} - x_{f}$ is the difference between the current
-and final state and $Q_{k}, R_{k}$ are matrices that define the penalty metric.
+where $\tilde{x}_{k} = x_{k} - x_{f}$ is the difference between the state
+at time step $k$ and final state, $u_{k}$ are the controls,
+and $Q_{k}, R_{k}$ are matrices that define the penalty metric.
+The state is propagated using a dynamics function similar to \ref{step-approx}
+$x_{k + 1} = f(x_{k}, u_{k}, t_{k}, \Delta t_{k})$.
+In the case of quantum optimal control $\ket{\psi_{k}} \subseteq x_{k}$
+and $f$ encodes the TDSE dynamics.
 
 The advantage of the LQR formulation
 is that there exists a dynamic programming algorithm to compute the
-optimal update to the controls $u_{k}$ at each time step.
-This algorithm employs the Ricatti recursion (see Appendix).
+optimal update to the controls ($u_{k}$) which minimizes the functional
+($J_{\textrm{iLQR}, k}$) for each time step. This algorithm proceeds by deriving a
+recurrence relation between time steps $k$ and $k + 1$ for the optimal
+feedback law--known as the Ricatti recursion (see Appendix). The
+iterative LQR (iLQR) algorithm computes $J_{\textrm{iLQR}}$
+and applies the Ricatti recursion to all time steps on multiple
+executions.
 
-In order to incorporate constraints into the problem we employ
-the augmented lagrangian method. This method adaptively
-updates the penalty of constraints
-%% LEFT OFF HERE
-
-
-
-Trajectory optimization gives us gaurantees
-about our updates via Ricatti recursion
-and allows us to put constraints on our cost functions.
-%% This is e.q. 2 from ALTRO paper
+In order to incorporate constraints we employ
+the augmented Lagrangian method. Constraints are contributions
+to the functional of arbitrary form $c_{k}(x_{k}, u_{k})$ which are
+zero-valued when the constraint is satisfied. The AL-iLQR
+method updates the penalty multiplier between
+iLQR executions. The penalty multiplier associated with the
+constraint functional estimates the Lagrange multiplier of
+the constraint. The functional now takes the form
 \begin{equation}
-\begin{aligned}[b]
-  \min_{U:N-1 \times m} &\mathcal{L}_{N}(x_{N}, \lambda_{N}, \mu_{N})\\
-  &+ \sum_{k = 1}^{N - 1} \mathcal{L}_{k}(x_{k}, u_{k}, \lambda_{k}, \mu_{k})\\
-\end{aligned}
+  \begin{aligned}
+    J_{\textrm{AL-iLQR}} = \ &(\lambda_{k} + \frac{1}{2}I_{\mu_{k}} c_{k}(x_{k}, u_{k}))^{T} c_{k}(x_{k}, u_{k})\\
+    &+ J_{\textrm{iLQR}}
+  \end{aligned}
 \end{equation}
-\begin{equation}
-\begin{aligned}[b]
-  \mathcal{L}_{k}(x_{k}, &u_{k}, \lambda_{k}, \mu_{k}) =\\
-  &(\lambda_{k} + \frac{1}{2}I_{\mu_{k}} c_{k}(x_{k}, u_{k}))^{T} c_{k}(x_{k}, u_{k})\\
-  &+ (x_{k} - x_{f})^{T} Q (x_{k} - x_{f}) + u_{k}^{T} R u_{k}\\
-\end{aligned}
-\end{equation}
-The important point is that there is an update step (e.q. 17 from ALTRO paper) where we send $\lambda \rightarrow \infty$
-and get all of the nice convergence properties. The weights are adjusted dynamically between iterations until
-all of our constraints are satisfied. The Markovian decision structure of the problem allows
-us to apply differentiable dynamic programming to garauntee that the update for each control $U_{k}$ is
-opimal, as apposed to the greedy updates of first-order optimizers like the naive gradient descent.
-
-%% TODO: (?) Figure comparing update procedures
-
+$\lambda_{k}$ is a Lagrange multiplier. $I_{\mu_{k}}$ is a penalty matrix
+with $\mu_{k}$ along the diagonal. $i$ indicates the $i$-th constraint functional.
+$\lambda_{k}$ and $\mu_{k}$ are updated after each augmented Lagrangian iteration according to
+\begin{align}
+  \lambda_{k_{i}}^{'} &= \lambda_{k_{i}} + \mu_{k_{i}} c_{k_{i}}(x_{k}^{*}, u_{k}^{*})\\
+  \mu_{k_{i}}^{'} &= \phi \mu_{k_{i}}
+\end{align}
+where $x^{*}, u^{*}$ are the optimal state and controls from the iLQR execution
+and $\phi$ is a hyperparameter. With this updated form of the cost
+functional there still exists a recurrence relation to calculate the optimal control
+updates, see \cite{howell2019altro}.
 
 %% SECTION 3
 \section{QOC on the Fluxonium}
-(Fluxonium Device) In the two-level
-approximation we have
+(Fluxonium Device) In the following we study
+the quantum optimal control problem on the fluxonium qubit.
+In the two-level
+approximation the system Hamiltonian takes the form
+\label{hamiltonian}
 \begin{align}
-  H/h &= \omega_{q} \frac{\sigma_{z}}{2} + A(\Phi_{ext}) \frac{\sigma_{x}}{2}
+  H/h &= \omega_{q} \frac{\sigma_{z}}{2} + u(t) \frac{\sigma_{x}}{2}
 \end{align}
-This approximation is good up to the avoided crossing at $\Phi_{\textrm{ext}} = 0.35 \Phi_{0}$. We get $A$
-by converting via $\bra{g} \hat{\phi} \ket{e}$.
-We use the gates $X/2, Y/2, Z/2$. $X/2, Y/2$ are universal
-up to an arbitrary Z rotation.
+$h$ is Planck's constant. The control parameter $u$ is experimentally
+realized by modulating the flux 
+threading the superconducting junction $\Phi_{\textrm{ext}}$.
+The conversion is defined by
+$u = 4 \pi \braket{g \lvert \hat{\phi} \rvert e} E_{L} \delta \Phi_{\textrm{ext}} / \Phi_{0}$
+where $\delta \Phi_{\textrm{ext}} = \Phi_{\textrm{ext}} - 0.5 \Phi_{0}$ is the flux
+offset from the flux frustration point.
+
+In the following we compare the gates found with our methods
+to the $X/2, Y/2, Z/2$ gates reported in \cite{zhang2020universal}
+for the same device. Note that $Y/2$ and arbitrary $Z$ rotations
+are sufficient for universal computation.
 %% TODO: list device parameters
 
-(Constraints) We want constraints on our pulses. We want pulses start and end at zero
-for concatenation. We want pulses to have zero net flux to mitigate
-hysteresis in flux bias lines.
+(Constraints) We now outline the constraints that we require each gate
+to obey.
+We require $u(t = 0) = u(t = t_{N}) = 0$.
+This constraint ensures gates may be concatenated arbitrarily without
+inducing AWG ringing due to high-frequency transitions.
+Furthermore, we require $\int_{0}^{t_{N}} u(t) dt = 0$. This
+constraint ensures the pulse has zero net flux, mitigating
+the hysteresis ubiquitous in flux bias lines.
 %% TODO: See ref. 28 in Helin paper
-We want the amplitude to be constrained
-$\delta \Phi_{\textrm{ext}} \sim 0.06 \Phi_{0}$
-so the two-level approximation stays valid.
-We want our state to obey normalization conditions,
-mitigating numerical error in simulaiton.
-%% TODO: mention pulse smoothing via optimizing over 2nd derivative
-%% of pulses
+We require $-300 \textrm{MHz} \le u(t) \le 300 \textrm{MHz}$
+to ensure the two-level approximation \ref{hamiltonian}
+remains valid. Additionally, we require that each gate achieves
+the desired state transition $\braket{\psi_{f} \lvert \psi_{N}} = 1$.
+In addition to these constraints we penalize the norm
+of the first and second derivatives of the control
+to mitigate AWG ringing.
+
+The equality and inequality constraints on $u$ are handled
+with a bound constraint. $\int_{0}^{t_{k}} u(t) dt$ is added
+to the augmented state vector $x_{k}$ by incorporating the
+integration of $u_{k}$ into the dynamics function $f$.
+Both the zero net flux and target quantum state constraint
+are then handled by ensuring the augmented final state is
+reached $x_{N} - x_{f} = 0$. The optimization is performed
+over the second derivative of the controls $\frac{d^{2}}{dt^{2}} u(t)$
+so that the second derivative, first derivative, zeroth derivative, and
+integral of the controls may be penalized.
 %% TODO: probably want to list equations for the constraints
 
 ($T_{1}$ and $T_{\phi}$ noise)
+In addition to optimizing the cost functional to achieve a gate
+that obeys experimental constraints and has a high simulated fidelity,
+we also want to make the gate robust to noise that affects the experimental
+fidelity of the gate. Decoherence of the quantum state due to external noise
+is typically modeled by two phenomena: longitudinal relaxation and pure dephasing.
+They are modeled using their $1/e$ decay times $T_{1}$ and $T_{\phi}$ respectively
+(see Appendix).
+The main contributions to longitudinal relaxation in our
+device are dielectric loss in the capacitor, resistive loss in the inductor,
+and Purcell loss. The main contributions to pure dephasing in our
+device are $1/f$ flux noise and decay via charge and flux coupling
+to the control lines.
+
 Dissipation to the thermal bath via longitudinal
-relaxation ($T_{1}$) is an irreversible process
+relaxation is an irreversible process
 that results in information loss.
-Pure dephasing ($T_{\phi}$) is a reversible process.
-Dielectric loss, etc. contribute
-to $T_{1}$. $1/f$ flux noise, etc. contribute to $T_{\phi}$
-There is a tradeoff between $T_{1}$ and $T_{\phi}$. In the case of white
+Converesely, pure dephasing is a reversible process.
+There is a tradeoff between the two decoherence processes. In the case of white
 noise we have that the sum of the noise weights $W_{1}$ and $W_{\phi}$
 is constant \cite{huang2020engineering}.
-In our case $T_{\phi}$ is saturated at the flux
-frustration point $\Phi_{\textrm{ext}} = 0.5 \Phi_{0}$
-$T_{\phi}$ decreases as we move away from the flux
+Our device achieves its best pure dephasing
+protection at the flux frustration point
+$T_{2e}(\Phi_{\textrm{ext}} = 0.5 \Phi_{0}) \sim 300 \mu\textrm{s}$
+where the qubit frequency is first-order insensitive to changes in flux.
+It becomes more succeptable to pure dephasing as the flux is tuned away from the flux
 frustration point. Conversely, $T_{1}$ is at a minimum
 around the flux frustration point $T_{1}(0.5 \Phi_{0}) = 0.315$ms,
 and increases away from the flux frustration point
 $T_{1}(0.43 \Phi_{0}) = 4.3$ms. Given the nature
 of the decay processes and the tradeoff, we choose
-to optimize the flux bias to have high time-averaged
-$T_{1}$ times and employ some techniques to mitigate
-$T_{\phi}$ dephasing.
+to maximize the longitudinal relaxation time ($T_{1}$)
+over the gate duration
+and employ robust control techniques to mitigate
+pure dephasing.
 %% TODO: See fig. 3 in Helin paper
 
 
+%% LOH
 %% SECTION 4
 \section{Robustness to $T_{1}$-type Noise}
 (Strategy) We seek to minimize the probability
@@ -451,7 +501,7 @@ a more naive method.
 
 
 %% APPENDIX 2
-\section{Measurements}
+\section{Experiment}
 We measure $T_{1}$ using the standard experiment
 and $T_{2}$ using te Ramsey experiment. We fit with splines
 and the data looks like fig. 3 in Helin's paper \cite{zhang2020universal}.
