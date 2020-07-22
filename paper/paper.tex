@@ -33,7 +33,7 @@
 \maketitle
 
 
-%% SECTION 1
+%% S1
 \section{Introduction}
 (Existing work) The leading model of universal
 quantum computation is gate-based. The Quantum Optimal Control (QOC)
@@ -104,7 +104,7 @@ some methods for engineering robustness to pure dephasing and
 compare them to existing techniques.
 
 
-%% SECTION 2
+%% S2
 \section{QOC + AL-iLQR}
 (QOC Problem Statement) Here we introduce the notation
 we will use throughout the paper,
@@ -129,10 +129,7 @@ the problem tractable by discretizing the problem into $N$
 time steps. Typical integration techniques for the TDSE include
 approximating unitary propagators as well as explicit integration methods,
 such as Runge-Kutta, of the form
-\label{eq:step-approx}
-\begin{align}
-  \ket{\psi_{k + 1}} \approx \ket{\psi_{k}} + \frac{d}{dt} \ket{\psi_{k}} \cdot \Delta t_{k}
-\end{align}
+$\ket{\psi_{k + 1}} \approx \ket{\psi_{k}} + \frac{d}{dt} \ket{\psi_{k}} \cdot \Delta t_{k}$
 
 Quantum optimal control seeks the control
 parameters that minimize a functional $J(u(t))$.
@@ -163,8 +160,7 @@ the same functional is evaluated at each time step
 where $\tilde{x}_{k} = x_{k} - x_{f}$ is the difference between the state
 at time step $k$ and final state, $u_{k}$ are the controls,
 and $Q_{k}, R_{k}$ are matrices that define the penalty metric.
-The state is propagated using a dynamics function similar to
-equation \ref{eq:step-approx}
+The state is propagated using a dynamics function
 $x_{k + 1} = f(x_{k}, u_{k}, t_{k}, \Delta t_{k})$.
 In the case of quantum optimal control $\ket{\psi_{k}} \subseteq x_{k}$
 and $f$ encodes the TDSE dynamics.
@@ -193,19 +189,42 @@ the constraint. The functional now takes the form
     &+ J_{\textrm{iLQR}}
   \end{aligned}
 \end{equation}
-$\lambda_{k}$ is a Lagrange multiplier. $I_{\mu_{k}}$ is a penalty matrix
-with $\mu_{k}$ along the diagonal. $i$ indicates the $i$-th constraint functional.
+where $\lambda_{k}$ is a Lagrange multiplier and $I_{\mu_{k}}$ is a penalty matrix
+with $\mu_{k}$ along the diagonal.
 $\lambda_{k}$ and $\mu_{k}$ are updated after each augmented Lagrangian iteration according to
 \begin{align}
-  \lambda_{k_{i}}^{'} &= \lambda_{k_{i}} + \mu_{k_{i}} c_{k_{i}}(x_{k}^{*}, u_{k}^{*})\\
-  \mu_{k_{i}}^{'} &= \phi \mu_{k_{i}}
+  \lambda_{k_{i}} &\gets \lambda_{k_{i}} + \mu_{k_{i}} c_{k_{i}}(x_{k}^{*}, u_{k}^{*})\\
+  \mu_{k_{i}} &\gets \phi \mu_{k_{i}}
 \end{align}
-where $x^{*}, u^{*}$ are the optimal state and controls from the iLQR execution
+where $x^{*}, u^{*}$ are the optimal state and controls from the iLQR execution,
+$i$ indicates the $i$-th constraint functional,
 and $\phi$ is a hyperparameter. With this updated form of the cost
 functional there still exists a recurrence relation to calculate the optimal control
 updates, see \cite{howell2019altro}.
 
-%% SECTION 3
+
+%% F4.1
+%% TODO: Update images. Use new gates constructed with
+%% spline T1 and use smaller sim times.
+\begin{figure*}[ht]
+  \begin{subfigure}{.3\linewidth}
+    \includegraphics[width=\linewidth]{assets/00045_spin16.png}
+    \label{fig:sub-first}
+  \end{subfigure}
+  \begin{subfigure}{.3\linewidth}
+    \includegraphics[width=\linewidth]{assets/00047_spin16.png}
+    \label{fig:sub-second}
+  \end{subfigure}
+  \begin{subfigure}{.3\linewidth}
+    \includegraphics[width=\linewidth]{assets/00049_spin16.png}
+    \label{fig:sub-third}
+  \end{subfigure}
+  \caption{Master equation simulation with $T_{1}$ dissipation for all basis gates,
+    comparing the performance of the analytic gates and the $T_{1}$ optimized QOC gates.}
+  \label{fig:fig}
+\end{figure*}
+
+%% S3
 \section{QOC on the Fluxonium}
 (Fluxonium Device) In the following we study
 the quantum optimal control problem on the fluxonium qubit.
@@ -215,9 +234,11 @@ approximation the system Hamiltonian takes the form
 \begin{align}
   H/h &= \omega_{q} \frac{\sigma_{z}}{2} + a(t) \frac{\sigma_{x}}{2}
 \end{align}
-$h$ is Planck's constant. The flux amplitude $a$ is experimentally
+where $\omega_{q}$ is the qubit frequency at the flux frustration point,
+$a$ is the flux drive amplitude, $h$ is Planck's constant, and $\sigma_{x}, \sigma_{y}$
+are pauli matrices. The flux amplitude $a$ is experimentally
 realized by modulating the flux 
-threading the deivce $\Phi_{\textrm{ext}}$.
+threading the device ($\Phi_{\textrm{ext}}$).
 The flux amplitude is obtained from the external flux by
 $a = 4 \pi \braket{g \lvert \hat{\phi} \rvert e} \rvert_{0.5 \Phi_{0}} E_{L}
 \delta \Phi_{\textrm{ext}} / (h \Phi_{0})$
@@ -248,10 +269,10 @@ of the first and second derivatives of the control
 to mitigate AWG ringing.
 
 The optimization is performed
-over the second derivative of the flux modulation amplitude
+over the second derivative of the flux amplitude
 ($\frac{d^{2}}{dt^{2}} a(t)$) so that the first derivative
 ($\frac{d}{dt} a(t)$), proportional ($a(t)$), and integral ($\int a(t)$)
-are tracked in the augmented state vector $x$ and obtained by
+are propagated in the state vector and obtained by
 integration in the dynamics function $f$.
 Both the zero net flux and target quantum state constraint
 are then handled by ensuring the augmented final state is
@@ -297,35 +318,15 @@ and employ robust control techniques to mitigate
 pure dephasing.
 %% TODO: See fig. 3 in Helin paper
 
-%% F4.1
-%% TODO: Update images. Use new gates constructed with
-%% spline T1 and use smaller sim times.
-\begin{figure*}[!t]
-  \begin{subfigure}{.3\linewidth}
-    \includegraphics[width=\linewidth]{assets/00045_spin16.png}
-    \label{fig:sub-first}
-  \end{subfigure}
-  \begin{subfigure}{.3\linewidth}
-    \includegraphics[width=\linewidth]{assets/00047_spin16.png}
-    \label{fig:sub-second}
-  \end{subfigure}
-  \begin{subfigure}{.3\linewidth}
-    \includegraphics[width=\linewidth]{assets/00049_spin16.png}
-    \label{fig:sub-third}
-  \end{subfigure}
-  \caption{Master equation simulation with $T_{1}$ dissipation for all basis gates.}
-  \label{fig:fig}
-\end{figure*}
 
-
-%% SECTION 4
+%% S4
 \section{Robustness to $T_{1}$-type Noise}
 (Strategy) We seek to minimize the probability
 that the qubit decays as a result of longitudinal
 relaxation. To this end we augment the state vector ($x_{k}$) with the
 longitudinal relaxation probability
 \begin{equation}
-  P_{1}(t_{k}) = \int_{0}^{t_{k}} \gamma_{1}(a(t)) dt
+  P_{1}(t) = \int_{0}^{t} \gamma_{1}(a(t^{\prime})) dt^{\prime}
 \end{equation}
 where $\gamma_{1} = T_{1}^{-1}$. Setting the target
 longitudinal relaxation probability to 0 results in
@@ -381,21 +382,21 @@ of time as shown in Fig. 1.
 %% long idle times at the flux frustration point for Z/2 and X/2. It
 %% might be a more fair comparison to show gates that have better T1s
 %% and as good flux noise mitigation.
-%% \begin{table}
-%%   \begin{tabular}{c | c | c | c}
-%%     & Analytic  & QOC &\\
-%%     Gate & $P_{1}\ (10^{-5})$ & $P_{1}\ (10^{-5})$ & Speedup\\
-%%     \hline
-%%     Z/2 & 4.615 & 2.576 & 1.792\\
-%%     Y/2 & 2.826 & 1.888 & 1.496\\
-%%     X/2 & 9.562 & 5.080 & 1.882\\
-%%   \end{tabular}
-%%   \caption{Probability of longitudinal relaxation for each gate
-%%     evaluated at the gate's duration.}
-%% \end{table}
+\begin{table}[h]
+  \begin{tabular}{c | c | c | c}
+    & Analytic  & QOC &\\
+    Gate & $P_{1}\ (10^{-5})$ & $P_{1}\ (10^{-5})$ & Speedup\\
+    \hline
+    Z/2 & 4.615 & 2.576 & 1.792\\
+    Y/2 & 2.826 & 1.888 & 1.496\\
+    X/2 & 9.562 & 5.080 & 1.882\\
+  \end{tabular}
+  \caption{Probability of longitudinal relaxation for each gate
+    evaluated at the gate's duration.}
+\end{table}
 
 
-%% SECTION 5
+%% S5
 \section{Robustness to $T_{\phi}$-type Noise}
 (Strategy) For the fluxonium, pure dephasing acts
 along the flux axis. Low frequency 1/$f$ noise,
@@ -422,15 +423,15 @@ numerical techniques for engineering robustness
 to parameter deviations.
 
 We propose two methods for engineering robustness
-to system parameter deviations. The first we call the
+to parameter deviations. The first we call the
 derivative method. We draw on the intuition that
 making the state evolution insensitive to changes
-in the system parameter is encoded in the derivative
+in the parameter is encoded in the derivative
 $\partial_{\omega_{q}}^{l} \ket{\psi}$.
-The $l$ state derviatives are added to the augmented
+The $l$ state derviatives are propgated in the
 state vector. Their dynamics are found by differentiating
 the TDSE dynamics with respect to the parameter of interest
-\ref{eq:tdse}. Setting the target state derivatives
+(see Appendix). Setting the target derivatives of the state
 to zero vectors results in quadratic costs at each
 knot point
 ${\lvert \partial_{\omega_{q}}^{l} \ket{\psi_{k}} \rvert}^{2}$.
@@ -442,70 +443,97 @@ We augment the state vector with additional
 states that follow deviant dynamics. The parameters of interest
 are altered by a small deviation, typically chosen
 to represent the distribution of the parameter.
-For example, in the 3-point sampling method we
-propagate $\ket{\psi_{\pm, I}}$ where
+For example, in the 2-point sampling method we
+propagate $\ket{\psi^{\pm, I}(t)}$ where
 $\omega_{q}^{\pm} = \omega_{q} \pm \sigma_{\omega_{q}}$,
 $\omega_{q}^{I} = \omega_{q}$.
 The difference between the final states and the target
 state is penalized, resulting in quadratic costs at
 each knot point
-${\lvert \ket{\psi_{\pm, I}} - \ket{\psi_{f}} \rvert}^{2}$
+${\lvert \ket{\psi^{\pm, I}_{k}} - \ket{\psi_{f}} \rvert}^{2}$
 
-%% LOH
+(Results) We compare the robust control
+schemes to a dynamic decoupling pulse
+for a single $R_{x}(\pi/2)$ gate
+subject to qubit frequency detuning
+($\omega_{q} \gets \omega_{q} + \delta \omega_{q}$)
+to demonstrate the applicability of our techniques to mitigate
+system parameter deviations.
+We use a compensating for off-resonance error
+(CORPSE) dynamic decoupling pulse that is optimized
+to mitigate first-order error arising due to the detuning.
+The pulse is composed of
+three rotations about the $\hat{x}$, $-\hat{x}$, and $\hat{x}$ axes
+of the Bloch sphere
+designed to compensate for erroneous rotations
+(see Appendix). We simulate the gate fidelity as
+a function of the qubit frequency detuning for
+variants of the
+derivative method, sample method, and
+CORPSE pulse (see Figure 2a). We also find that
+increasing the gate duration allows the optimizer
+to find a more robust pulse
+(see Figure 3a). Increasing the order of the derivative
+and sample methods requires propagating an additional quantum state
+in the state vector, a linear increase
+in the computational complexity, but finding higher order
+variants of the CORPSE family is prohibitively difficult.
 
-(Results) We compare the simplest schemes
-for the derivative and sampling methods to
-the CORPSE dynamic decoupling sequence.
-They perform X better by Y metric.
-
-We also find that longer gate durations allow for
-greater robustness.
+Additionally, we compare the robust control
+schemes to a dynamic decoupling pulse
+for sequential $R_{x}(\pi/2)$ gates
+subject to $T_{\phi}$ noise to demonstrate the applicability
+of our techniques to mitigate noise of this type.
+We simulate the gate fidelity as a function of time
+for variants of the derivative method,
+sample method, and B2CORPSE pulse (see Figure 3).
+The B2CORPSE pulse is constructed to be robust
+to qubit frequency detuning errors and
+amplitude scaling errors (see Appendix).
+The derivative and sampling methods are employed to
+mitigate error due to qubit frequency detuning
+($\omega_{q} \gets \omega_{q} + \delta \omega_{q}$)
+as well as flux amplitude scaling error
+($a \gets a (1 + \delta a)$).
 
 %% F5.1
-%% TODO: Update this and make sure it is for X/2.
-%% I'm not sure if we should include all gates Z/2, Y/2, X/2
-%% because I don't know what the dynamic decoupling analogy
-%% for Z/2 and Y/2 are. On the other hand we would
-%% want to include all of them to show that the benefit
-%% is not uniform across gates.
-%% (maybe add 5-sample and 3-derivative)
+%% TODO: Make this figure for real. Add inset to second figure
+%% to show high performing variants at high time steps
 \begin{figure}
-  %% \includegraphics[width=\linewidth]{assets/00005_spin12_hpsweep.png}
-  \caption{fidelity v.s. $\omega$ for the $X/2$ gate via
-    analytic, 3-sample, 2-derivative}
+  \begin{subfigure}{\linewidth}
+    \label{fig:5.1:a}
+    \includegraphics[width=\linewidth]{assets/00005_spin12_hpsweep.png}
+  \end{subfigure}
+  
+  \begin{subfigure}{\linewidth}
+    \includegraphics[width=\linewidth]{assets/00006_spin12_hpsweep.png}
+    \label{fig:5.1:a}
+  \end{subfigure}
+  \caption{\centering Robustness to qubit frequency detuning for
+    the (2, 4)-point sampling method, (2\textsuperscript{nd}, 3\textsuperscript{rd})
+    order derivative method, and CORPSE pulses for the $R_{x}(\pi/2)$ gate.
+    (a) Gate fidelity as a function of the qubit frequency detuning.
+    (b) Gate fidelity at one standard deviation from the nominal qubit frequency
+    as a function of time.
+  }
 \end{figure}
 
 %% F5.2
-%% TODO: Update this and make sure it is for X/2.
-%% Add inset to show high-performing variants at large time steps.
+%% TODO: Make this figure.
 \begin{figure}
-  %% \includegraphics[width=\linewidth]{assets/00006_spin12_hpsweep.png}
-  \caption{fidelity at $\omega \pm \sigma_{\omega}$ v.s. time for the
-    $X/2$ gate via analytic, 3-sample, 2-derivative}
+  \includegraphics[width=\linewidth]{assets/t2_temp.jpg}
+  \caption{Robustness to $T_{\phi}$-type noise for the
+    the (2, 4)-point sampling method, (2\textsuperscript{nd}, 3\textsuperscript{rd})
+    order derivative method, and B2CORPSE pulse for the $R_{x}(\pi/2)$ gate.}
 \end{figure}
 
-%% F5.3
-%% TODO: Make this figure. My guess is we want a 5-sample, with 2 at \omega_{\pm}
-%% and 2 at A_{\pm} as well as 2-derivative of both parameters separately.
-%% (maybe add 5-sample and 3-derivative)
-\begin{figure}
-  %% \includegraphics[width=\linewidth]{assets/t2_temp.jpg}
-  \caption{Master equation simulation with $T_{2}$ dissipation
-    comparing the $X/2$ gate robust to $\delta \omega_{q}$ and $\delta a$ against
-    the analytic gate.}
-\end{figure}
-
-
-%% TODO: Fig: Full ME simulation for best T1 and T\phi pulses
-%% v.s. analytic (?)
-
-%% SECTION 6
+%% S6
 \section{Conclusion}
 We have proposed some schemes and they work well.
 
 
 \appendix
-%% APPENDIX 1
+%% AA
 \section{Ricatti Recursion}
 This will give the reader unfamiliar with trajectory
 optimization intuition for how the trajectory optimization
@@ -513,7 +541,7 @@ update scheme works and why it is better than
 a more naive method.
 
 
-%% APPENDIX 2
+%% AB
 \section{Experiment}
 We measure $T_{1}$ using the standard experiment
 and $T_{2}$ using te Ramsey experiment. We fit with splines
@@ -521,7 +549,7 @@ and the data looks like fig. 3 in Helin's paper \cite{zhang2020universal}.
 We measure $\omega_{q}$ and $\sigma_{\omega_{q}}$ using X method.
 
 
-%% APPENDIX 3
+%% AC
 \section{ME Simulation}
 We model dissipation using the Lindblad master
 equation and standard collapse operators for
@@ -529,7 +557,7 @@ longitudinal relaxation and dephasing
 of a two-level system.
 
 
-%% APPENDIX 4
+%% AD
 \section{Derivative Method}
 \begin{equation}
   \begin{aligned}
