@@ -37,7 +37,8 @@
 \section{Introduction}
 (Existing work) The leading model of universal
 quantum computation is gate-based. The Quantum Optimal Control (QOC)
-literature has saught to answer the question "What is the best way to construct a quantum gate?".
+literature has saught to construct techniques for engineering waveforms to manipulate
+quantum systems with high fidelity.
 Analytic methods
 have been demonstrated to construct quantum gates
 \cite{zhang2020universal, huang2020engineering, han2020experimental,
@@ -99,7 +100,7 @@ our methods mitigate dephasing by order X over dynamic decoupling.
 in the trajectory optimization framework. Then, we introduce the dynamics
 of the fluxonium device and outline experimental considerations
 relevant to gate construction. Next we outline a method for
-making the optimization $T_{1}$ aware. Finally, we present
+making the optimization longitudinal relaxation aware. Finally, we present
 some methods for engineering robustness to pure dephasing and
 compare them to existing techniques.
 
@@ -126,7 +127,7 @@ act on the system.
 
 Numerical quantum optimal control techniques make
 the problem tractable by discretizing the problem into $N$
-time steps. Typical integration techniques for the TDSE include
+knot points (time steps). Typical integration techniques for the TDSE include
 approximating unitary propagators as well as explicit integration methods,
 such as Runge-Kutta, of the form
 $\ket{\psi_{k + 1}} \approx \ket{\psi_{k}} + \frac{d}{dt} \ket{\psi_{k}} \cdot \Delta t_{k}$
@@ -136,7 +137,7 @@ parameters that minimize a functional $J(u(t))$.
 In the simplest case the functional is
 $J = 1 - {\lvert \braket{\psi_{f} \lvert \psi_{N}(u(t))} \rvert}^{2}$
 the infidelity between the inital state evolved
-to the final time step ($\ket{\psi_{N}(u(t))}$)
+to the final knot point ($\ket{\psi_{N}(u(t))}$)
 and the target state ($\ket{\psi_{f}}$). In general
 $J$ is a linear combinaion of cost functions on the state, e.g.
 forbidden-state occupation, as well as
@@ -152,37 +153,39 @@ the quantum optimal control problem. The quantum optimal control
 problem is a specific case of the linear quadratic regulator (LQR).
 LQR is so called because the dynamics are linear in the state and
 the functional is quadratic in the state. In the LQR formulation
-the same functional is evaluated at each time step
+the same functional is evaluated at each knot point
 \begin{equation}
   J_{\textrm{iLQR}} = \tilde{x}_{N}^{T} Q_{N} \tilde{x}_{N}
   + \sum_{k = 0}^{N - 1} \tilde{x}_{k}^{T} Q_{k} \tilde{x}_{k} + u_{k}^{T} R_{k} u_{k}
 \end{equation}
 where $\tilde{x}_{k} = x_{k} - x_{f}$ is the difference between the state
-at time step $k$ and final state, $u_{k}$ are the controls,
+at knot point $k$ and final state, $u_{k}$ are the controls,
 and $Q_{k}, R_{k}$ are matrices that define the penalty metric.
 The state is propagated using a dynamics function
 $x_{k + 1} = f(x_{k}, u_{k}, t_{k}, \Delta t_{k})$.
 In the case of quantum optimal control $\ket{\psi_{k}} \subseteq x_{k}$
-and $f$ encodes the TDSE dynamics.
+and $f$ encodes the TDSE dynamics. In the following
+we refer to $\ket{\psi}$ as the state. We refer to $x$ and $u$ as
+the augmented state and augmented controls, respectively.
 
 The advantage of the LQR formulation
 is that there exists a dynamic programming algorithm to compute the
-optimal update to the controls ($u_{k}$) which minimizes the functional
-($J_{\textrm{iLQR}, k}$) for each time step. This algorithm proceeds by deriving a
-recurrence relation between time steps $k$ and $k + 1$ for the optimal
+optimal update to the augmented controls ($u_{k}$) which minimizes the functional
+($J_{\textrm{iLQR}, k}$) for each knot point. This algorithm proceeds by deriving a
+recurrence relation between knot points $k$ and $k + 1$ for the optimal
 feedback law--known as the Ricatti recursion (see Appendix). The
 iterative LQR (iLQR) algorithm computes $J_{\textrm{iLQR}}$
-and applies the Ricatti recursion to all time steps on multiple
+and applies the Ricatti recursion to all knot points on multiple
 executions.
 
 In order to incorporate constraints we employ
 the augmented Lagrangian method. Constraints are contributions
 to the functional of arbitrary form $c_{k}(x_{k}, u_{k})$ which are
-zero-valued when the constraint is satisfied. The AL-iLQR
-method updates the penalty multiplier between
-iLQR executions. The penalty multiplier associated with the
-constraint functional estimates the Lagrange multiplier of
-the constraint. The functional now takes the form
+zero or negative when the constraint is satisfied. The AL-iLQR
+method associates a penalty multiplier with the functional
+that estimates the constraint's Lagrange multiplier.
+The algorithm updates the penalty multiplier between
+iLQR executions. In this scheme the functional takes the form
 \begin{equation}
   \begin{aligned}
     J_{\textrm{AL-iLQR}} = \ &(\lambda_{k} + \frac{1}{2}I_{\mu_{k}} c_{k}(x_{k}, u_{k}))^{T} c_{k}(x_{k}, u_{k})\\
@@ -193,10 +196,10 @@ where $\lambda_{k}$ is a Lagrange multiplier and $I_{\mu_{k}}$ is a penalty matr
 with $\mu_{k}$ along the diagonal.
 $\lambda_{k}$ and $\mu_{k}$ are updated after each augmented Lagrangian iteration according to
 \begin{align}
-  \lambda_{k_{i}} &\gets \lambda_{k_{i}} + \mu_{k_{i}} c_{k_{i}}(x_{k}^{*}, u_{k}^{*})\\
+  \lambda_{k_{i}} &\gets \max(0, \lambda_{k_{i}} + \mu_{k_{i}} c_{k_{i}}(x_{k}^{*}, u_{k}^{*}))\\
   \mu_{k_{i}} &\gets \phi \mu_{k_{i}}
 \end{align}
-where $x^{*}, u^{*}$ are the optimal state and controls from the iLQR execution,
+where $x^{*}, u^{*}$ are the optimal augmented state and augmented controls from the iLQR execution,
 $i$ indicates the $i$-th constraint functional,
 and $\phi$ is a hyperparameter. With this updated form of the cost
 functional there still exists a recurrence relation to calculate the optimal control
@@ -236,13 +239,15 @@ approximation the system Hamiltonian takes the form
 \end{align}
 where $\omega_{q}$ is the qubit frequency at the flux frustration point,
 $a$ is the flux drive amplitude, $h$ is Planck's constant, and $\sigma_{x}, \sigma_{y}$
-are pauli matrices. The flux amplitude $a$ is experimentally
+are Pauli matrices. The flux amplitude $a$ is experimentally
 realized by modulating the flux 
 threading the device ($\Phi_{\textrm{ext}}$).
 The flux amplitude is obtained from the external flux by
 $a = 4 \pi \braket{g \lvert \hat{\phi} \rvert e} \rvert_{0.5 \Phi_{0}} E_{L}
 \delta \Phi_{\textrm{ext}} / (h \Phi_{0})$
-where $\delta \Phi_{\textrm{ext}} = \Phi_{\textrm{ext}} - 0.5 \Phi_{0}$ is the flux
+where $\hat{\phi}$ is the phase operator, $E_{L}$ is the characteristic inductance energy, $\Phi_{0}$
+is a flux quantum, and
+$\delta \Phi_{\textrm{ext}} = \Phi_{\textrm{ext}} - 0.5 \Phi_{0}$ is the flux
 offset from the flux frustration point.
 
 In the following we compare the gates found with our methods
@@ -265,14 +270,16 @@ to ensure the two-level approximation \ref{eq:hamiltonian}
 remains valid. Additionally, we require that each gate achieves
 the desired state transition $\braket{\psi_{f} \lvert \psi_{N}} = 1$.
 In addition to these constraints we penalize the norm
-of the first and second derivatives of the control
+of the first and second derivatives of the flux amplitude
 to mitigate AWG ringing.
 
-The optimization is performed
-over the second derivative of the flux amplitude
-($\frac{d^{2}}{dt^{2}} a(t)$) so that the first derivative
+The optimization is performed over the second derivative of the flux amplitude
+($\frac{d^{2}}{dt^{2}} a(t)$) which is contained in the
+augmented control vector. The first derivative
 ($\frac{d}{dt} a(t)$), proportional ($a(t)$), and integral ($\int a(t)$)
-are propagated in the state vector and obtained by
+flux amplitude terms
+are contained in the augmented state vector. They are obtained from
+the second derivative of the flux amplitude by
 integration in the dynamics function $f$.
 Both the zero net flux and target quantum state constraint
 are then handled by ensuring the augmented final state is
@@ -323,8 +330,9 @@ pure dephasing.
 \section{Robustness to $T_{1}$-type Noise}
 (Strategy) We seek to minimize the probability
 that the qubit decays as a result of longitudinal
-relaxation. To this end we augment the state vector ($x_{k}$) with the
+relaxation. To this end we add the
 longitudinal relaxation probability
+to the augmented state vector
 \begin{equation}
   P_{1}(t) = \int_{0}^{t} \gamma_{1}(a(t^{\prime})) dt^{\prime}
 \end{equation}
@@ -352,8 +360,8 @@ the fridge truth of the simulation.
 Furthermore, the probability of longitudinal 
 relaxation is dependent on the gate duration $t_{N}$.
 We allow the optimizer to tune the gate duration by
-augmenting the control vector $u_{k}$ with
-the time step between knot points $\Delta t_{k}$.
+adding the time step between knot points $\Delta t_{k}$
+to the augmented control vector $u_{k}$.
 Promoting $\Delta t_{k}$ to a decision variable, rather
 than the number of knot points $N$, preserves the
 Markovian decision structure of the trajectory
@@ -396,6 +404,38 @@ of time as shown in Fig. 1.
 \end{table}
 
 
+%% F5.1
+%% TODO: Make this figure for real. Add inset to second figure
+%% to show high performing variants at high time steps
+\begin{figure}
+  \begin{subfigure}{\linewidth}
+    \label{fig:5.1:a}
+    \includegraphics[width=\linewidth]{assets/00005_spin12_hpsweep.png}
+  \end{subfigure}
+  
+  \begin{subfigure}{\linewidth}
+    \includegraphics[width=\linewidth]{assets/00006_spin12_hpsweep.png}
+    \label{fig:5.1:a}
+  \end{subfigure}
+  \caption{\centering Robustness to qubit frequency detuning for
+    the (2, 4)-point sampling method, (2\textsuperscript{nd}, 3\textsuperscript{rd})
+    order derivative method, and CORPSE pulses for the $R_{x}(\pi/2)$ gate.
+    (a) Gate fidelity as a function of the qubit frequency detuning.
+    (b) Gate fidelity at one standard deviation from the nominal qubit frequency
+    as a function of time.
+  }
+\end{figure}
+
+%% F5.2
+%% TODO: Make this figure.
+\begin{figure}
+  \includegraphics[width=\linewidth]{assets/t2_temp.jpg}
+  \caption{Robustness to $T_{\phi}$-type noise for the
+    the (2, 4)-point sampling method, (2\textsuperscript{nd}, 3\textsuperscript{rd})
+    order derivative method, and B2CORPSE pulse for the $R_{x}(\pi/2)$ gate.}
+\end{figure}
+
+
 %% S5
 \section{Robustness to $T_{\phi}$-type Noise}
 (Strategy) For the fluxonium, pure dephasing acts
@@ -426,21 +466,23 @@ We propose two methods for engineering robustness
 to parameter deviations. The first we call the
 derivative method. We draw on the intuition that
 making the state evolution insensitive to changes
-in the parameter is encoded in the derivative
-$\partial_{\omega_{q}}^{l} \ket{\psi}$.
-The $l$ state derviatives are propgated in the
-state vector. Their dynamics are found by differentiating
+in the parameter ($x$) is encoded in the derivative of
+the state with respect to that parameter
+$\partial_{x}^{l} \ket{\psi}$.
+The derviatives of the state are propgated in the
+augmented state vector. Their dynamics are found by differentiating
 the TDSE dynamics with respect to the parameter of interest
 (see Appendix). Setting the target derivatives of the state
 to zero vectors results in quadratic costs at each
 knot point
-${\lvert \partial_{\omega_{q}}^{l} \ket{\psi_{k}} \rvert}^{2}$.
+${\lvert \partial_{x}^{l} \ket{\psi_{k}} \rvert}^{2}$.
 
 The second scheme we analyze is the sampling method,
 which is well studied in the robust control literature
 \cite{manchester2016derivative} \cite{tronarp2016sigma}.
-We augment the state vector with additional
-states that follow deviant dynamics. The parameters of interest
+We add additional
+states that follow deviant dynamics to the augmented
+state vector. The parameters of interest
 are altered by a small deviation, typically chosen
 to represent the distribution of the parameter.
 For example, in the 2-point sampling method we
@@ -473,9 +515,9 @@ derivative method, sample method, and
 CORPSE pulse (see Figure 2a). We also find that
 increasing the gate duration allows the optimizer
 to find a more robust pulse
-(see Figure 3a). Increasing the order of the derivative
+(see Figure 2b). Increasing the order of the derivative
 and sample methods requires propagating an additional quantum state
-in the state vector, a linear increase
+in the augmented state vector, a linear increase
 in the computational complexity, but finding higher order
 variants of the CORPSE family is prohibitively difficult.
 
@@ -495,37 +537,6 @@ mitigate error due to qubit frequency detuning
 ($\omega_{q} \gets \omega_{q} + \delta \omega_{q}$)
 as well as flux amplitude scaling error
 ($a \gets a (1 + \delta a)$).
-
-%% F5.1
-%% TODO: Make this figure for real. Add inset to second figure
-%% to show high performing variants at high time steps
-\begin{figure}
-  \begin{subfigure}{\linewidth}
-    \label{fig:5.1:a}
-    \includegraphics[width=\linewidth]{assets/00005_spin12_hpsweep.png}
-  \end{subfigure}
-  
-  \begin{subfigure}{\linewidth}
-    \includegraphics[width=\linewidth]{assets/00006_spin12_hpsweep.png}
-    \label{fig:5.1:a}
-  \end{subfigure}
-  \caption{\centering Robustness to qubit frequency detuning for
-    the (2, 4)-point sampling method, (2\textsuperscript{nd}, 3\textsuperscript{rd})
-    order derivative method, and CORPSE pulses for the $R_{x}(\pi/2)$ gate.
-    (a) Gate fidelity as a function of the qubit frequency detuning.
-    (b) Gate fidelity at one standard deviation from the nominal qubit frequency
-    as a function of time.
-  }
-\end{figure}
-
-%% F5.2
-%% TODO: Make this figure.
-\begin{figure}
-  \includegraphics[width=\linewidth]{assets/t2_temp.jpg}
-  \caption{Robustness to $T_{\phi}$-type noise for the
-    the (2, 4)-point sampling method, (2\textsuperscript{nd}, 3\textsuperscript{rd})
-    order derivative method, and B2CORPSE pulse for the $R_{x}(\pi/2)$ gate.}
-\end{figure}
 
 %% S6
 \section{Conclusion}
@@ -550,22 +561,63 @@ We measure $\omega_{q}$ and $\sigma_{\omega_{q}}$ using X method.
 
 
 %% AC
-\section{ME Simulation}
+\section{Dissipation Simulation}
 We model dissipation using the Lindblad master
-equation and standard collapse operators for
-longitudinal relaxation and dephasing
-of a two-level system.
+equation. 
+\begin{equation}
+  \frac{d}{dt} \rho = \frac{-i}{\hbar} [H, \rho] + \sum_{i = 1}^{N^{2} - 1} \gamma_{i} (L_{i} \rho L_{i}^{\dagger} - \frac{1}{2} \{L_{i}^{\dagger} L_{i}, \rho\})
+\end{equation}
+where $\rho = \ket{\psi}\bra{\psi}$ is the density matrix, $N = \textrm{dim}(\mathcal{H})$,
+and $[\cdot, \cdot], \{\cdot, \cdot \}$ are the algebraic commutator and anti-commutator.
+For longitudinal relaxation $\gamma_{1} = T_{1}^{-1} = T_{1, \uparrow}^{-1} + T_{1, \downarrow}^{-1}$
+and $L_{\uparrow} = \sigma^{+}/2$,
+$L_{\downarrow} = \sigma^{-}/2$
+are the ladder operators $\sigma^{\pm} = \sigma_{x} \pm i \sigma_{y}$. For pure dephasing
+$\gamma_{2} = T_{2}^{-1} = (2 T_{1})^{-1} + T_{\phi}^{-1}$ and
+$L_{2} = (I - \sigma_{z})/2$.
 
 
 %% AD
-\section{Derivative Method}
+\section{Derivative Method Dynamics}
+To obtain the dynamics for the derivative of the state $\partial_{x}^{l} \ket{\psi(t)}$
+we differentiate the TDSE dynamics \ref{eq:tdse} with respect to the parameter of interest
+($x$). Using the fluxonium hamiltonian \ref{eq:hamiltonian} we obtain the derivative of the
+state with respect to the qubit frequency ($\omega_{q}$) and the flux amplitude ($a$).
+Here we present the dynamics for the second derivative of the state with respect to the
+qubit frequency. The case is analogous for the flux amplitude. Both $H$ and $\ket{\psi}$ are functions
+of $\omega_{q}$, $a$, and $t$, but we omit the explicit dependence in notation for
+brevity.
 \begin{equation}
   \begin{aligned}
-    \partial_{\omega}^{2} \partial_{t} \psi
-    = \frac{-i}{h} [&2 \cdot \frac{\sigma_{z}}{2} \partial_{\omega} \psi\\
-      &+ (\omega \frac{\sigma_{z}}{2} + A \frac{\sigma_{x}}{2}) \partial_{\omega}^{2} \psi]
+      \partial_{\omega_{q}} \partial_{t} \ket{\psi} &= \partial_{\omega_{q}} H \ket{\psi}\\
+      &= (\partial_{\omega_{q}} H) \ket{\psi} + H (\partial_{\omega_{q}} \ket{\psi})\\
+      &= \frac{\sigma_{z}}{2} \ket{\psi} + H (\partial_{\omega_{q}} \ket{\psi})
   \end{aligned}
 \end{equation}
+\begin{equation}
+  \begin{aligned}
+    \partial_{\omega_{q}}^{2} \partial_{t} \ket{\psi} &= \partial_{\omega_{q}} (\partial_{\omega_{q}} H \ket{\psi})\\
+    &= (\partial_{\omega_{q}}^{2} H) \ket{\psi} + 2 (\partial_{\omega_{q}} H)(\partial_{\omega_{q}} \ket{\psi})\\
+    &\quad + H (\partial_{\omega_{q}}^{2} \ket{\psi})\\
+    &= \sigma_{z} (\partial_{\omega_{q}} \ket{\psi}) + H (\partial_{\omega_{q}}^{2} \ket{\psi})
+  \end{aligned}
+\end{equation}
+The augmented state vector carries $\partial_{\omega_{q}}^{l} \ket{\psi}$
+which appears explicitly in its own dynamics. Due to the dependence of $H$ on $\omega_{q}$ and $a$,
+the $l$\textsuperscript{th} state derivative is coupled to the
+$l - 1$\textsuperscript{th} state derivative.
+
+
+%% AE
+\section{Dynamic Decoupling Sequences}
+Here we present the equations for constructing the CORPSE and
+B2CORPSE sequences.
+
+
+%% AF
+\section{Complex Tensor Handling}
+We use an isomorphism $\mathcal{H}(\mathbb{C}^{n}) \cong \mathcal{H}(\mathbb{R}^{2n})$
+because the software we use does not support complex numbers yet.
 
 
 \bibliography{refs}
