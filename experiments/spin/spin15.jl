@@ -16,14 +16,15 @@ WDIR = ENV["RBQOC_PATH"]
 SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
 # Define the optimization.
-EVOLUTION_TIME = 56.80
+CONSTRAINT_TOLERANCE = 1e-8
 CONTROL_COUNT = 1
-DT_INTEGRATOR = 1
+DT_STATIC = DT_PREF
+DT_STATIC_INV = DT_PREF_INV
 DT_INIT = DT_PREF
 DT_INIT_INV = DT_PREF_INV
 DT_MIN = DT_INIT / 2
 DT_MAX = DT_INIT * 2
-N = Int(EVOLUTION_TIME * DT_INIT_INV) + 1
+EVOLUTION_TIME = 20.0
 
 # Define the problem.
 INITIAL_STATE_0 = SA[1., 0, 0, 0]
@@ -44,8 +45,8 @@ YPIBY2_0 = SA[1., 1, 0, 0] / sqrt(2)
 YPIBY2_1 = SA[-1., 1, 0, 0] / sqrt(2)
 XPIBY2_0 = SA[1., 0, 0, -1] / sqrt(2)
 XPIBY2_1 = SA[0., 1, -1, 0] / sqrt(2)
-TARGET_STATE_0 = XPIBY2_0
-TARGET_STATE_1 = XPIBY2_1
+TARGET_STATE_0 = ZPIBY2_0
+TARGET_STATE_1 = ZPIBY2_1
 TARGET_ASTATE = [
     TARGET_STATE_0;
     TARGET_STATE_1;
@@ -81,12 +82,12 @@ Base.size(model::Model) = (model.n, model.m)
 
 function TrajectoryOptimization.dynamics(model::Model, astate, acontrols, time)
     neg_i_control_hamiltonian = astate[CONTROLS_IDX][1] * NEG_I_H_C1
-            delta_state_0 = (OMEGA_NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_0_IDX]
+    delta_state_0 = (OMEGA_NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_0_IDX]
     delta_state_1 = (OMEGA_NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_1_IDX]
     delta_int_control = astate[CONTROLS_IDX]
     delta_control = astate[DCONTROLS_DT_IDX]
     delta_dcontrol_dt = acontrols[D2CONTROLS_DT2_IDX]
-    delta_int_gamma = get_t1_poly(astate[CONTROLS_IDX][1] / (2 * pi))^(-1)
+    delta_int_gamma = get_t1_spline(astate[CONTROLS_IDX][1] / (2 * pi))^(-1)
     return [
         delta_state_0;
         delta_state_1;
@@ -107,12 +108,14 @@ function run_traj(;time_optimal=false)
     xf = TARGET_ASTATE
     if time_optimal
         m = CONTROL_COUNT + 1
-        dt = DT_INTEGRATOR
+        dt = 1
+        N = Int(floor(EVOLUTION_TIME * DT_INIT_INV)) + 1
     else
         m = CONTROL_COUNT
-        dt = DT_INIT
+        dt = DT_STATIC
+        N = Int(floor(EVOLUTION_TIME * DT_STATIC_INV)) + 1
     end
-
+    
     # Bound the control amplitude.
     x_max = SVector{n}([
         fill(Inf, STATE_SIZE);
@@ -173,7 +176,7 @@ function run_traj(;time_optimal=false)
     if time_optimal
         U0 = [SVector{m}([
             fill(1e-4, CONTROL_COUNT);
-            DT_INIT;
+            fill(DT_INIT, 1);
         ]) for k = 1:N - 1]
     else
         U0 = [SVector{m}(
@@ -187,18 +190,18 @@ function run_traj(;time_optimal=false)
 
     # Define penalties.
     Q = Diagonal(SVector{n}([
-        fill(1e-1, STATE_SIZE); # state 0
-        fill(1e-1, STATE_SIZE); # state 1
-        fill(1e-1, CONTROL_COUNT); # int_control
+        fill(1e0, STATE_SIZE); # state 0
+        fill(1e0, STATE_SIZE); # state 1
+        fill(1e0, CONTROL_COUNT); # int_control
         fill(0, CONTROL_COUNT); # control
         fill(1e-1, CONTROL_COUNT); # dcontrol_dt
-        fill(3e7, 1); # int_gamma
+        fill(5e7, 1); # int_gamma
     ]))
     Qf = Q * N
     if time_optimal
         R = Diagonal(SVector{m}([
             fill(1e-1, CONTROL_COUNT); # d2control_dt2
-            fill(2e1, 1); # dt
+            fill(1e1, 1); # dt
         ]))
     else
         R = Diagonal(SVector{m}([
@@ -225,11 +228,12 @@ function run_traj(;time_optimal=false)
         add_constraint!(constraints, dt_bnd, 1:N-1)
     end
 
-
     # Instantiate problem and solve.
     prob = Problem{TrajectoryOptimization.RK4}(model, obj, constraints, x0, xf, Z, N, t0, tf)
     opts = SolverOptions(verbose=VERBOSE)
     solver = AugmentedLagrangianSolver(prob, opts)
+    solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
+    solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
     TrajectoryOptimization.solve!(solver)
 
     # Post-process.

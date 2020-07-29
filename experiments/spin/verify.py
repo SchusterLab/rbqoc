@@ -3,6 +3,7 @@ verify.py - Quitp verification.
 """
 
 from argparse import ArgumentParser
+from enum import Enum
 from functools import reduce
 import os
 
@@ -88,7 +89,7 @@ NEG_YPIBY2 = np.array([[1., 1.],
 ZPIBY2 = np.array([[1. - 1.j, 0],
                    [0,        1. + 1.j]]) * INV_ROOT_2
 INITIAL_STATE = gen_initial_state(2)
-TARGET_STATE = np.matmul(YPIBY2, INITIAL_STATE)
+TARGET_STATE = np.matmul(XPIBY2, INITIAL_STATE)
 INITIAL_DENSITY = np.matmul(INITIAL_STATE, conjugate_transpose(INITIAL_STATE))
 TARGET_DENSITY = np.matmul(TARGET_STATE, conjugate_transpose(TARGET_STATE))
 
@@ -146,7 +147,6 @@ def main():
     parser.add_argument("--ename", action="store", type=str)
     parser.add_argument("--cname", action="store", type=str)
     parser.add_argument("--cidx", action="store", type=int)
-    parser.add_argument("--cidx", action="store", type=str)
     args = vars(parser.parse_args())
     do_spin = args["spin"]
     experiment_name = args["ename"]

@@ -2,7 +2,9 @@
 t1.jl - do some calculations for fluxonium t1
 """
 
+using Dierckx
 using HDF5
+using Interpolations
 using LaTeXStrings
 using LinearAlgebra
 using TrajectoryOptimization
@@ -16,33 +18,15 @@ EXPERIMENT_NAME = "spin15"
 WDIR = ENV["ROBUST_QOC_PATH"]
 SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 T1_SAVE_FILE_PATH = joinpath(SAVE_PATH, "t1.h5")
+T1CMP_PLOT_FILE_PATH = joinpath(SAVE_PATH, "t1splinecmp.png")
 
 # Plotting configuration.
 ENV["GKSwstype"] = "nul"
 Plots.gr()
 DPI = 300
 
-function generate_save_file_path(save_file_name, save_path)
-    # Ensure the path exists.
-    mkpath(save_path)
-
-    # Create a save file name based on the one given; ensure it will
-    # not conflict with others in the directory.
-    max_numeric_prefix = -1
-    for (_, _, files) in walkdir(save_path)
-        for file_name in files
-            if occursin("_$save_file_name.h5", file_name)
-                max_numeric_prefix = max(parse(Int, split(file_name, "_")[1]))
-            end
-        end
-    end
-
-    save_file_name = "_$save_file_name.h5"
-    save_file_name = @sprintf("%05d%s", max_numeric_prefix + 1, save_file_name)
-
-    return joinpath(save_path, save_file_name)
-end
-
+# misc. constants
+SAMPLE_SIZE = Int(1e3)
 
 # Define experimental constants.
 # E / h
@@ -63,6 +47,17 @@ E_CHARGE = 1.60217646e-19
 INVERSE_FLUX_QUANTUM = 4.835977958971655e14
 # FLUX_FRUSTRATION = FLUX_QUANTUM / 2
 FLUX_FRUSTRATION = 1.033917036516689e-15
+# raw T1s reported in units of microseconds
+T1_ARRAY = [
+    1597.923, 1627.93, 301.86, 269.03, 476.33, 1783.19, 2131.76, 2634.50, 
+    4364.68, 2587.82, 1661.915, 1794.468, 2173.88, 1188.83, 
+    1576.493, 965.183, 560.251, 310.88
+] * 1e3
+FBFQ_ARRAY = [
+    0.26, 0.28, 0.32, 0.34, 0.36, 0.38, 0.4,
+    0.42, 0.44, 0.46, 0.465, 0.47, 0.475,
+    0.48, 0.484, 0.488, 0.492, 0.5
+]
 
 # Define the system.
 # FLUXONIUM_STATE_COUNT is the state count used in the T1 calculations
@@ -79,6 +74,7 @@ PHI_OP = PHI_OSC * 2^(-0.5) * (CREATE + ANNIHILATE)
 H_EXP_RAW = exp(1im * PHI_OP)
 H_LC = diagm(E_PLASMA * FLUXONIUM_LEVELS)
 
+### ANALYTICAL CALCULATIONS ###
 function get_hamiltonian_oscillator_basis(flux :: Float64)
     reduced_flux = 2 * pi * flux * INVERSE_FLUX_QUANTUM
     h_exp = H_EXP_RAW * exp(1im * reduced_flux)
@@ -103,3 +99,21 @@ function get_t1(flux :: Float64)
     return t1
 end
 
+
+### EXPERIMENTAL DATA FIT ###
+function compare_splines()
+    # fit
+    t1_spline_dierckx = Spline1D(FBFQ_ARRAY, T1_ARRAY)
+    t1_spline_itp = extrapolate(interpolate((FBFQ_ARRAY,), T1_ARRAY, Gridded(Linear())), Flat())
+    # fbfq_axis = range(minimum(FBFQ_ARRAY), stop=maximum(FBFQ_ARRAY), length=SAMPLE_SIZE)
+    fbfq_axis = range(0, stop=2 * maximum(FBFQ_ARRAY), length=SAMPLE_SIZE)
+
+    # plot
+    fig = Plots.plot(dpi=DPI)
+    Plots.plot!(fbfq_axis, map(t1_spline_dierckx, fbfq_axis), label="dierckx")
+    Plots.plot!(fbfq_axis, map(t1_spline_itp, fbfq_axis), label="itp")
+    Plots.scatter!(FBFQ_ARRAY, T1_ARRAY, label="data")
+    Plots.xlabel!(L"\Phi / \Phi_{0}")
+    Plots.ylabel!(L"T_{1}")
+    Plots.savefig(fig, T1CMP_PLOT_FILE_PATH)
+end
