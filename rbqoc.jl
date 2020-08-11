@@ -183,7 +183,7 @@ function plot_controls(save_file_paths, plot_file_path;
                 label = labels[i][j]
             end
             if colors == nothing
-                color = nothing
+                color = :auto
             else
                 color = colors[i][j]
             end
@@ -209,10 +209,9 @@ show_nice(x) = show(IOContext(stdout), "text/plain", x)
 # Define experimental constants.
 # qubit frequency at flux frustration point
 FQ = 1.4e-2 #GHz
-OMEGA = 2 * pi * FQ
-DOMEGA = OMEGA * 5e-2
-OMEGA_PLUS = OMEGA + DOMEGA
-OMEGA_MINUS = OMEGA - DOMEGA
+SIGMAFQ = FQ * 5e-2
+S1FQ = FQ + SIGMAFQ
+S2FQ = FQ - SIGMAFQ
 MAX_CONTROL_NORM_0 = 5e-1 #GHz
 FBFQ_A = 0.202407
 FBFQ_B = 0.5
@@ -259,6 +258,8 @@ SIGMAZ_ISO = SA_F64[1   0   0   0;
 NEGI_H0_ISO = pi * NEGI * SIGMAZ_ISO
 NEGI_H1_ISO = pi * NEGI * SIGMAX_ISO
 FQ_NEGI_H0_ISO = FQ * NEGI_H0_ISO
+S1FQ_NEGI_H0_ISO = S1FQ * NEGI_H0_ISO
+S2FQ_NEGI_H0_ISO = S2FQ * NEGI_H0_ISO
 AYPIBY2_NEGI_H1_ISO = AYPIBY2 * NEGI_H1_ISO
 # dissipation ops
 # L_{0} = |g> <e|
@@ -284,23 +285,26 @@ NEG_E_E_BY2 = SA_F64[0 0 0 0;
                      0 0 0 0;
                      0 0 0 1;] * -0.5
 # gates
-ZPIBY2 = SA_F64[1  0 1  0;
-                0  1 0 -1;
-                -1 0 1  0;
-                0  1 0  1;] / sqrt(2)
-YPIBY2 = SA_F64[1 -1 0  0;
-                1  1 0  0;
-                0  0 1 -1;
-                0  0 1  1;] / sqrt(2)
-XPIBY2 = SA_F64[1   0 0 1;
-                0   1 1 0;
-                0  -1 1 0;
-                -1  0 0 1;] / sqrt(2)
+ZPIBY2 = [1-1im 0;
+          0 1+1im] / sqrt(2)
+ZPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(ZPIBY2))
+ZPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(ZPIBY2[:,1])
+ZPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(ZPIBY2[:,2])
+YPIBY2 = [1 -1;
+          1  1] / sqrt(2)
+YPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(YPIBY2))
+YPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(YPIBY2[:,1])
+YPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(YPIBY2[:,2])
+XPIBY2 = [1 -1im;
+          -1im 1] / sqrt(2)
+XPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(XPIBY2))
+XPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(XPIBY2[:,1])
+XPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(XPIBY2[:,2])
 
 GT_GATE = Dict(
-    xpiby2 => XPIBY2,
-    ypiby2 => YPIBY2,
-    zpiby2 => ZPIBY2,
+    xpiby2 => XPIBY2_ISO,
+    ypiby2 => YPIBY2_ISO,
+    zpiby2 => ZPIBY2_ISO,
 )
 
 
@@ -345,10 +349,13 @@ amplitude :: Array(N) - amplitude in units of GHz (no 2 pi)
 amp_t1_spline(amplitude) = FBFQ_T1_SPLINE_ITP(amp_fbfq(amplitude))
 
 
-function dynamics_schroed_deqjl(state, (controls, control_knot_count, dt_inv), t)
+"""
+Schroedinger dynamics.
+"""
+function dynamics_schroed_deqjl(state, (controls, control_knot_count, dt_inv, negi_h0), t)
     knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
     negi_h = (
-        FQ_NEGI_H0_ISO
+        negi_h0
         + controls[knot_point][1] * NEGI_H1_ISO
     )
     return (
@@ -357,7 +364,7 @@ function dynamics_schroed_deqjl(state, (controls, control_knot_count, dt_inv), t
 end
 
 
-function dynamics_lindbladdis_deqjl(density, (controls, control_knot_count, dt_inv), t)
+function dynamics_lindbladdis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
     knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
     gamma_1 = (amp_t1_spline(controls[knot_point][1]))^(-1)
     negi_h = (
@@ -372,7 +379,7 @@ function dynamics_lindbladdis_deqjl(density, (controls, control_knot_count, dt_i
 end
 
 
-function dynamics_lindbladnodis_deqjl(density, (controls, control_knot_count, dt_inv), t)
+function dynamics_lindbladnodis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
     knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
     negi_h = (
         FQ_NEGI_H0_ISO
@@ -394,7 +401,7 @@ T1_YPIBY2 = TX_YPIBY2
 T2_YPIBY2 = T1_YPIBY2 + TZ_YPIBY2
 GAMMA11_YPIBY2 = amp_t1_spline(AYPIBY2)^(-1)
 GAMMA12_YPIBY2 = amp_t1_spline(0)^(-1)
-function dynamics_ypiby2nodis_deqjl(density, (controls, control_knot_count, dt_inv), t)
+function dynamics_ypiby2nodis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
     t = t - Int(floor(t / TTOT_YPIBY2)) * TTOT_YPIBY2
     if t <= T1_YPIBY2
         negi_h = H1_YPIBY2
@@ -409,7 +416,7 @@ function dynamics_ypiby2nodis_deqjl(density, (controls, control_knot_count, dt_i
 end
 
 
-function dynamics_ypiby2dis_deqjl(density, (controls, control_knot_count, dt_inv), t)
+function dynamics_ypiby2dis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
     t = t - Int(floor(t / TTOT_YPIBY2)) * TTOT_YPIBY2
     if t <= T1_YPIBY2
         negi_h = H1_YPIBY2
@@ -492,7 +499,15 @@ function dynamics_xpiby2dis_deqjl(density, (controls, control_knot_count, dt_inv
 end
 
 
-fidelity_mat(m1, m2) = abs(tr(m1' * m2)) / abs(tr(m2' * m2))
+@inline fidelity_vec_iso2(s1, s2) = (
+    (s1's2)^2 + (s1[1] * s2[3] + s1[2] * s2[4] - s1[3] * s2[1] - s1[4] * s2[2])^2
+)
+
+
+@inline fidelity_mat_iso(m1, m2) = abs(tr(m1' * m2)) / abs(tr(m2' * m2))
+
+
+@inline fidelity_mat_iso2(m1, m2) = 0
 
 
 function gen_rand_state_iso(;seed=0)
@@ -554,7 +569,8 @@ function run_sim_deqjl(
     controls_dt_inv=DT_PREF_INV,
     deqjl_adaptive=false, dynamics_type=lindbladnodis,
     dt=DT_PREF, save=true, save_type=jl, seed=-1,
-    solver=DifferentialEquations.Vern9, print_seq=false, print_final=false)
+    solver=DifferentialEquations.Vern9, print_seq=false, print_final=false,
+    negi_h0=FQ_NEGI_H0_ISO)
     start_time = Dates.now()
     # grab
     if isnothing(save_file_path)
@@ -599,9 +615,9 @@ function run_sim_deqjl(
         initial_state =  gen_rand_density_iso(;seed=seed)
     end
     tspan = (0., gate_time * gate_count)
-    p = (controls, control_knot_count, controls_dt_inv)
+    p = (controls, control_knot_count, controls_dt_inv, negi_h0)
     prob = ODEProblem(f, initial_state, tspan, p)
-    result = solve(prob, DifferentialEquations.Vern9(), dt=dt, saveat=save_times,
+    result = solve(prob, solver(), dt=dt, saveat=save_times,
                    maxiters=DEQJL_MAXITERS, adaptive=DEQJL_ADAPTIVE)
 
     # Compute the fidelities.
@@ -697,9 +713,125 @@ function run_sim_deqjl(
             write(data_file, "fidelities", fidelities)
             write(data_file, "run_time", string(run_time))
             write(data_file, "dt", dt)
+            write(data_file, "negi_h0", negi_h0)
         end
         println("Saved simulation to $(data_file_path)")
     end
+    return data_file_path
+end
+
+
+"""
+1 gate, many h0s
+"""
+function run_sim_h0sweep_deqjl(
+    gate_type, negi_h0s;
+    save_file_path=nothing,
+    controls_dt_inv=DT_PREF_INV,
+    deqjl_adaptive=false, dynamics_type=schroed,
+    dt=DT_PREF, save=true, save_type=jl, seed=-1,
+    solver=DifferentialEquations.Vern9, print_seq=false)
+    
+    start_time = Dates.now()
+    # grab
+    if isnothing(save_file_path)
+        controls = control_knot_count = nothing
+        if dynamics_type == ypiby2nodis || dynamics_type == ypiby2dis
+            gate_time = TTOT_YPIBY2
+        elseif dynamics_type == xpiby2nodis || dynamics_type == xpiby2dis
+            gate_time = TTOT_XPIBY2
+        end
+    else
+        (controls, gate_time) = grab_controls(save_file_path; save_type=save_type)
+        # controls = controls ./ (2 * pi)
+        control_knot_count = Int(floor(gate_time * controls_dt_inv))
+    end
+    save_times = [0., gate_time]
+    
+    # set up integration
+    if dynamics_type == lindbladnodis
+        dynamics = dynamics_lindbladnodis_deqjl
+    elseif dynamics_type == lindbladdis
+        dynamics = dynamics_lindbladdis_deqjl
+    elseif dynamics_type == schroed
+        dynamics = dynamics_schroed_deqjl
+    elseif dynamics_type == ypiby2nodis
+        dynamics = dynamics_ypiby2nodis_deqjl
+    elseif dynamics_type == ypiby2dis
+        dynamics = dynamics_ypiby2dis_deqjl
+    elseif dynamics_type == xpiby2nodis
+        dynamics = dynamics_xpiby2nodis_deqjl
+    elseif dynamics_type == xpiby2dis
+        dynamics = dynamics_xpiby2dis_deqjl
+    end
+    is_state = is_density = false
+    if dynamics_type == schroed
+        is_state = true
+    else
+        is_density = true
+    end
+    if is_state
+        initial_state = gen_rand_state_iso(;seed=seed)
+    elseif is_density
+        initial_state =  gen_rand_density_iso(;seed=seed)
+    end
+    tspan = (0., gate_time)
+
+    # integrate and compute fidelity
+    sample_count = size(negi_h0s)[1]
+    fidelities = zeros(sample_count)
+    gate = GT_GATE[gate_type]
+    if is_state
+        target_state = gate * initial_state
+    elseif is_density
+        target_state = gate * initial_state * gate'
+    end
+    for i = 1:sample_count
+        dargs = (controls, control_knot_count, controls_dt_inv, negi_h0s[i])
+        prob = ODEProblem(dynamics, initial_state, tspan, dargs)
+        result = solve(prob, solver(), dt=dt, saveat=save_times,
+                       maxiters=DEQJL_MAXITERS, adaptive=DEQJL_ADAPTIVE)
+        final_state = result.u[end]
+        if is_state
+            fidelities[i] = fidelity_vec_iso2(final_state, target_state)
+        elseif is_density
+            fidelities[i] = fidelity_mat_iso2(final_state, target_state)
+        end
+        if print_seq
+            println("fidelities[$(i)] = $(fidelities[i])")
+        end
+    end
+    end_time = Dates.now()
+    run_time = end_time - start_time
+    
+    # save
+    experiment_name = save_path = nothing
+    if isnothing(save_file_path)
+        if (dynamics_type == ypiby2nodis || dynamics_type == ypiby2dis
+            || dynamics_type == xpiby2nodis || dynamics_type == xpiby2dis)
+            experiment_name = "spin14"
+            save_path = joinpath(ENV["RBQOC_PATH"], "out", "spin", "spin14")
+        end
+    else
+        experiment_name = split(save_file_path, "/")[end - 1]
+        save_path = dirname(save_file_path)
+    end
+    data_file_path = nothing
+    if save
+        data_file_path = generate_save_file_path("h5", experiment_name, save_path)
+        h5open(data_file_path, "cw") do data_file
+            write(data_file, "dynamics_type", Integer(dynamics_type))
+            write(data_file, "gate_time", gate_time)
+            write(data_file, "gate_type", Integer(gate_type))
+            write(data_file, "save_file_path", isnothing(save_file_path) ? "" : save_file_path)
+            write(data_file, "seed", seed)
+            write(data_file, "fidelities", fidelities)
+            write(data_file, "run_time", string(run_time))
+            write(data_file, "dt", dt)
+        end
+        println("Saved run_sim_h0sweep_deqjl to $(data_file_path)")
+    end
+
     return data_file_path
 end
 
@@ -715,8 +847,12 @@ function sample_controls(save_file_path; dt=DT_PREF, dt_inv=DT_PREF_INV,
     controls = save["astates"][1:end - 1, (save["controls_idx"])]
     d2controls_dt2 = save["acontrols"][1:end, save["d2controls_dt2_idx"]]
     (control_knot_count, control_count) = size(controls)
-    dts = save["acontrols"][1:end, save["dt_idx"]]
-    time_axis = [0; cumsum(dts, dims=1)[1:end-1]]
+    if "dt_idx" in keys(save)
+        dts = save["acontrols"][1:end, save["dt_idx"]]
+    elseif "dt" in keys(save)
+        dts = save["dt"] * ones(control_knot_count)
+    end
+    time_axis = [0; cumsum(dts, dims=1)[1:end - 1]]
 
     # Construct time axis to sample over.
     final_time_sample = sum(dts)

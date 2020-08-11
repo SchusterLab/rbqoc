@@ -24,9 +24,13 @@ DT_STATIC = DT_PREF
 DT_STATIC_INV = DT_PREF_INV
 DT_INIT = DT_PREF
 DT_INIT_INV = DT_PREF_INV
+# DT_INIT = 2e-2
+# DT_INIT_INV = 5e1
 DT_MIN = DT_INIT / 2
 DT_MAX = DT_INIT * 2
 CONSTRAINT_TOLERANCE = 1e-8
+AL_KICKOUT_TOLERANCE = 1e-6
+PN_STEPS = 5
 
 # Define the problem.
 INITIAL_STATE_1 = SA[1., 0, 0, 0]
@@ -254,12 +258,12 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
 
     # Define penalties.
     Q = Diagonal(SVector{n}([
-        fill(5e1, STATE_SIZE); # state 0
-        fill(5e1, STATE_SIZE); # state 1
+        fill(1e2, STATE_SIZE); # state 0
+        fill(1e2, STATE_SIZE); # state 1
         fill(5e1, CONTROL_COUNT); # int
-        fill(1e-8, CONTROL_COUNT); # control
+        fill(5e1, CONTROL_COUNT); # control
         fill(1e-1, CONTROL_COUNT); # dcontrol_dt
-        fill(1e9, 1); # int_gamma
+        fill(1e7, 1); # int_gamma
     ]))
     Qf = Q * N
     if time_optimal
@@ -282,6 +286,7 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     dt_bnd = BoundConstraint(n, m, u_max=u_max, u_min=u_min)
     # Must reach target state. Must have zero net flux.
     target_astate_constraint = GoalConstraint(xf, [STATE_1_IDX; STATE_2_IDX; INT_CONTROLS_IDX])
+    # target_astate_constraint = GoalConstraint(xf, [STATE_1_IDX; STATE_2_IDX])
     # Must obey unit norm.
     normalization_constraint_1 = NormConstraint(n, m, 1, TO.Equality(), STATE_1_IDX)
     normalization_constraint_2 = NormConstraint(n, m, 1, TO.Equality(), STATE_2_IDX)
@@ -293,21 +298,26 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     add_constraint!(constraints, normalization_constraint_1, 2:N-1)
     add_constraint!(constraints, normalization_constraint_2, 2:N-1)
     if time_optimal
-        add_constraint!(constraints, dt_bnd, 2:N-1)
+        add_constraint!(constraints, dt_bnd, 1:N-1)
     end
 
     # Instantiate problem and solve.
     prob = Problem{RobotDynamics.RK4}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
-    opts = SolverOptions(verbose=VERBOSE)
     solver = nothing
+    opts = SolverOptions(verbose=VERBOSE)
     if solver_type == alilqr
         solver = AugmentedLagrangianSolver(prob, opts)
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
+        # solver.opts.penalty_initial = AL_INITIAL_PENALTY
     elseif solver_type == altro
         solver = ALTROSolver(prob, opts)
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
-        solver.opts.projected_newton_tolerance = CONSTRAINT_TOLERANCE * 1e2
+        solver.solver_al.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
+        solver.solver_al.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
+        solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
+        solver.solver_pn.opts.n_steps = PN_STEPS
+        # solver.solver_al.opts.penalty_initial = AL_INITIAL_PENALTY
     end
     Altro.solve!(solver)
 
