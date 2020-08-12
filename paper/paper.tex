@@ -91,7 +91,7 @@ realizing practical quantum computing.
 We study the quantum optimal control problem on the fluxonium qubit.
 We outline experimentally realistic constraints and map them to
 the trajectory optimization framework. For the device we study
-we achieve a 1.5x decrease in longitudinal relaxation probability.
+we achieve a 2.5x decrease in longitudinal relaxation probability.
 We present two methods for achieving robustness to pure dephasing,
 and compare them to existing dynamic decoupling methods. We find that 
 our methods mitigate dephasing by order X over dynamic decoupling.
@@ -371,7 +371,7 @@ broken for intermediate iterations of the optimization,
 so we use the absolute value of the time step
 $\lvert \Delta t_{k} \rvert$ to ensure that it is non-negative.
 
-(Results) We achieve a factor of 1.5 decrease in the probability
+(Results) We achieve a factor of 2.5 decrease in the probability
 of longitudinal relaxation from the analytic gates we benchmark
 against. We simulate the performance of the gates using the
 Lindblad master equation (see Appendix). We repeatedly apply the basis gates
@@ -379,21 +379,20 @@ and measure the fidelity of the resulting state as a function
 of time as shown in Fig. 1.
 
 %% T4.1
-%% TODO: Update this table with spline T1 optimizations and calculations.
 %% TODO: Maybe best for appendix.
 %% TOOD: Maybe add some commentary about why we see more speedup
 %% for Z/2 and X/2 than Y/2. In particular I think this is because of the
 %% long idle times at the flux frustration point for Z/2 and X/2. It
 %% might be a more fair comparison to show gates that have better T1s
 %% and as good flux noise mitigation.
-\begin{table}[h]
+\begin{table}[ht]
   \begin{tabular}{c | c | c | c}
     & Analytic  & QOC &\\
     Gate & $P_{1}\ (10^{-5})$ & $P_{1}\ (10^{-5})$ & Speedup\\
     \hline
-    Z/2 & 4.615 & 2.576 & 1.792\\
-    Y/2 & 2.826 & 1.888 & 1.496\\
-    X/2 & 9.562 & 5.080 & 1.882\\
+    Z/2 & 5.745 & 2.144 & 2.680\\
+    Y/2 & 5.253 & 2.011 & 2.612\\
+    X/2 & 16.251 & 6.234 & 2.607\\
   \end{tabular}
   \caption{Probability of longitudinal relaxation for each gate
     evaluated at the gate's duration.}

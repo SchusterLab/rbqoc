@@ -17,6 +17,7 @@ __pycache__
 *.DS_Store
 !report/report.pdf
 !paper/paper.pdf
+*.ipynb_checkpoints
 
 # ignore local files
 _test
