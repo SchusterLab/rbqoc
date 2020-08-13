@@ -19,6 +19,10 @@ using Statistics
 
 ### COMMON ###
 
+# paths
+SPIN_OUT_PATH = joinpath(ENV["RBQOC_PATH"], "out", "spin")
+FBFQ_DFQ_DATA_FILE_PATH = joinpath(SPIN_OUT_PATH, "figures", "dfq.h5")
+
 # simulation constants
 DT_PREF = 1e-2
 DT_PREF_INV = 1e2
@@ -40,11 +44,12 @@ DEQJL_ADAPTIVE = false
 @enum DynamicsType begin
     schroed = 1
     lindbladnodis = 2
-    lindbladdis = 3
+    lindbladt1 = 3
     ypiby2nodis = 4
-    ypiby2dis = 5
+    ypiby2t1 = 5
     xpiby2nodis = 6
-    xpiby2dis = 7
+    xpiby2t1 = 7
+    lindbladt2 = 8
 end
 
 
@@ -72,7 +77,7 @@ end
 DT_STR = Dict(
     schroed => "Schroedinger",
     lindbladnodis => "Lindblad No Dissipation",
-    lindbladdis => "Lindblad Dissipation",
+    lindbladt1 => "Lindblad T1 Dissipation",
 )
 
 GT_STR = Dict(
@@ -204,6 +209,21 @@ end
 show_nice(x) = show(IOContext(stdout), "text/plain", x)
 
 
+function get_vec_iso(vec)
+    return vcat(real(vec),
+                imag(vec))
+end
+
+
+function get_mat_iso(mat)
+    len = size(mat)[1]
+    mat_r = real(mat)
+    mat_i = imag(mat)
+    return vcat(hcat(mat_r, -mat_i),
+                hcat(mat_i,  mat_r))
+end
+
+
 ### SPIN ###
 
 # Define experimental constants.
@@ -235,6 +255,13 @@ FBFQ_ARRAY = [
 ]
 FBFQ_T1_SPLINE_DIERCKX = Spline1D(FBFQ_ARRAY, T1_ARRAY)
 FBFQ_T1_SPLINE_ITP = extrapolate(interpolate((FBFQ_ARRAY,), T1_ARRAY, Gridded(Linear())), Flat())
+# TODO: idk if hdf5 is inter-process safe
+(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS) = h5open(FBFQ_DFQ_DATA_FILE_PATH, "r") do data_file
+    fbfqs = read(data_file, "fbfqs")
+    dfqs = read(data_file, "dfqs")
+    return(fbfqs, dfqs)
+end
+FBFQ_DFQ_SPLINE_DIERCKX = Spline1D(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS)
 STATE_SIZE_NOISO = 2
 STATE_SIZE_ISO = 2 * STATE_SIZE_NOISO
 ZPIBY2_GATE_TIME = 17.86
@@ -288,18 +315,18 @@ NEG_E_E_BY2 = SA_F64[0 0 0 0;
 ZPIBY2 = [1-1im 0;
           0 1+1im] / sqrt(2)
 ZPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(ZPIBY2))
-ZPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(ZPIBY2[:,1])
-ZPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(ZPIBY2[:,2])
+ZPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(ZPIBY2[:,1]))
+ZPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(ZPIBY2[:,2]))
 YPIBY2 = [1 -1;
           1  1] / sqrt(2)
 YPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(YPIBY2))
-YPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(YPIBY2[:,1])
-YPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(YPIBY2[:,2])
+YPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(YPIBY2[:,1]))
+YPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(YPIBY2[:,2]))
 XPIBY2 = [1 -1im;
           -1im 1] / sqrt(2)
 XPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(XPIBY2))
-XPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(XPIBY2[:,1])
-XPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(XPIBY2[:,2])
+XPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPIBY2[:,1]))
+onXPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPIBY2[:,2]))
 
 GT_GATE = Dict(
     xpiby2 => XPIBY2_ISO,
@@ -364,7 +391,19 @@ function dynamics_schroed_deqjl(state, (controls, control_knot_count, dt_inv, ne
 end
 
 
-function dynamics_lindbladdis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
+function dynamics_lindbladnodis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
+    knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
+    negi_h = (
+        FQ_NEGI_H0_ISO
+        + controls[knot_point][1] * NEGI_H1_ISO
+    )
+    return (
+        negi_h * density - density * negi_h
+    )
+end
+
+
+function dynamics_lindbladt1_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
     knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
     gamma_1 = (amp_t1_spline(controls[knot_point][1]))^(-1)
     negi_h = (
@@ -379,14 +418,17 @@ function dynamics_lindbladdis_deqjl(density, (controls, control_knot_count, dt_i
 end
 
 
-function dynamics_lindbladnodis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
+function dynamics_lindbladt1_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
     knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
+    gamma_1 = (amp_t1_spline(controls[knot_point][1]))^(-1)
     negi_h = (
         FQ_NEGI_H0_ISO
         + controls[knot_point][1] * NEGI_H1_ISO
     )
     return (
         negi_h * density - density * negi_h
+        + gamma_1 * (G_E * density * E_G + NEG_E_E_BY2 * density + density * NEG_E_E_BY2)
+        + gamma_1 * (E_G * density * G_E + NEG_G_G_BY2 * density + density * NEG_G_G_BY2)
     )
 end
 
@@ -416,7 +458,7 @@ function dynamics_ypiby2nodis_deqjl(density, (controls, control_knot_count, dt_i
 end
 
 
-function dynamics_ypiby2dis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
+function dynamics_ypiby2t1_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
     t = t - Int(floor(t / TTOT_YPIBY2)) * TTOT_YPIBY2
     if t <= T1_YPIBY2
         negi_h = H1_YPIBY2
@@ -467,7 +509,7 @@ function dynamics_xpiby2nodis_deqjl(density, (controls, control_knot_count, dt_i
 end
 
 
-function dynamics_xpiby2dis_deqjl(density, (controls, control_knot_count, dt_inv), t)
+function dynamics_xpiby2t1_deqjl(density, (controls, control_knot_count, dt_inv), t)
     t = t - Int(floor(t / TTOT_XPIBY2)) * TTOT_XPIBY2
     if t <= T1_XPIBY2
         negi_h = H1_YPIBY2
@@ -541,21 +583,6 @@ function gen_rand_density_iso(;seed=0)
 end
 
 
-function get_vec_iso(vec)
-    return vcat(real(vec),
-                imag(vec))
-end
-
-
-function get_mat_iso(mat)
-    len = size(mat)[1]
-    mat_r = real(mat)
-    mat_i = imag(mat)
-    return vcat(hcat(mat_r, -mat_i),
-                hcat(mat_i,  mat_r))
-end
-
-
 """
 run_sim_deqjl - Apply a gate multiple times and measure the fidelity
 after each application. Save the output.
@@ -575,9 +602,9 @@ function run_sim_deqjl(
     # grab
     if isnothing(save_file_path)
         controls = control_knot_count = nothing
-        if dynamics_type == ypiby2nodis || dynamics_type == ypiby2dis
+        if dynamics_type == ypiby2nodis || dynamics_type == ypiby2t1
             gate_time = TTOT_YPIBY2
-        elseif dynamics_type == xpiby2nodis || dynamics_type == xpiby2dis
+        elseif dynamics_type == xpiby2nodis || dynamics_type == xpiby2t1
             gate_time = TTOT_XPIBY2
         end
     else
@@ -590,18 +617,18 @@ function run_sim_deqjl(
     # integrate
     if dynamics_type == lindbladnodis
         f = dynamics_lindbladnodis_deqjl
-    elseif dynamics_type == lindbladdis
-        f = dynamics_lindbladdis_deqjl
+    elseif dynamics_type == lindbladt1
+        f = dynamics_lindbladt1_deqjl
     elseif dynamics_type == schroed
         f = dynamics_schroed_deqjl
     elseif dynamics_type == ypiby2nodis
         f = dynamics_ypiby2nodis_deqjl
-    elseif dynamics_type == ypiby2dis
-        f = dynamics_ypiby2dis_deqjl
+    elseif dynamics_type == ypiby2t1
+        f = dynamics_ypiby2t1_deqjl
     elseif dynamics_type == xpiby2nodis
         f = dynamics_xpiby2nodis_deqjl
-    elseif dynamics_type == xpiby2dis
-        f = dynamics_xpiby2dis_deqjl
+    elseif dynamics_type == xpiby2t1
+        f = dynamics_xpiby2t1_deqjl
     end
     is_state = is_density = false
     if dynamics_type == schroed
@@ -690,8 +717,8 @@ function run_sim_deqjl(
     # Save the data.
     experiment_name = save_path = nothing
     if isnothing(save_file_path)
-        if (dynamics_type == ypiby2nodis || dynamics_type == ypiby2dis
-            || dynamics_type == xpiby2nodis || dynamics_type == xpiby2dis)
+        if (dynamics_type == ypiby2nodis || dynamics_type == ypiby2t1
+            || dynamics_type == xpiby2nodis || dynamics_type == xpiby2t1)
             experiment_name = "spin14"
             save_path = joinpath(ENV["RBQOC_PATH"], "out", "spin", "spin14")
         end
@@ -713,7 +740,7 @@ function run_sim_deqjl(
             write(data_file, "fidelities", fidelities)
             write(data_file, "run_time", string(run_time))
             write(data_file, "dt", dt)
-            write(data_file, "negi_h0", negi_h0)
+            write(data_file, "negi_h0", Array(negi_h0))
         end
         println("Saved simulation to $(data_file_path)")
     end
@@ -736,9 +763,9 @@ function run_sim_h0sweep_deqjl(
     # grab
     if isnothing(save_file_path)
         controls = control_knot_count = nothing
-        if dynamics_type == ypiby2nodis || dynamics_type == ypiby2dis
+        if dynamics_type == ypiby2nodis || dynamics_type == ypiby2t1
             gate_time = TTOT_YPIBY2
-        elseif dynamics_type == xpiby2nodis || dynamics_type == xpiby2dis
+        elseif dynamics_type == xpiby2nodis || dynamics_type == xpiby2t1
             gate_time = TTOT_XPIBY2
         end
     else
@@ -751,18 +778,18 @@ function run_sim_h0sweep_deqjl(
     # set up integration
     if dynamics_type == lindbladnodis
         dynamics = dynamics_lindbladnodis_deqjl
-    elseif dynamics_type == lindbladdis
-        dynamics = dynamics_lindbladdis_deqjl
+    elseif dynamics_type == lindbladt1
+        dynamics = dynamics_lindbladt1_deqjl
     elseif dynamics_type == schroed
         dynamics = dynamics_schroed_deqjl
     elseif dynamics_type == ypiby2nodis
         dynamics = dynamics_ypiby2nodis_deqjl
-    elseif dynamics_type == ypiby2dis
-        dynamics = dynamics_ypiby2dis_deqjl
+    elseif dynamics_type == ypiby2t1
+        dynamics = dynamics_ypiby2t1_deqjl
     elseif dynamics_type == xpiby2nodis
         dynamics = dynamics_xpiby2nodis_deqjl
-    elseif dynamics_type == xpiby2dis
-        dynamics = dynamics_xpiby2dis_deqjl
+    elseif dynamics_type == xpiby2t1
+        dynamics = dynamics_xpiby2t1_deqjl
     end
     is_state = is_density = false
     if dynamics_type == schroed
@@ -807,8 +834,8 @@ function run_sim_h0sweep_deqjl(
     # save
     experiment_name = save_path = nothing
     if isnothing(save_file_path)
-        if (dynamics_type == ypiby2nodis || dynamics_type == ypiby2dis
-            || dynamics_type == xpiby2nodis || dynamics_type == xpiby2dis)
+        if (dynamics_type == ypiby2nodis || dynamics_type == ypiby2t1
+            || dynamics_type == xpiby2nodis || dynamics_type == xpiby2t1)
             experiment_name = "spin14"
             save_path = joinpath(ENV["RBQOC_PATH"], "out", "spin", "spin14")
         end

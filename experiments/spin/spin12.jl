@@ -23,7 +23,11 @@ CONTROL_COUNT = 1
 SORDER = 2
 DT_STATIC = DT_PREF
 DT_STATIC_INV = DT_PREF_INV
+# DT_STATIC = 2e-2
+# DT_STATIC_INV = 5e1
 CONSTRAINT_TOLERANCE = 1e-8
+AL_KICKOUT_TOLERANCE = 1e-6
+PN_STEPS = 5
 
 # Define the problem.
 INITIAL_STATE1 = SA[1., 0, 0, 0]
@@ -96,7 +100,7 @@ function RobotDynamics.dynamics(model::Model, astate, acontrols, time)
 end
 
 
-function run_traj(;gate_type=ypiby2, evolution_time=20.)
+function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr)
     dt = DT_STATIC
     N = Int(floor(evolution_time * DT_STATIC_INV)) + 1
     n = ASTATE_SIZE
@@ -150,15 +154,15 @@ function run_traj(;gate_type=ypiby2, evolution_time=20.)
 
     model = Model(n, m)
     U0 = [SVector{m}([
-        fill(1e-4, CONTROL_COUNT)
+        fill(1e-4, CONTROL_COUNT);
     ]) for k = 1:N-1]
     X0 = [SVector{n}([
         fill(NaN, n);
     ]) for k = 1:N]
-    Z = Traj(n, m, dt, N)
+    Z = Traj(X0, U0, dt * ones(N))
 
-    Qs = 1e1
-    Qsn = 1e4
+    Qs = 1e2
+    Qsn = 1e2
     Q = Diagonal(SVector{n}([
         fill(Qs, STATE_SIZE_ISO); # state1
         fill(Qsn, STATE_SIZE_ISO); # s1state1
@@ -167,7 +171,7 @@ function run_traj(;gate_type=ypiby2, evolution_time=20.)
         fill(Qsn, STATE_SIZE_ISO); # s1state2
         fill(Qsn, STATE_SIZE_ISO); # s2state2
         fill(1e1, 1); # int_control
-        fill(1e1, 1); # control
+        fill(1e-1, 1); # control
         fill(1e-1, 1); # dcontrol_dt
     ]))
     Qf = Q * N
@@ -181,25 +185,34 @@ function run_traj(;gate_type=ypiby2, evolution_time=20.)
     # Must statisfy conrols start and stop at 0.
     control_bnd_boundary = BoundConstraint(n, m, x_max=x_max_boundary, x_min=x_min_boundary)
     # Must reach target state. Must have zero net flux.
-    target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX]);
+    target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
     # Must obey unit norm.
     normalization_constraint_1 = NormConstraint(n, m, 1, TO.Equality(), STATE1_IDX)
     normalization_constraint_2 = NormConstraint(n, m, 1, TO.Equality(), STATE2_IDX)
     
     constraints = ConstraintList(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)
-    add_constraint!(constraints, control_bnd_boundary, 1:1)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
     add_constraint!(constraints, target_astate_constraint, N:N);
-    add_constraint!(constraints, normalization_constraint_1, 1:N)
-    add_constraint!(constraints, normalization_constraint_2, 1:N)
+    add_constraint!(constraints, normalization_constraint_1, 2:N-1)
+    add_constraint!(constraints, normalization_constraint_2, 2:N-1)
 
     # Instantiate problem and solve.
-    prob = Problem{RobotDynamics.RK4}(model, obj, constraints, x0, xf, Z, N, t0, tf)
+    prob = Problem{RobotDynamics.RK4}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
     opts = SolverOptions(verbose=VERBOSE)
     solver = AugmentedLagrangianSolver(prob, opts)
-    solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
-    solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
+    if solver_type == alilqr
+        solver = AugmentedLagrangianSolver(prob, opts)
+        solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
+        solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
+    elseif solver_type == altro
+        solver = ALTROSolver(prob, opts)
+        solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
+        solver.solver_al.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
+        solver.solver_al.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
+        solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
+        solver.solver_pn.opts.n_steps = PN_STEPS
+    end
     Altro.solve!(solver)
 
     # Post-process.
@@ -215,20 +228,34 @@ function run_traj(;gate_type=ypiby2, evolution_time=20.)
     R_arr = [R_raw[i, i] for i in 1:size(R_raw)[1]]
     cidx_arr = Array(CONTROLS_IDX)
     d2cidx_arr = Array(D2CONTROLS_IDX)
+    cmax = TrajectoryOptimization.max_violation(solver)
+    cmax_info = TrajectoryOptimization.findmax_violation(get_constraints(solver))
     
     # Save.
     if SAVE
-        save_file_path = generate_save_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
+            save_file_path = generate_save_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
         println("Saving this optimization to $(save_file_path)")
         h5open(save_file_path, "cw") do save_file
             write(save_file, "acontrols", acontrols_arr)
             write(save_file, "controls_idx", cidx_arr)
-            write(save_file, "d2controls_idx", d2cidx_arr)
+            write(save_file, "d2controls_dt2_idx", d2cidx_arr)
             write(save_file, "evolution_time", evolution_time)
             write(save_file, "astates", astates_arr)
             write(save_file, "Q", Q_arr)
             write(save_file, "Qf", Qf_arr)
             write(save_file, "R", R_arr)
+            write(save_file, "cmax", cmax)
+            write(save_file, "cmax_info", cmax_info)
+            write(save_file, "dt", dt)
+        end
+
+        if postsample
+            (csample, d2csample, etsample) = sample_controls(save_file_path)
+            h5open(save_file_path, "r+") do save_file
+                write(save_file, "controls_sample", csample)
+                write(save_file, "d2controls_dt2_sample", d2csample)
+                write(save_file, "evolution_time_sample", etsample)
+            end
         end
     end
 end

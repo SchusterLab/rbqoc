@@ -258,12 +258,12 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
 
     # Define penalties.
     Q = Diagonal(SVector{n}([
-        fill(1e2, STATE_SIZE); # state 0
-        fill(1e2, STATE_SIZE); # state 1
-        fill(5e1, CONTROL_COUNT); # int
-        fill(5e1, CONTROL_COUNT); # control
+        fill(1e1, STATE_SIZE); # state 0
+        fill(1e1, STATE_SIZE); # state 1
+        fill(1e-1, CONTROL_COUNT); # int
+        fill(1e0, CONTROL_COUNT); # control
         fill(1e-1, CONTROL_COUNT); # dcontrol_dt
-        fill(1e7, 1); # int_gamma
+        fill(1e8, 1); # int_gamma
     ]))
     Qf = Q * N
     if time_optimal

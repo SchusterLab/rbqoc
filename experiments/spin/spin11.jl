@@ -23,8 +23,8 @@ CONTROL_COUNT = 1
 DORDER = 2
 DT_STATIC = DT_PREF
 DT_STATIC_INV = DT_PREF_INV
-# DT_STATIC = 2.5e-2
-# DT_STATIC_INV = 4e1
+# DT_STATIC = 2e-2
+# DT_STATIC_INV = 5e1
 CONSTRAINT_TOLERANCE = 1e-8
 AL_KICKOUT_TOLERANCE = 1e-6
 PN_STEPS = 5
@@ -184,7 +184,7 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr, pos
     ]) for k = 1:N]
     Z = Traj(X0, U0, dt * ones(N))
 
-    Qs = 5e2
+    Qs = 1e1
     Qd1s = Qd2s = Qd3s = 1e-5
     Q = Diagonal(SVector{n}([
         fill(Qs, STATE_SIZE_ISO); # state1
@@ -195,8 +195,8 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr, pos
         fill(Qd1s, STATE_SIZE_ISO); # dstate2
         fill(Qd2s, STATE_SIZE_ISO); # d2state2
         # fill(Qd3s, STATE_SIZE_ISO); # d3state2
-        fill(1e2, 1); # int_control
-        fill(1e2, 1); # control
+        fill(1e1, 1); # int_control
+        fill(1e1, 1); # control
         fill(1e-1, 1); # dcontrol_dt
     ]))
     Qf = Q * N

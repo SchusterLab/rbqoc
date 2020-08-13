@@ -255,9 +255,10 @@ end
 ### FIGURE 2 ###
 F2_PULSE_DATA = Dict(
     derivative => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00047_spin11.h5"),
+        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00059_spin11.h5"),
         SAVE_TYPE_KEY => jl,
-        COLOR_KEY => :red
+        COLOR_KEY => :red,
+        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00060_spin11.h5")
     ),
     # sample => Dict(
     #     SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00040_spin12.h5"),
@@ -267,7 +268,8 @@ F2_PULSE_DATA = Dict(
     analytic => Dict(
         SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00003_spin14.h5"),
         SAVE_TYPE_KEY => py,
-        COLOR_KEY => :lightskyblue
+        COLOR_KEY => :lightskyblue,
+        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00026_spin14.h5"),
     ),
 )
 F2B_TRIAL_COUNT = Integer(1e3)
@@ -293,32 +295,28 @@ function make_figure2b()
     negi_h0s = [NEGI_H0_ISO * fq for fq in fqs]
 
     # sweep
-    # data_file_paths = []
-    # gate_type = ypiby2
-    # for pulse_type in keys(F2_PULSE_DATA)
-    #     save_file_path = F2_PULSE_DATA[pulse_type][SAVE_FILE_PATH_KEY]
-    #     save_type = F2_PULSE_DATA[pulse_type][SAVE_TYPE_KEY]
-    #     data_file_path = run_sim_h0sweep_deqjl(ypiby2, negi_h0s; save_file_path=save_file_path,
-    #                                            save_type=save_type)
-    #     h5open(data_file_path, "r+") do data_file
-    #         write(data_file, "fqs", fqs)
-    #         write(data_file, "pulse_type", Integer(pulse_type))
-    #     end
-    #     push!(data_file_paths, data_file_path)
-    # end
-    data_file_paths = [
-        # joinpath(META_SAVE_PATH, "spin12/00052_spin12.h5"),
-        joinpath(META_SAVE_PATH, "spin11/00049_spin11.h5"),
-        joinpath(META_SAVE_PATH, "spin14/00026_spin14.h5"),
-    ]
+    gate_type = ypiby2
+    for pulse_type in keys(F2_PULSE_DATA)
+        if isnothing(F2_PULSE_DATA[pulse_type][DATA_FILE_PATH_KEY])
+            save_file_path = F2_PULSE_DATA[pulse_type][SAVE_FILE_PATH_KEY]
+            save_type = F2_PULSE_DATA[pulse_type][SAVE_TYPE_KEY]
+            data_file_path = run_sim_h0sweep_deqjl(ypiby2, negi_h0s; save_file_path=save_file_path,
+                                                   save_type=save_type)
+            h5open(data_file_path, "r+") do data_file
+                write(data_file, "fqs", fqs)
+                write(data_file, "pulse_type", Integer(pulse_type))
+            end
+            F2_PULSE_DATA[pulse_type][DATA_FILE_PATH_KEY] = data_file_path
+        end
+    end
 
     # plot
     fig = Plots.plot(dpi=DPI)
-    for (i, pulse_type) in enumerate(keys(F2_PULSE_DATA))
+    for pulse_type in keys(F2_PULSE_DATA)
         pulse_data = F2_PULSE_DATA[pulse_type]
         label = "$(PT_STR[pulse_type])"
         color = pulse_data[COLOR_KEY]
-        data_file_path = data_file_paths[i]
+        data_file_path = pulse_data[DATA_FILE_PATH_KEY]
         (fidelities,) = h5open(data_file_path, "r") do data_file
             fidelities = read(data_file, "fidelities")
             return (fidelities,)
