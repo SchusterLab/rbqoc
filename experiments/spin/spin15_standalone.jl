@@ -4,28 +4,88 @@ spin15.jl - T1 optimized pulses
 
 using Altro
 using HDF5
+using Interpolations
 using LinearAlgebra
 using RobotDynamics
 using StaticArrays
 using TrajectoryOptimization
 const TO = TrajectoryOptimization
 
-WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
-include(joinpath(WDIR, "rbqoc.jl"))
-
 # paths
+WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
 EXPERIMENT_META = "spin"
 EXPERIMENT_NAME = "spin15"
 SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
+# defs
+# this type is used for specifying a target transformation
+@enum GateType begin
+    zpiby2 = 1
+    ypiby2 = 2
+    xpiby2 = 3
+end
+
+# this type specifies common save formats i use
+@enum SaveType begin
+    jl = 1
+    samplejl = 2
+    py = 3
+end
+
+# this type is used for choosing an Altro solver
+@enum SolverType begin
+    ilqr = 1
+    alilqr = 2
+    altro = 3
+end
+
+# system defs
+FQ = 1.4e-2 #GHz
+MAX_CONTROL_NORM_0 = 5e-1 #GHz
+FBFQ_A = 0.202407
+FBFQ_B = 0.5
+NEGI = SA_F64[0   0  1  0 ;
+              0   0  0  1 ;
+              -1  0  0  0 ;
+              0  -1  0  0 ;]
+SIGMAX_ISO = SA_F64[0   1   0   0;
+                    1   0   0   0;
+                    0   0   0   1;
+                    0   0   1   0]
+SIGMAZ_ISO = SA_F64[1   0   0   0;
+                    0  -1   0   0;
+                    0   0   1   0;
+                    0   0   0  -1]
+NEGI_H0_ISO = pi * NEGI * SIGMAZ_ISO
+NEGI_H1_ISO = pi * NEGI * SIGMAX_ISO
+const FQ_NEGI_H0_ISO = FQ * NEGI_H0_ISO
+
+# raw T1 times are in units of microseconds
+T1_ARRAY = [
+    1597.923, 1627.93, 301.86, 269.03, 476.33, 1783.19, 2131.76, 2634.50, 
+    4364.68, 2587.82, 1661.915, 1794.468, 2173.88, 1188.83, 
+    1576.493, 965.183, 560.251, 310.88
+] * 1e3
+FBFQ_ARRAY = [
+    0.26, 0.28, 0.32, 0.34, 0.36, 0.38, 0.4,
+    0.42, 0.44, 0.46, 0.465, 0.47, 0.475,
+    0.48, 0.484, 0.488, 0.492, 0.5
+]
+const FBFQ_T1_SPLINE_ITP = extrapolate(interpolate((FBFQ_ARRAY,), T1_ARRAY, Gridded(Linear())), Flat())
+@inline amp_fbfq_lo(amplitude) = -abs(amplitude) * FBFQ_A + FBFQ_B
+@inline amp_t1_spline(amplitude) = FBFQ_T1_SPLINE_ITP(amp_fbfq_lo(amplitude))
+
+
 # Define the optimization.
 CONTROL_COUNT = 1
+DT_PREF = 1e-2
+DT_PREF_INV = 1e2
+# static is the time step used for non time-optimal problems
 DT_STATIC = DT_PREF
 DT_STATIC_INV = DT_PREF_INV
+# dt_init is the initial time step at all knot points for time-optimal problems
 DT_INIT = DT_PREF
 DT_INIT_INV = DT_PREF_INV
-# DT_INIT = 2e-2
-# DT_INIT_INV = 5e1
 DT_MIN = DT_INIT / 2
 DT_MAX = DT_INIT * 2
 CONSTRAINT_TOLERANCE = 1e-8
@@ -33,35 +93,36 @@ AL_KICKOUT_TOLERANCE = 1e-7
 PN_STEPS = 5
 
 # Define the problem.
-INITIAL_STATE_1 = SA[1., 0, 0, 0]
-INITIAL_STATE_2 = SA[0., 1, 0, 0]
-STATE_SIZE, = size(INITIAL_STATE_1)
+INITIAL_STATE1 = SA[1., 0, 0, 0]
+INITIAL_STATE2 = SA[0., 1, 0, 0]
+STATE_SIZE, = size(INITIAL_STATE1)
 INITIAL_ASTATE = [
-    INITIAL_STATE_1; # state_0
-    INITIAL_STATE_2;
-    @SVector zeros(CONTROL_COUNT); # int_control
-    @SVector zeros(CONTROL_COUNT); # control
-    @SVector zeros(CONTROL_COUNT); # dcontrol_dt
-    @SVector zeros(1); # int_gamma;
+    INITIAL_STATE1; # state1, this is a quantum evolving according to the schroedinger equation
+    INITIAL_STATE2; # state2, also a quantum state
+    @SVector zeros(CONTROL_COUNT); # int_control, this is the integral of the control
+    @SVector zeros(CONTROL_COUNT); # control, this is the control
+    @SVector zeros(CONTROL_COUNT); # dcontrol_dt, this is the first time derivative of the control
+    @SVector zeros(1); # int_gamma, this is a thing i want to minimize subject to the constraints of the state evolution
 ]
 ASTATE_SIZE, = size(INITIAL_ASTATE)
+# definitions of target quantum states
 ZPIBY2_1 = SA[1., 0, -1, 0] / sqrt(2)
 ZPIBY2_2 = SA[0., 1, 0, 1] / sqrt(2)
 YPIBY2_1 = SA[1., 1, 0, 0] / sqrt(2)
 YPIBY2_2 = SA[-1., 1, 0, 0] / sqrt(2)
 XPIBY2_1 = SA[1., 0, 0, -1] / sqrt(2)
 XPIBY2_2 = SA[0., 1, -1, 0] / sqrt(2)
-# state indices
-STATE_1_IDX = 1:STATE_SIZE
-STATE_2_IDX = STATE_1_IDX[end] + 1:STATE_1_IDX[end] + STATE_SIZE
-INT_CONTROLS_IDX = STATE_2_IDX[end] + 1:STATE_2_IDX[end] + CONTROL_COUNT
-CONTROLS_IDX = INT_CONTROLS_IDX[end] + 1:INT_CONTROLS_IDX[end] + CONTROL_COUNT
-DCONTROLS_DT_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
-INT_GAMMA_IDX = DCONTROLS_DT_IDX[end] + 1:DCONTROLS_DT_IDX[end] + 1
-# control indices
-D2CONTROLS_DT2_IDX = 1:CONTROL_COUNT
-DT_IDX = D2CONTROLS_DT2_IDX[end] + 1:D2CONTROLS_DT2_IDX[end] + 1
 
+# state indices
+const STATE1_IDX = 1:STATE_SIZE
+const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + STATE_SIZE
+const INT_CONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
+const CONTROLS_IDX = INT_CONTROLS_IDX[end] + 1:INT_CONTROLS_IDX[end] + CONTROL_COUNT
+const DCONTROLS_DT_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
+const INT_GAMMA_IDX = DCONTROLS_DT_IDX[end] + 1:DCONTROLS_DT_IDX[end] + 1
+# control indices
+const D2CONTROLS_DT2_IDX = 1:CONTROL_COUNT
+const DT_IDX = D2CONTROLS_DT2_IDX[end] + 1:D2CONTROLS_DT2_IDX[end] + 1
 
 # Specify logging.
 VERBOSE = true
@@ -76,31 +137,45 @@ end
 Base.size(model::Model) = (model.n, model.m)
 
 
-function run_traj(;evolution_time=20., gate_type=zpiby2,
+# Running this function with the default arguments given here reproduces
+# the problem that I want to solve.
+function run_traj(;evolution_time=60., gate_type=xpiby2,
                   initial_save_file_path=nothing,
-                  initial_save_type=jl, time_optimal=false,
-                  solver_type=alilqr)
+                  initial_save_type=jl, time_optimal=true,
+                  solver_type=altro)
     # Choose dynamics
+    # It is likely the first time you run the script than an error will be thrown
+    # saying that the dynamics can not be found. You should be able to reinclude
+    # the file and try running it again. There is some weird behavior with world
+    # contexts that I don't understand yet due to the eval statements. There
+    # might be another way to define the dynamics function conditionally
+    # like this but I do not know one yet.
     if time_optimal
         expr = :(
-        function RobotDynamics.dynamics(model::Model, astate, acontrols, time)
+            function RobotDynamics.dynamics(model::Model, astate, acontrols, time)
             negi_h = (
                 FQ_NEGI_H0_ISO
                 + astate[CONTROLS_IDX][1] * NEGI_H1_ISO
             )
-            delta_state_1 = negi_h * astate[STATE_1_IDX]
-            delta_state_2 = negi_h * astate[STATE_2_IDX]
+            delta_state1 = negi_h * astate[STATE1_IDX]
+            delta_state2 = negi_h * astate[STATE2_IDX]
             delta_int_control = astate[CONTROLS_IDX]
             delta_control = astate[DCONTROLS_DT_IDX]
             delta_dcontrol_dt = acontrols[D2CONTROLS_DT2_IDX]
+            # int_gamma is a bad thing that I want to be small. the
+            # value of amp_t1_spline is proportional to the value of astate[CONTROLS_IDX][1]
+            # so making int_gamma small is often at odds with keeping the controls small
             delta_int_gamma = amp_t1_spline(astate[CONTROLS_IDX][1])^(-1)
             return [
-                delta_state_1;
-                delta_state_2;
+                delta_state1;
+                delta_state2;
                 delta_int_control;
                 delta_control;
                 delta_dcontrol_dt;
                 delta_int_gamma;
+                # I have been doing time optimal problems by multiplying the dynamics
+                # by the dt in the acontrols vector, and telling TO that my
+                # dt is 1.
             ] .* acontrols[DT_IDX][1]^2
         end
         )
@@ -112,15 +187,15 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
                 FQ_NEGI_H0_ISO
                 + astate[CONTROLS_IDX][1] * NEGI_H1_ISO
             )
-            delta_state_1 = negi_h * astate[STATE_1_IDX]
-            delta_state_2 = negi_h * astate[STATE_2_IDX]
+            delta_state1 = negi_h * astate[STATE1_IDX]
+            delta_state2 = negi_h * astate[STATE2_IDX]
             delta_int_control = astate[CONTROLS_IDX]
             delta_control = astate[DCONTROLS_DT_IDX]
             delta_dcontrol_dt = acontrols[D2CONTROLS_DT2_IDX]
             delta_int_gamma = amp_t1_spline(astate[CONTROLS_IDX][1])^(-1)
             return [
-                delta_state_1;
-                delta_state_2;
+                delta_state1;
+                delta_state2;
                 delta_int_control;
                 delta_control;
                 delta_dcontrol_dt;
@@ -135,23 +210,24 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     t0 = 0.
     x0 = INITIAL_ASTATE
     if time_optimal
+        # add one to make dt a decision variable
         m = CONTROL_COUNT + 1
     else
         m = CONTROL_COUNT
     end
     if gate_type == xpiby2
-        target_state_1 = XPIBY2_1
-        target_state_2 = XPIBY2_2
+        target_state1 = XPIBY2_1
+        target_state2 = XPIBY2_2
     elseif gate_type == ypiby2
-        target_state_1 = YPIBY2_1
-        target_state_2 = YPIBY2_2
+        target_state1 = YPIBY2_1
+        target_state2 = YPIBY2_2
     elseif gate_type == zpiby2
-        target_state_1 = ZPIBY2_1
-        target_state_2 = ZPIBY2_2
+        target_state1 = ZPIBY2_1
+        target_state2 = ZPIBY2_2
     end
     xf = [
-        target_state_1;
-        target_state_2;
+        target_state1;
+        target_state2;
         @SVector zeros(CONTROL_COUNT); # int_control
         @SVector zeros(CONTROL_COUNT); # control
         @SVector zeros(CONTROL_COUNT); # dcontrol_dt
@@ -258,18 +334,20 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
 
     # Define penalties.
     Q = Diagonal(SVector{n}([
-        fill(1e1, STATE_SIZE); # state 0
         fill(1e1, STATE_SIZE); # state 1
+        fill(1e1, STATE_SIZE); # state 2
         fill(1e2, CONTROL_COUNT); # int
         fill(1e2, CONTROL_COUNT); # control
-        fill(1e0, CONTROL_COUNT); # dcontrol_dt
-        fill(1e5, 1); # int_gamma
+        fill(1e-1, CONTROL_COUNT); # dcontrol_dt
+        # I would like this value to be as large as possible so int_gamma is as small as possible.
+        # int_gamma is typically on the order of 1e-5 so this 1e7 is not that large.
+        fill(1e7, 1); # int_gamma
     ]))
     Qf = Q * N
     if time_optimal
         R = Diagonal(SVector{m}([
-            fill(1e0, CONTROL_COUNT); # d2control_dt2
-            fill(5e2, 1); # dt
+            fill(1e-1, CONTROL_COUNT); # d2control_dt2
+            fill(5e2, 1); # dt, I have found this typically needs to be high
         ]))
     else
         R = Diagonal(SVector{m}([
@@ -280,19 +358,23 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
 
     # Must satisfy control amplitude bound.
     control_bnd = BoundConstraint(n, m, x_max=x_max, x_min=x_min)
+    # Must satisfy controls start and stop at zero.
+    control_bnd_boundary = BoundConstraint(n, m, x_max=x_max_boundary, x_min=x_min_boundary)
     # Must satisfy dt bound.
     dt_bnd = BoundConstraint(n, m, u_max=u_max, u_min=u_min)
-    # States must reach target. Controls must have zero net flux. Controls must stop at zero.
-    target_astate_constraint = GoalConstraint(xf, [STATE_1_IDX; STATE_2_IDX; INT_CONTROLS_IDX; CONTROLS_IDX])
-    # States must obey unit norm.
-    # normalization_constraint_1 = NormConstraint(n, m, 1, TO.Equality(), STATE_1_IDX)
-    # normalization_constraint_2 = NormConstraint(n, m, 1, TO.Equality(), STATE_2_IDX)
+    # States must reach target. Controls must have zero net flux.
+    target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INT_CONTROLS_IDX])
+    # States must obey unit norm. This constraint can be removed if necessary.
+    # This constraint is rarely the reason for tolerance violation if dt is adequately small / integration is accurate.
+    normalization_constraint_1 = NormConstraint(n, m, 1, TO.Equality(), STATE1_IDX)
+    normalization_constraint_2 = NormConstraint(n, m, 1, TO.Equality(), STATE2_IDX)
     
     constraints = ConstraintList(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)
-    add_constraint!(constraints, target_astate_constraint, N:N);
-    # add_constraint!(constraints, normalization_constraint_1, 2:N-1)
-    # add_constraint!(constraints, normalization_constraint_2, 2:N-1)
+    add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
+    add_constraint!(constraints, target_astate_constraint, N:N)
+    add_constraint!(constraints, normalization_constraint_1, 2:N-1)
+    add_constraint!(constraints, normalization_constraint_2, 2:N-1)
     if time_optimal
         add_constraint!(constraints, dt_bnd, 1:N-1)
     end
@@ -311,7 +393,6 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.solver_al.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
         solver.solver_al.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
-        solver.solver_al.solver_uncon.opts.square_root = true
         solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.solver_pn.opts.n_steps = PN_STEPS
         # solver.solver_al.opts.penalty_initial = AL_INITIAL_PENALTY
@@ -336,8 +417,8 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     if time_optimal
         acontrols_arr[:, DT_IDX] = acontrols_arr[:, DT_IDX] .^2
     end
-    cmax = TrajectoryOptimization.max_violation(solver)
-    cmax_info = TrajectoryOptimization.findmax_violation(get_constraints(solver))
+    cmax = TO.max_violation(solver)
+    cmax_info = TO.findmax_violation(get_constraints(solver))
     
     # Save.
     if SAVE

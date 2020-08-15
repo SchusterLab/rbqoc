@@ -6,6 +6,7 @@ rbqoc.jl - common definitions for the rbqoc repo
 using Dates
 using Dierckx
 using DifferentialEquations
+using Distributions
 using ForwardDiff
 using HDF5
 using Interpolations
@@ -20,8 +21,9 @@ using Statistics
 ### COMMON ###
 
 # paths
-SPIN_OUT_PATH = joinpath(ENV["RBQOC_PATH"], "out", "spin")
-FBFQ_DFQ_DATA_FILE_PATH = joinpath(SPIN_OUT_PATH, "figures", "dfq.h5")
+# WDIR = get(ENV, "RBQOC_PATH", "../../")
+# SPIN_OUT_PATH = joinpath(ENV["RBQOC_PATH"], "out", "spin")
+# FBFQ_DFQ_DATA_FILE_PATH = joinpath(SPIN_OUT_PATH, "figures", "dfq.h5")
 
 # simulation constants
 DT_PREF = 1e-2
@@ -49,7 +51,7 @@ DEQJL_ADAPTIVE = false
     ypiby2t1 = 5
     xpiby2nodis = 6
     xpiby2t1 = 7
-    lindbladt2 = 8
+    lindbladcfn = 8
 end
 
 
@@ -77,7 +79,8 @@ end
 DT_STR = Dict(
     schroed => "Schroedinger",
     lindbladnodis => "Lindblad No Dissipation",
-    lindbladt1 => "Lindblad T1 Dissipation",
+    lindbladt1 => "Lindblad T_1 Dissipation",
+    lindbladcfn => "Lindblad T_phi Dissipation w/ Flux Noise"
 )
 
 GT_STR = Dict(
@@ -176,22 +179,13 @@ function plot_controls(save_file_paths, plot_file_path;
     for (i, save_file_path) in enumerate(save_file_paths)
         # Grab and prep data.
         (controls, evolution_time) = grab_controls(save_file_path; save_type=save_types[i])
-        controls = controls ./ (2 * pi)
         (control_eval_count, control_count) = size(controls)
         control_eval_times = Array(1:1:control_eval_count) * DT_PREF
         
         # Plot.
         for j = 1:control_count
-            if labels == nothing
-                label = nothing
-            else
-                label = labels[i][j]
-            end
-            if colors == nothing
-                color = :auto
-            else
-                color = colors[i][j]
-            end
+            label = isnothing(labels) ? nothing : labels[i][j]
+            color = isnothing(colors) ? :auto : colors[i][j]
             Plots.plot!(control_eval_times, controls[:, j],
                         label=label, color=color)
         end
@@ -236,6 +230,9 @@ MAX_CONTROL_NORM_0 = 5e-1 #GHz
 FBFQ_A = 0.202407
 FBFQ_B = 0.5
 AYPIBY2 = 1.25e-1 #GHz
+GAMMAC = 1 / 3e5 #GHz(T_c = 300 us)
+FBFQ_NAMP = 5.21e-6 # flux noise amplitude
+FBFQ_NDIST = Normal(0., 1.)
 # coefficients are listed in descending order
 # raw coefficients are in units of seconds
 FBFQ_T1_COEFFS = [
@@ -256,12 +253,12 @@ FBFQ_ARRAY = [
 FBFQ_T1_SPLINE_DIERCKX = Spline1D(FBFQ_ARRAY, T1_ARRAY)
 FBFQ_T1_SPLINE_ITP = extrapolate(interpolate((FBFQ_ARRAY,), T1_ARRAY, Gridded(Linear())), Flat())
 # TODO: idk if hdf5 is inter-process safe
-(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS) = h5open(FBFQ_DFQ_DATA_FILE_PATH, "r") do data_file
-    fbfqs = read(data_file, "fbfqs")
-    dfqs = read(data_file, "dfqs")
-    return(fbfqs, dfqs)
-end
-FBFQ_DFQ_SPLINE_DIERCKX = Spline1D(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS)
+# (FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS) = h5open(FBFQ_DFQ_DATA_FILE_PATH, "r") do data_file
+#     fbfqs = read(data_file, "fbfqs")
+#     dfqs = read(data_file, "dfqs")
+#     return(fbfqs, dfqs)
+# end
+# FBFQ_DFQ_SPLINE_DIERCKX = Spline1D(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS)
 STATE_SIZE_NOISO = 2
 STATE_SIZE_ISO = 2 * STATE_SIZE_NOISO
 ZPIBY2_GATE_TIME = 17.86
@@ -288,7 +285,7 @@ FQ_NEGI_H0_ISO = FQ * NEGI_H0_ISO
 S1FQ_NEGI_H0_ISO = S1FQ * NEGI_H0_ISO
 S2FQ_NEGI_H0_ISO = S2FQ * NEGI_H0_ISO
 AYPIBY2_NEGI_H1_ISO = AYPIBY2 * NEGI_H1_ISO
-# dissipation ops
+# relaxation dissipation ops
 # L_{0} = |g> <e|
 # L_{0}^{\dagger} = |e> <g|
 # L_{0}^{\dagger} L_{0} = |e> <e|
@@ -311,6 +308,13 @@ NEG_E_E_BY2 = SA_F64[0 0 0 0;
                      0 1 0 0;
                      0 0 0 0;
                      0 0 0 1;] * -0.5
+# dephasing dissipation ops
+NEG_DOP_ISO = -SA_F64[0 1 0 1;
+                      1 0 1 0;
+                      0 1 0 1;
+                      1 0 1 0]
+NEG_GAMMAC_DOP_ISO = GAMMAC * NEG_DOP_ISO
+
 # gates
 ZPIBY2 = [1-1im 0;
           0 1+1im] / sqrt(2)
@@ -338,20 +342,30 @@ GT_GATE = Dict(
 # methods
 
 """
-amp_fbfq - Compute flux by flux quantum. Reflects
-over the flux frustration point.
+amp_fbfq - Compute flux by flux quantum from flux
+drive amplitude.
+"""
+amp_fbfq(amplitude) = amplitude * FBFQ_A + FBFQ_B
+
+"""
+amp_fbfq_lo - Compute flux by flux quantum
+from flux drive quantum. Flux by flux
+quantum will always be under the flux frustration
+point (0.5).
 
 Arguments
 amplitude :: Array(N) - amplitude in units of GHz (no 2 pi)
 """
-amp_fbfq(amplitude) = -abs(amplitude) * FBFQ_A + FBFQ_B
+amp_fbfq_lo(amplitude) = -abs(amplitude) * FBFQ_A + FBFQ_B
 
 
 """
-fbfq_amp - Compute the amplitude from the flux by
-flux quantum. Reflects over the flux frustration point.
+amp_dfq - Compute the derivative of the qubit frequency
+with respect to the flux by flux quantum from the flux drive
+amplitude.
 """
-fbfq_amp(fbfq) = (fbfq - FBFQ_B) / FBFQ_A
+# amp_dfq(amplitude) = FBFQ_DFQ_SPLINE_DIERCKX(amp_fbfq(amplitude))
+amp_dfq(amplitude) = 1.
 
 
 """
@@ -361,7 +375,7 @@ of nanoseconds.
 Arguments
 amplitude :: Array(N) - amplitude in units of GHz (no 2 pi)
 """
-amp_t1_poly(amplitude) = horner(FBFQ_T1_COEFFS, amp_fbfq(amplitude))
+amp_t1_poly(amplitude) = horner(FBFQ_T1_COEFFS, amp_fbfq_lo(amplitude))
 
 
 """
@@ -371,9 +385,9 @@ for the given amplitude.
 Arguments
 amplitude :: Array(N) - amplitude in units of GHz (no 2 pi)
 """
-# amp_t1_spline(amplitude::Float64) = Dierckx.evaluate(FBFQ_T1_SPLINE_DIERCKX, amp_fbfq(amplitude))
-# damp_t1_spline(amplitude::Float64) = Dierckx.derivative(FBFQ_T1_SPLINE_DIERCKX, amp_fbfq(amplitude))
-amp_t1_spline(amplitude) = FBFQ_T1_SPLINE_ITP(amp_fbfq(amplitude))
+# amp_t1_spline(amplitude::Float64) = Dierckx.evaluate(FBFQ_T1_SPLINE_DIERCKX, amp_fbfq_lo(amplitude))
+# damp_t1_spline(amplitude::Float64) = Dierckx.derivative(FBFQ_T1_SPLINE_DIERCKX, amp_fbfq_lo(amplitude))
+amp_t1_spline(amplitude) = FBFQ_T1_SPLINE_ITP(amp_fbfq_lo(amplitude))
 
 
 """
@@ -394,7 +408,7 @@ end
 function dynamics_lindbladnodis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
     knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
     negi_h = (
-        FQ_NEGI_H0_ISO
+        negi_h0
         + controls[knot_point][1] * NEGI_H1_ISO
     )
     return (
@@ -407,7 +421,7 @@ function dynamics_lindbladt1_deqjl(density, (controls, control_knot_count, dt_in
     knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
     gamma_1 = (amp_t1_spline(controls[knot_point][1]))^(-1)
     negi_h = (
-        FQ_NEGI_H0_ISO
+        negi_h0
         + controls[knot_point][1] * NEGI_H1_ISO
     )
     return (
@@ -418,24 +432,23 @@ function dynamics_lindbladt1_deqjl(density, (controls, control_knot_count, dt_in
 end
 
 
-function dynamics_lindbladt1_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
+function dynamics_lindbladcfn_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
     knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
-    gamma_1 = (amp_t1_spline(controls[knot_point][1]))^(-1)
+    c1 = controls[knot_point][1]
+    fq = FQ + rand(FBFQ_NDIST) * FBFQ_NAMP * amp_dfq(c1)
     negi_h = (
-        FQ_NEGI_H0_ISO
-        + controls[knot_point][1] * NEGI_H1_ISO
+        fq * NEGI_H0_ISO
+        + c1 * NEGI_H1_ISO
     )
     return (
         negi_h * density - density * negi_h
-        + gamma_1 * (G_E * density * E_G + NEG_E_E_BY2 * density + density * NEG_E_E_BY2)
-        + gamma_1 * (E_G * density * G_E + NEG_G_G_BY2 * density + density * NEG_G_G_BY2)
+        + NEG_GAMMAC_DOP_ISO .* density
     )
 end
 
 
-H1_YPIBY2 = FQ_NEGI_H0_ISO + AYPIBY2_NEGI_H1_ISO
-H2_YPIBY2 = FQ_NEGI_H0_ISO
-H3_YPIBY2 = FQ_NEGI_H0_ISO - AYPIBY2_NEGI_H1_ISO
+H11_YPIBY2 = AYPIBY2_NEGI_H1_ISO
+H31_YPIBY2 = -AYPIBY2_NEGI_H1_ISO
 TX_YPIBY2 = 2.1656249366575766
 TZ_YPIBY2 = 15.1423305995572655
 TTOT_YPIBY2 = 19.4735804728724204
@@ -446,11 +459,11 @@ GAMMA12_YPIBY2 = amp_t1_spline(0)^(-1)
 function dynamics_ypiby2nodis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
     t = t - Int(floor(t / TTOT_YPIBY2)) * TTOT_YPIBY2
     if t <= T1_YPIBY2
-        negi_h = H1_YPIBY2
+        negi_h = negi_h0 + H11_YPIBY2
     elseif t <= T2_YPIBY2
-        negi_h = H2_YPIBY2
+        negi_h = negi_h0
     else
-        negi_h = H3_YPIBY2
+        negi_h = negi_h0 + H31_YPIBY2
     end
     return(
         negi_h * density - density * negi_h
@@ -541,6 +554,18 @@ function dynamics_xpiby2t1_deqjl(density, (controls, control_knot_count, dt_inv)
 end
 
 
+DT_DYN = Dict(
+    lindbladnodis => dynamics_lindbladnodis_deqjl,
+    lindbladt1 => dynamics_lindbladt1_deqjl,
+    schroed => dynamics_schroed_deqjl,
+    ypiby2nodis => dynamics_ypiby2nodis_deqjl,
+    ypiby2t1 => dynamics_ypiby2t1_deqjl,
+    xpiby2nodis => dynamics_xpiby2nodis_deqjl,
+    xpiby2t1 => dynamics_xpiby2t1_deqjl,
+    lindbladcfn => dynamics_lindbladcfn_deqjl,
+)
+
+
 @inline fidelity_vec_iso2(s1, s2) = (
     (s1's2)^2 + (s1[1] * s2[3] + s1[2] * s2[4] - s1[3] * s2[1] - s1[4] * s2[2])^2
 )
@@ -615,21 +640,7 @@ function run_sim_deqjl(
     save_times = Array(0:1:gate_count) * gate_time
     
     # integrate
-    if dynamics_type == lindbladnodis
-        f = dynamics_lindbladnodis_deqjl
-    elseif dynamics_type == lindbladt1
-        f = dynamics_lindbladt1_deqjl
-    elseif dynamics_type == schroed
-        f = dynamics_schroed_deqjl
-    elseif dynamics_type == ypiby2nodis
-        f = dynamics_ypiby2nodis_deqjl
-    elseif dynamics_type == ypiby2t1
-        f = dynamics_ypiby2t1_deqjl
-    elseif dynamics_type == xpiby2nodis
-        f = dynamics_xpiby2nodis_deqjl
-    elseif dynamics_type == xpiby2t1
-        f = dynamics_xpiby2t1_deqjl
-    end
+    dynamics = DT_DYN[dynamics_type]
     is_state = is_density = false
     if dynamics_type == schroed
         is_state = true
@@ -641,9 +652,10 @@ function run_sim_deqjl(
     elseif is_density
         initial_state =  gen_rand_density_iso(;seed=seed)
     end
+    Random.seed!(seed < 0 ? 0 : seed)
     tspan = (0., gate_time * gate_count)
     p = (controls, control_knot_count, controls_dt_inv, negi_h0)
-    prob = ODEProblem(f, initial_state, tspan, p)
+    prob = ODEProblem(dynamics, initial_state, tspan, p)
     result = solve(prob, solver(), dt=dt, saveat=save_times,
                    maxiters=DEQJL_MAXITERS, adaptive=DEQJL_ADAPTIVE)
 
@@ -776,21 +788,7 @@ function run_sim_h0sweep_deqjl(
     save_times = [0., gate_time]
     
     # set up integration
-    if dynamics_type == lindbladnodis
-        dynamics = dynamics_lindbladnodis_deqjl
-    elseif dynamics_type == lindbladt1
-        dynamics = dynamics_lindbladt1_deqjl
-    elseif dynamics_type == schroed
-        dynamics = dynamics_schroed_deqjl
-    elseif dynamics_type == ypiby2nodis
-        dynamics = dynamics_ypiby2nodis_deqjl
-    elseif dynamics_type == ypiby2t1
-        dynamics = dynamics_ypiby2t1_deqjl
-    elseif dynamics_type == xpiby2nodis
-        dynamics = dynamics_xpiby2nodis_deqjl
-    elseif dynamics_type == xpiby2t1
-        dynamics = dynamics_xpiby2t1_deqjl
-    end
+    dynmiacs = DT_DYN[dynamics_type]
     is_state = is_density = false
     if dynamics_type == schroed
         is_state = true

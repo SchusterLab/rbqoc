@@ -26,7 +26,7 @@ DT_STATIC_INV = DT_PREF_INV
 # DT_STATIC = 2e-2
 # DT_STATIC_INV = 5e1
 CONSTRAINT_TOLERANCE = 1e-8
-AL_KICKOUT_TOLERANCE = 1e-6
+AL_KICKOUT_TOLERANCE = 1e-7
 PN_STEPS = 5
 
 # Define the problem.
@@ -100,7 +100,7 @@ function RobotDynamics.dynamics(model::Model, astate, acontrols, time)
 end
 
 
-function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr)
+function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr, postsample=false)
     dt = DT_STATIC
     N = Int(floor(evolution_time * DT_STATIC_INV)) + 1
     n = ASTATE_SIZE
@@ -161,7 +161,7 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr)
     ]) for k = 1:N]
     Z = Traj(X0, U0, dt * ones(N))
 
-    Qs = 1e2
+    Qs = 1e1
     Qsn = 1e2
     Q = Diagonal(SVector{n}([
         fill(Qs, STATE_SIZE_ISO); # state1
@@ -170,13 +170,13 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr)
         fill(Qs, STATE_SIZE_ISO); # state2
         fill(Qsn, STATE_SIZE_ISO); # s1state2
         fill(Qsn, STATE_SIZE_ISO); # s2state2
-        fill(1e1, 1); # int_control
-        fill(1e-1, 1); # control
-        fill(1e-1, 1); # dcontrol_dt
+        fill(1e2, 1); # int_control
+        fill(1e4, 1); # control
+        fill(1e1, 1); # dcontrol_dt
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([
-        fill(1e-1, CONTROL_COUNT);
+        fill(1e1, CONTROL_COUNT);
     ]))
     obj = LQRObjective(Q, R, Qf, xf, N)
 
@@ -198,7 +198,7 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr)
     add_constraint!(constraints, normalization_constraint_2, 2:N-1)
 
     # Instantiate problem and solve.
-    prob = Problem{RobotDynamics.RK4}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
+    prob = Problem{RobotDynamics.RK6}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
     opts = SolverOptions(verbose=VERBOSE)
     solver = AugmentedLagrangianSolver(prob, opts)
     if solver_type == alilqr
