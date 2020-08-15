@@ -6,6 +6,7 @@ using Altro
 using HDF5
 using Interpolations
 using LinearAlgebra
+using Printf
 using RobotDynamics
 using StaticArrays
 using TrajectoryOptimization
@@ -38,6 +39,33 @@ end
     alilqr = 2
     altro = 3
 end
+
+
+"""
+get an unused file name like XXXXX_<save_file_path>/<save_file_name>.<extension>
+where XXXXX is a unique numeric prefix
+"""
+function generate_save_file_path(extension, save_file_name, save_path)
+    # Ensure the path exists.
+    mkpath(save_path)
+
+    # Create a save file name based on the one given; ensure it will
+    # not conflict with others in the directory.
+    max_numeric_prefix = -1
+    for (_, _, files) in walkdir(save_path)
+        for file_name in files
+            if occursin("_$(save_file_name).$(extension)", file_name)
+                max_numeric_prefix = max(parse(Int, split(file_name, "_")[1]))
+            end
+        end
+    end
+
+    save_file_name = "_$(save_file_name).$(extension)"
+    save_file_name = @sprintf("%05d%s", max_numeric_prefix + 1, save_file_name)
+
+    return joinpath(save_path, save_file_name)
+end
+
 
 # system defs
 FQ = 1.4e-2 #GHz
