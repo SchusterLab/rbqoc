@@ -1,11 +1,13 @@
 """
-spin15.jl - T1 optimized pulses
+spin15_standalone.jl - t1 optimized pulses
 """
 
 using Altro
+using Dierckx
 using HDF5
 using Interpolations
 using LinearAlgebra
+using Plots
 using Printf
 using RobotDynamics
 using StaticArrays
@@ -64,6 +66,76 @@ function generate_save_file_path(extension, save_file_name, save_path)
     save_file_name = @sprintf("%05d%s", max_numeric_prefix + 1, save_file_name)
 
     return joinpath(save_path, save_file_name)
+end
+
+
+"""
+read_save - Read all data from an h5 file into memory.
+"""
+function read_save(save_file_path)
+    dict = h5open(save_file_path, "r") do save_file
+        dict = Dict()
+        for key in names(save_file)
+            dict[key] = read(save_file, key)
+        end
+        return dict
+    end
+
+    return dict
+end
+
+
+"""
+sample_controls - Sample controls and d2controls_dt2
+on the preferred time axis using a spline.
+"""
+function sample_controls(save_file_path; dt=DT_PREF, dt_inv=DT_PREF_INV,
+                         plot=false, plot_file_path=nothing)
+    # Grab data to sample from.
+    save = read_save(save_file_path)
+    controls = save["astates"][1:end - 1, (save["controls_idx"])]
+    d2controls_dt2 = save["acontrols"][1:end, save["d2controls_dt2_idx"]]
+    (control_knot_count, control_count) = size(controls)
+    if "dt_idx" in keys(save)
+        dts = save["acontrols"][1:end, save["dt_idx"]]
+    elseif "dt" in keys(save)
+        dts = save["dt"] * ones(control_knot_count)
+    end
+    time_axis = [0; cumsum(dts, dims=1)[1:end - 1]]
+
+    # Construct time axis to sample over.
+    final_time_sample = sum(dts)
+    knot_count_sample = Int(floor(final_time_sample * dt_inv))
+    # The last control should be DT_PREF before final_time_sample.
+    time_axis_sample = Array(0:1:knot_count_sample - 1) * dt
+
+    # Sample time_axis_sample via spline.
+    controls_sample = zeros(knot_count_sample, control_count)
+    d2controls_dt2_sample = zeros(knot_count_sample, control_count)
+    for i = 1:control_count
+        controls_spline = Spline1D(time_axis, controls[:, i])
+        controls_sample[:, i] = map(controls_spline, time_axis_sample)
+        d2controls_dt2_spline = Spline1D(time_axis, d2controls_dt2[:, i])
+        d2controls_dt2_sample[:, i] = map(d2controls_dt2_spline, time_axis_sample)
+    end
+
+    # Plot.
+    if plot
+        DPI = 300
+        MS_SMALL = 2
+        ALPHA = 0.2
+        fig = Plots.plot(dpi=DPI)
+        Plots.scatter!(time_axis, controls[:, 1], label="controls data", markersize=MS_SMALL, alpha=ALPHA)
+        Plots.scatter!(time_axis_sample, controls_sample[:, 1], label="controls fit",
+                       markersize=MS_SMALL, alpha=ALPHA)
+        Plots.scatter!(time_axis, d2controls_dt2[:, 1], label="d2_controls_dt2 data")
+        Plots.scatter!(time_axis_sample, d2controls_dt2_sample[:, 1], label="d2_controls_dt2 fit")
+        Plots.xlabel!("Time (ns)")
+        Plots.ylabel!("Amplitude (GHz)")
+        Plots.savefig(fig, plot_file_path)
+        println("Plotted to $(plot_file_path)")
+    end
+    return (controls_sample, d2controls_dt2_sample, final_time_sample)
 end
 
 
@@ -393,7 +465,8 @@ function run_traj(;evolution_time=60., gate_type=xpiby2,
     # States must reach target. Controls must have zero net flux.
     target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INT_CONTROLS_IDX])
     # States must obey unit norm. This constraint can be removed if necessary.
-    # This constraint is rarely the reason for tolerance violation if dt is adequately small / integration is accurate.
+    # This constraint is rarely the reason for tolerance violation if dt is
+    # adequately small / integration is accurate.
     normalization_constraint_1 = NormConstraint(n, m, 1, TO.Equality(), STATE1_IDX)
     normalization_constraint_2 = NormConstraint(n, m, 1, TO.Equality(), STATE2_IDX)
     
@@ -415,7 +488,6 @@ function run_traj(;evolution_time=60., gate_type=xpiby2,
         solver = AugmentedLagrangianSolver(prob, opts)
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
-        # solver.opts.penalty_initial = AL_INITIAL_PENALTY
     elseif solver_type == altro
         solver = ALTROSolver(prob, opts)
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
@@ -423,7 +495,8 @@ function run_traj(;evolution_time=60., gate_type=xpiby2,
         solver.solver_al.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
         solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.solver_pn.opts.n_steps = PN_STEPS
-        # solver.solver_al.opts.penalty_initial = AL_INITIAL_PENALTY
+        solver.solver_al.opts.iterations = 1
+        solver.solver_al.solver_uncon.opts.iterations = 1
     end
     Altro.solve!(solver)
 
