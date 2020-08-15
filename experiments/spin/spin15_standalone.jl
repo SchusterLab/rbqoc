@@ -334,6 +334,11 @@ function run_traj(;evolution_time=60., gate_type=xpiby2,
 
     # Define penalties.
     Q = Diagonal(SVector{n}([
+        # The state1 and state2 evolution is the key thing. I want to simulate their evolution
+        # for very long periods of time using the controls obtained from this optimization.
+        # Therefore, I need to make sure the optimized controls get very low tolerances
+        # on reaching the target state, otherwise when I put the controls into the long
+        # time simulation I get numerical error that builds with each iterate.
         fill(1e1, STATE_SIZE); # state 1
         fill(1e1, STATE_SIZE); # state 2
         fill(1e2, CONTROL_COUNT); # int
@@ -341,6 +346,7 @@ function run_traj(;evolution_time=60., gate_type=xpiby2,
         fill(1e-1, CONTROL_COUNT); # dcontrol_dt
         # I would like this value to be as large as possible so int_gamma is as small as possible.
         # int_gamma is typically on the order of 1e-5 so this 1e7 is not that large.
+        # I can typically afford to use 1e9 for similar problems.
         fill(1e7, 1); # int_gamma
     ]))
     Qf = Q * N
