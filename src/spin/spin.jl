@@ -1,48 +1,34 @@
 """
-rbqoc.jl - common definitions for the rbqoc repo
+spin.jl - common definitions for the spin directory
 """
 
-# imports
 using Dates
 using Dierckx
 using DifferentialEquations
 using Distributions
-using ForwardDiff
 using HDF5
-using Interpolations
-using LinearAlgebra
-using Plots
-using Printf
 using Random
 using StaticArrays
 using Statistics
 
-
-### COMMON ###
+WDIR = get(ENV, "RBQOC_PATH", "../../")
+include(joinpath(WDIR, "src", "rbqoc.jl"))
 
 # paths
-# WDIR = get(ENV, "RBQOC_PATH", "../../")
-# SPIN_OUT_PATH = joinpath(ENV["RBQOC_PATH"], "out", "spin")
-# FBFQ_DFQ_DATA_FILE_PATH = joinpath(SPIN_OUT_PATH, "figures", "dfq.h5")
+const SPIN_OUT_PATH = joinpath(WDIR, "out", "spin")
+const FBFQ_DFQ_DATA_FILE_PATH = joinpath(SPIN_OUT_PATH, "figures", "dfq.h5")
 
 # simulation constants
-DT_PREF = 1e-2
-DT_PREF_INV = 1e2
-
-# plotting configuration and constants
-ENV["GKSwstype"] = "nul"
-Plots.gr()
-DPI = 300
-DPI_FINAL = Integer(2e3)
-MS_SMALL = 2
-MS_MED = 6
-ALPHA = 0.2
-
-# other constants
-DEQJL_MAXITERS = 1e10
-DEQJL_ADAPTIVE = false
+const DT_PREF = 1e-2
+const DT_PREF_INV = 1e2
 
 # types
+@enum GateType begin
+    zpiby2 = 1
+    ypiby2 = 2
+    xpiby2 = 3
+end
+
 @enum DynamicsType begin
     schroed = 1
     lindbladnodis = 2
@@ -52,239 +38,102 @@ DEQJL_ADAPTIVE = false
     xpiby2nodis = 6
     xpiby2t1 = 7
     lindbladcfn = 8
+    zpiby2nodis = 9
+    zpiby2t1 = 10
 end
 
-
-@enum GateType begin
-    zpiby2 = 1
-    ypiby2 = 2
-    xpiby2 = 3
-end
-
-
-@enum SaveType begin
-    jl = 1
-    samplejl = 2
-    py = 3
-end
-
-
-@enum SolverType begin
-    ilqr = 1
-    alilqr = 2
-    altro = 3
-end
-
-
-DT_STR = Dict(
+const DT_STR = Dict(
     schroed => "Schroedinger",
     lindbladnodis => "Lindblad No Dissipation",
     lindbladt1 => "Lindblad T_1 Dissipation",
     lindbladcfn => "Lindblad T_phi Dissipation w/ Flux Noise"
 )
 
-GT_STR = Dict(
+const GT_STR = Dict(
     zpiby2 => "Z/2",
     ypiby2 => "Y/2",
     xpiby2 => "X/2",
 )
 
+# other constants
+const DEQJL_MAXITERS = 1e10
+const DEQJL_ADAPTIVE = false
 
-# methods
-function generate_save_file_path(extension, save_file_name, save_path)
-    # Ensure the path exists.
-    mkpath(save_path)
-
-    # Create a save file name based on the one given; ensure it will
-    # not conflict with others in the directory.
-    max_numeric_prefix = -1
-    for (_, _, files) in walkdir(save_path)
-        for file_name in files
-            if occursin("_$(save_file_name).$(extension)", file_name)
-                max_numeric_prefix = max(parse(Int, split(file_name, "_")[1]))
-            end
-        end
-    end
-
-    save_file_name = "_$(save_file_name).$(extension)"
-    save_file_name = @sprintf("%05d%s", max_numeric_prefix + 1, save_file_name)
-
-    return joinpath(save_path, save_file_name)
-end
-
-
-"""
-grab_controls - do some extraction of relevant controls
-data for common h5 save formats
-"""
-function grab_controls(save_file_path; save_type=jl)
-    data = h5open(save_file_path, "r") do save_file
-        if save_type == jl
-            cidx = read(save_file, "controls_idx")
-            controls = read(save_file, "astates")[:, cidx]
-            evolution_time = read(save_file, "evolution_time")
-        elseif save_type == samplejl
-            controls = read(save_file, "controls_sample")
-            evolution_time = read(save_file, "evolution_time_sample")
-        elseif save_type == py
-            controls = permutedims(read(save_file, "controls"), (2, 1))
-            evolution_time = read(save_file, "evolution_time")
-        end
-        return (controls, evolution_time)
-    end
-
-    return data
-end
-
-
-"""
-read_save - Read all data from an h5 file into memory.
-"""
-function read_save(save_file_path)
-    dict = h5open(save_file_path, "r") do save_file
-        dict = Dict()
-        for key in names(save_file)
-            dict[key] = read(save_file, key)
-        end
-        return dict
-    end
-
-    return dict
-end
-
-
-"""
-horner - compute the value of a polynomial using Horner's method
-Args:
-coeffs :: Array(N) - the coefficients in descending order of degree
-    a_{n - 1}, a_{n - 2}, ..., a_{1}, a_{0}
-val :: T - the value at which the polynomial is computed
-Returns:
-polyval :: T - the polynomial evaluated at val
-"""
-function horner(coeffs, val)
-    run = coeffs[1]
-    for i = 2:lastindex(coeffs)
-        run = coeffs[i] + val * run
-    end
-    return run
-end
-
-
-function plot_controls(save_file_paths, plot_file_path;
-                       save_types=[jl,], labels=nothing,
-                       title="", colors=nothing, print_out=true,
-                       legend=nothing)
-    fig = Plots.plot(dpi=DPI, title=title, legend=legend)
-    for (i, save_file_path) in enumerate(save_file_paths)
-        # Grab and prep data.
-        (controls, evolution_time) = grab_controls(save_file_path; save_type=save_types[i])
-        (control_eval_count, control_count) = size(controls)
-        control_eval_times = Array(1:1:control_eval_count) * DT_PREF
-        
-        # Plot.
-        for j = 1:control_count
-            label = isnothing(labels) ? nothing : labels[i][j]
-            color = isnothing(colors) ? :auto : colors[i][j]
-            Plots.plot!(control_eval_times, controls[:, j],
-                        label=label, color=color)
-        end
-    end
-    Plots.xlabel!("Time (ns)")
-    Plots.ylabel!("Amplitude (GHz)")
-    Plots.savefig(fig, plot_file_path)
-    if print_out
-        println("Plotted to $(plot_file_path)")
-    end
-    return
-end
-
-
-show_nice(x) = show(IOContext(stdout), "text/plain", x)
-
-
-function get_vec_iso(vec)
-    return vcat(real(vec),
-                imag(vec))
-end
-
-
-function get_mat_iso(mat)
-    len = size(mat)[1]
-    mat_r = real(mat)
-    mat_i = imag(mat)
-    return vcat(hcat(mat_r, -mat_i),
-                hcat(mat_i,  mat_r))
-end
-
-
-### SPIN ###
 
 # Define experimental constants.
 # qubit frequency at flux frustration point
-FQ = 1.4e-2 #GHz
-SIGMAFQ = FQ * 5e-2
-S1FQ = FQ + SIGMAFQ
-S2FQ = FQ - SIGMAFQ
-MAX_CONTROL_NORM_0 = 5e-1 #GHz
-FBFQ_A = 0.202407
-FBFQ_B = 0.5
-AYPIBY2 = 1.25e-1 #GHz
-GAMMAC = 1 / 3e5 #GHz(T_c = 300 us)
-FBFQ_NAMP = 5.21e-6 # flux noise amplitude
-FBFQ_NDIST = Normal(0., 1.)
+const FQ = 1.4e-2 #GHz
+const SIGMAFQ = FQ * 5e-2
+const S1FQ = FQ + SIGMAFQ
+const S2FQ = FQ - SIGMAFQ
+const MAX_CONTROL_NORM_0 = 5e-1 #GHz
+const FBFQ_A = 0.202407
+const FBFQ_B = 0.5
+const AYPIBY2 = 1.25e-1 #GHz
+const GAMMAC = 1 / 3e5 #GHz(T_c = 300 us)
+const FBFQ_NAMP = 5.21e-6 # flux noise amplitude
+const FBFQ_NDIST = Normal(0., 1.)
 # coefficients are listed in descending order
 # raw coefficients are in units of seconds
-FBFQ_T1_COEFFS = [
+const FBFQ_T1_COEFFS = [
     3276.06057; -7905.24414; 8285.24137; -4939.22432;
     1821.23488; -415.520981; 53.9684414; -3.04500484
 ] * 1e9
-# raw T1 times are in units of microseconds
-T1_ARRAY = [
+# raw T1 times are in units of microseconds, yielding times in units of nanoseconds
+const T1_ARRAY = [
     1597.923, 1627.93, 301.86, 269.03, 476.33, 1783.19, 2131.76, 2634.50, 
     4364.68, 2587.82, 1661.915, 1794.468, 2173.88, 1188.83, 
     1576.493, 965.183, 560.251, 310.88
 ] * 1e3
-FBFQ_ARRAY = [
+# raw T1 times are in units of microseconds
+const T1_ARRAY_REDUCED = [
+    1597.923, 1627.93, 301.86, 269.03, 476.33, 1783.19, 2131.76, 2634.50, 
+    4364.68, 2587.82, 1661.915, 1794.468, 2173.88, 1188.83, 
+    1576.493, 965.183, 560.251, 310.88
+]
+const FBFQ_ARRAY = [
     0.26, 0.28, 0.32, 0.34, 0.36, 0.38, 0.4,
     0.42, 0.44, 0.46, 0.465, 0.47, 0.475,
     0.48, 0.484, 0.488, 0.492, 0.5
 ]
-FBFQ_T1_SPLINE_DIERCKX = Spline1D(FBFQ_ARRAY, T1_ARRAY)
-FBFQ_T1_SPLINE_ITP = extrapolate(interpolate((FBFQ_ARRAY,), T1_ARRAY, Gridded(Linear())), Flat())
+const FBFQ_T1_SPLINE_DIERCKX = Spline1D(FBFQ_ARRAY, T1_ARRAY)
+const FBFQ_T1_SPLINE_ITP = extrapolate(interpolate(
+    (FBFQ_ARRAY,), T1_ARRAY, Gridded(Linear())), Flat())
+const FBFQ_T1_REDUCED_SPLINE_ITP = extrapolate(interpolate(
+    (FBFQ_ARRAY,), T1_ARRAY_REDUCED, Gridded(Linear())), Flat())
 # TODO: idk if hdf5 is inter-process safe
-# (FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS) = h5open(FBFQ_DFQ_DATA_FILE_PATH, "r") do data_file
-#     fbfqs = read(data_file, "fbfqs")
-#     dfqs = read(data_file, "dfqs")
-#     return(fbfqs, dfqs)
-# end
-# FBFQ_DFQ_SPLINE_DIERCKX = Spline1D(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS)
-STATE_SIZE_NOISO = 2
-STATE_SIZE_ISO = 2 * STATE_SIZE_NOISO
-ZPIBY2_GATE_TIME = 17.86
+(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS) = h5open(FBFQ_DFQ_DATA_FILE_PATH, "r") do data_file
+    fbfqs = read(data_file, "fbfqs")
+    dfqs = read(data_file, "dfqs")
+    return(fbfqs, dfqs)
+end
+const FBFQ_DFQ_SPLINE_DIERCKX = Spline1D(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS)
+const STATE_SIZE_NOISO = 2
+const STATE_SIZE_ISO = 2 * STATE_SIZE_NOISO
+const ZPIBY2_GATE_TIME = 17.86
 
 # Define the system.
 # ISO indicates the object is defined in the complex to real isomorphism.
 # NEGI is the negative complex unit.
-NEGI = SA_F64[0   0  1  0 ;
+const NEGI = SA_F64[0   0  1  0 ;
               0   0  0  1 ;
               -1  0  0  0 ;
               0  -1  0  0 ;]
 # SIGMAX, SIGMAZ are the X and Z pauli matrices
-SIGMAX_ISO = SA_F64[0   1   0   0;
+const SIGMAX_ISO = SA_F64[0   1   0   0;
                     1   0   0   0;
                     0   0   0   1;
                     0   0   1   0]
-SIGMAZ_ISO = SA_F64[1   0   0   0;
+const SIGMAZ_ISO = SA_F64[1   0   0   0;
                     0  -1   0   0;
                     0   0   1   0;
                     0   0   0  -1]
-NEGI_H0_ISO = pi * NEGI * SIGMAZ_ISO
-NEGI_H1_ISO = pi * NEGI * SIGMAX_ISO
-FQ_NEGI_H0_ISO = FQ * NEGI_H0_ISO
-S1FQ_NEGI_H0_ISO = S1FQ * NEGI_H0_ISO
-S2FQ_NEGI_H0_ISO = S2FQ * NEGI_H0_ISO
-AYPIBY2_NEGI_H1_ISO = AYPIBY2 * NEGI_H1_ISO
+const NEGI_H0_ISO = pi * NEGI * SIGMAZ_ISO
+const NEGI_H1_ISO = pi * NEGI * SIGMAX_ISO
+const FQ_NEGI_H0_ISO = FQ * NEGI_H0_ISO
+const S1FQ_NEGI_H0_ISO = S1FQ * NEGI_H0_ISO
+const S2FQ_NEGI_H0_ISO = S2FQ * NEGI_H0_ISO
+const AYPIBY2_NEGI_H1_ISO = AYPIBY2 * NEGI_H1_ISO
 # relaxation dissipation ops
 # L_{0} = |g> <e|
 # L_{0}^{\dagger} = |e> <g|
@@ -292,47 +141,47 @@ AYPIBY2_NEGI_H1_ISO = AYPIBY2 * NEGI_H1_ISO
 # L_{1} = L_{0}^{\dagger} = |e> <g|
 # L_{1}^{\dagger} = L_{0} = |g> <e|
 # L_{1}^{\dagger} L_{1} = |g> <g|
-G_E = SA_F64[0 1 0 0;
+const G_E = SA_F64[0 1 0 0;
              0 0 0 0;
              0 0 0 1;
              0 0 0 0;]
-E_G = SA_F64[0 0 0 0;
+const E_G = SA_F64[0 0 0 0;
              1 0 0 0;
              0 0 0 0;
              0 0 1 0;]
-NEG_G_G_BY2 = SA_F64[1 0 0 0;
-                     0 0 0 0;
-                     0 0 1 0;
-                     0 0 0 0] * -0.5
-NEG_E_E_BY2 = SA_F64[0 0 0 0;
-                     0 1 0 0;
-                     0 0 0 0;
-                     0 0 0 1;] * -0.5
+const NEG_G_G_BY2 = SA_F64[1 0 0 0;
+                           0 0 0 0;
+                           0 0 1 0;
+                           0 0 0 0] * -0.5
+const NEG_E_E_BY2 = SA_F64[0 0 0 0;
+                           0 1 0 0;
+                           0 0 0 0;
+                           0 0 0 1;] * -0.5
 # dephasing dissipation ops
-NEG_DOP_ISO = -SA_F64[0 1 0 1;
-                      1 0 1 0;
-                      0 1 0 1;
-                      1 0 1 0]
-NEG_GAMMAC_DOP_ISO = GAMMAC * NEG_DOP_ISO
+const NEG_DOP_ISO = -SA_F64[0 1 0 1;
+                            1 0 1 0;
+                            0 1 0 1;
+                            1 0 1 0]
+const NEG_GAMMAC_DOP_ISO = GAMMAC * NEG_DOP_ISO
 
 # gates
-ZPIBY2 = [1-1im 0;
-          0 1+1im] / sqrt(2)
-ZPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(ZPIBY2))
-ZPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(ZPIBY2[:,1]))
-ZPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(ZPIBY2[:,2]))
-YPIBY2 = [1 -1;
-          1  1] / sqrt(2)
-YPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(YPIBY2))
-YPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(YPIBY2[:,1]))
-YPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(YPIBY2[:,2]))
-XPIBY2 = [1 -1im;
-          -1im 1] / sqrt(2)
-XPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(XPIBY2))
-XPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPIBY2[:,1]))
-onXPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPIBY2[:,2]))
+const ZPIBY2 = [1-1im 0;
+                0 1+1im] / sqrt(2)
+const ZPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(ZPIBY2))
+const ZPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(ZPIBY2[:,1]))
+const ZPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(ZPIBY2[:,2]))
+const YPIBY2 = [1 -1;
+                1  1] / sqrt(2)
+const YPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(YPIBY2))
+const YPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(YPIBY2[:,1]))
+const YPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(YPIBY2[:,2]))
+const XPIBY2 = [1 -1im;
+                -1im 1] / sqrt(2)
+const XPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(XPIBY2))
+const XPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPIBY2[:,1]))
+const XPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPIBY2[:,2]))
 
-GT_GATE = Dict(
+const GT_GATE = Dict(
     xpiby2 => XPIBY2_ISO,
     ypiby2 => YPIBY2_ISO,
     zpiby2 => ZPIBY2_ISO,
@@ -345,7 +194,7 @@ GT_GATE = Dict(
 amp_fbfq - Compute flux by flux quantum from flux
 drive amplitude.
 """
-amp_fbfq(amplitude) = amplitude * FBFQ_A + FBFQ_B
+@inline amp_fbfq(amplitude) = amplitude * FBFQ_A + FBFQ_B
 
 """
 amp_fbfq_lo - Compute flux by flux quantum
@@ -356,7 +205,7 @@ point (0.5).
 Arguments
 amplitude :: Array(N) - amplitude in units of GHz (no 2 pi)
 """
-amp_fbfq_lo(amplitude) = -abs(amplitude) * FBFQ_A + FBFQ_B
+@inline amp_fbfq_lo(amplitude) = -abs(amplitude) * FBFQ_A + FBFQ_B
 
 
 """
@@ -364,8 +213,8 @@ amp_dfq - Compute the derivative of the qubit frequency
 with respect to the flux by flux quantum from the flux drive
 amplitude.
 """
-# amp_dfq(amplitude) = FBFQ_DFQ_SPLINE_DIERCKX(amp_fbfq(amplitude))
-amp_dfq(amplitude) = 1.
+@inline amp_dfq(amplitude) = FBFQ_DFQ_SPLINE_DIERCKX(amp_fbfq(amplitude))
+
 
 
 """
@@ -375,7 +224,7 @@ of nanoseconds.
 Arguments
 amplitude :: Array(N) - amplitude in units of GHz (no 2 pi)
 """
-amp_t1_poly(amplitude) = horner(FBFQ_T1_COEFFS, amp_fbfq_lo(amplitude))
+@inline amp_t1_poly(amplitude) = horner(FBFQ_T1_COEFFS, amp_fbfq_lo(amplitude))
 
 
 """
@@ -387,7 +236,10 @@ amplitude :: Array(N) - amplitude in units of GHz (no 2 pi)
 """
 # amp_t1_spline(amplitude::Float64) = Dierckx.evaluate(FBFQ_T1_SPLINE_DIERCKX, amp_fbfq_lo(amplitude))
 # damp_t1_spline(amplitude::Float64) = Dierckx.derivative(FBFQ_T1_SPLINE_DIERCKX, amp_fbfq_lo(amplitude))
-amp_t1_spline(amplitude) = FBFQ_T1_SPLINE_ITP(amp_fbfq_lo(amplitude))
+@inline amp_t1_spline(amplitude) = FBFQ_T1_SPLINE_ITP(amp_fbfq_lo(amplitude))
+
+
+@inline amp_t1_reduced_spline(amplitude)= FBFQ_T1_REDUCED_SPLINE_ITP(amp_fbfq_lo(amplitude))
 
 
 """
@@ -446,16 +298,33 @@ function dynamics_lindbladcfn_deqjl(density, (controls, control_knot_count, dt_i
     )
 end
 
+const TTOT_ZPIBY2 = 17.857142857142858
+const GAMMA_ZPIBY2 = amp_t1_spline(0)^(-1)
+@inline dynamics_zpiby2nodis_deqjl(
+    density, (_, _, _, negi_h0), _,
+) = (
+    negi_h0 * density - density * negi_h0
+)
 
-H11_YPIBY2 = AYPIBY2_NEGI_H1_ISO
-H31_YPIBY2 = -AYPIBY2_NEGI_H1_ISO
-TX_YPIBY2 = 2.1656249366575766
-TZ_YPIBY2 = 15.1423305995572655
-TTOT_YPIBY2 = 19.4735804728724204
-T1_YPIBY2 = TX_YPIBY2
-T2_YPIBY2 = T1_YPIBY2 + TZ_YPIBY2
-GAMMA11_YPIBY2 = amp_t1_spline(AYPIBY2)^(-1)
-GAMMA12_YPIBY2 = amp_t1_spline(0)^(-1)
+
+@inline dynamics_zpiby2t1_deqjl(
+    density, (_, _, _, negi_h0), _,
+) = (
+    negi_h0 * density - density * negi_h0
+    + gamma1 * (G_E * density * E_G + NEG_E_E_BY2 * density + density * NEG_E_E_BY2
+                + E_G * density * G_E + NEG_G_G_BY2 * density + density * NEG_G_G_BY2)    
+)
+
+
+const H11_YPIBY2 = AYPIBY2_NEGI_H1_ISO
+const H31_YPIBY2 = -AYPIBY2_NEGI_H1_ISO
+const TX_YPIBY2 = 2.1656249366575766
+const TZ_YPIBY2 = 15.1423305995572655
+const TTOT_YPIBY2 = 19.4735804728724204
+const T1_YPIBY2 = TX_YPIBY2
+const T2_YPIBY2 = T1_YPIBY2 + TZ_YPIBY2
+const GAMMA11_YPIBY2 = amp_t1_spline(AYPIBY2)^(-1)
+const GAMMA12_YPIBY2 = amp_t1_spline(0)^(-1)
 function dynamics_ypiby2nodis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0), t)
     t = t - Int(floor(t / TTOT_YPIBY2)) * TTOT_YPIBY2
     if t <= T1_YPIBY2
@@ -491,14 +360,14 @@ function dynamics_ypiby2t1_deqjl(density, (controls, control_knot_count, dt_inv,
 end
 
 
-TTOT_ZPIBY2 = 17.857142857142858
-TTOT_XPIBY2 = 4 * TX_YPIBY2 + 2 * TZ_YPIBY2 + TTOT_ZPIBY2
-T1_XPIBY2 = TX_YPIBY2
-T2_XPIBY2 = T1_YPIBY2 + TZ_YPIBY2
-T3_XPIBY2 = T2_XPIBY2 + TX_YPIBY2
-T4_XPIBY2 = T3_XPIBY2 + TTOT_ZPIBY2
-T5_XPIBY2 = T4_XPIBY2 + TX_YPIBY2
-T6_XPIBY2 = T5_XPIBY2 + TZ_YPIBY2
+const TTOT_ZPIBY2 = 17.857142857142858
+const TTOT_XPIBY2 = 4 * TX_YPIBY2 + 2 * TZ_YPIBY2 + TTOT_ZPIBY2
+const T1_XPIBY2 = TX_YPIBY2
+const T2_XPIBY2 = T1_YPIBY2 + TZ_YPIBY2
+const T3_XPIBY2 = T2_XPIBY2 + TX_YPIBY2
+const T4_XPIBY2 = T3_XPIBY2 + TTOT_ZPIBY2
+const T5_XPIBY2 = T4_XPIBY2 + TX_YPIBY2
+const T6_XPIBY2 = T5_XPIBY2 + TZ_YPIBY2
 function dynamics_xpiby2nodis_deqjl(density, (controls, control_knot_count, dt_inv), t)
     t = t - Int(floor(t / TTOT_XPIBY2)) * TTOT_XPIBY2
     if t <= T1_XPIBY2
@@ -554,7 +423,7 @@ function dynamics_xpiby2t1_deqjl(density, (controls, control_knot_count, dt_inv)
 end
 
 
-DT_DYN = Dict(
+const DT_DYN = Dict(
     lindbladnodis => dynamics_lindbladnodis_deqjl,
     lindbladt1 => dynamics_lindbladt1_deqjl,
     schroed => dynamics_schroed_deqjl,
@@ -563,6 +432,8 @@ DT_DYN = Dict(
     xpiby2nodis => dynamics_xpiby2nodis_deqjl,
     xpiby2t1 => dynamics_xpiby2t1_deqjl,
     lindbladcfn => dynamics_lindbladcfn_deqjl,
+    zpiby2nodis => dynamics_zpiby2nodis_deqjl,
+    zpiby2t1 => dynamics_zpiby2t1_deqjl,
 )
 
 
@@ -619,7 +490,7 @@ function run_sim_deqjl(
     gate_count, gate_type;
     save_file_path=nothing,
     controls_dt_inv=DT_PREF_INV,
-    deqjl_adaptive=false, dynamics_type=lindbladnodis,
+    adaptive=DEQJL_ADAPTIVE, dynamics_type=lindbladnodis,
     dt=DT_PREF, save=true, save_type=jl, seed=-1,
     solver=DifferentialEquations.Vern9, print_seq=false, print_final=false,
     negi_h0=FQ_NEGI_H0_ISO)
@@ -631,6 +502,8 @@ function run_sim_deqjl(
             gate_time = TTOT_YPIBY2
         elseif dynamics_type == xpiby2nodis || dynamics_type == xpiby2t1
             gate_time = TTOT_XPIBY2
+        elseif dynamics_type == zpiby2nodis || dynamics_type == zpiby2t1
+            gate_time = TTOT_ZPIBY2
         end
     else
         (controls, gate_time) = grab_controls(save_file_path; save_type=save_type)
@@ -657,7 +530,7 @@ function run_sim_deqjl(
     p = (controls, control_knot_count, controls_dt_inv, negi_h0)
     prob = ODEProblem(dynamics, initial_state, tspan, p)
     result = solve(prob, solver(), dt=dt, saveat=save_times,
-                   maxiters=DEQJL_MAXITERS, adaptive=DEQJL_ADAPTIVE)
+                   maxiters=DEQJL_MAXITERS, adaptive=adaptive)
 
     # Compute the fidelities.
     # All of the gates we consider are 4-cyclic up to phase.
@@ -788,7 +661,7 @@ function run_sim_h0sweep_deqjl(
     save_times = [0., gate_time]
     
     # set up integration
-    dynmiacs = DT_DYN[dynamics_type]
+    dynamics = DT_DYN[dynamics_type]
     is_state = is_density = false
     if dynamics_type == schroed
         is_state = true
@@ -927,3 +800,4 @@ function t1_average(save_file_path; save_type=jl)
     
     return t1_avgs
 end
+

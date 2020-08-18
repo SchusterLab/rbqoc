@@ -1,6 +1,8 @@
 """
 spin15_standalone.jl - t1 optimized pulses
 """
+# Usually a good idea to ship code with a Project.toml file to specify the environment
+import Pkg; Pkg.activate(@__DIR__)
 
 using Altro
 using Dierckx
@@ -177,7 +179,7 @@ const FBFQ_T1_SPLINE_ITP = extrapolate(interpolate((FBFQ_ARRAY,), T1_ARRAY, Grid
 
 
 # Define the optimization.
-CONTROL_COUNT = 1
+const CONTROL_COUNT = 1   # the sizes are one of the things that really NEED to be const
 DT_PREF = 1e-2
 DT_PREF_INV = 1e2
 # static is the time step used for non time-optimal problems
@@ -204,7 +206,7 @@ INITIAL_ASTATE = [
     @SVector zeros(CONTROL_COUNT); # dcontrol_dt, this is the first time derivative of the control
     @SVector zeros(1); # int_gamma, this is a thing i want to minimize subject to the constraints of the state evolution
 ]
-ASTATE_SIZE, = size(INITIAL_ASTATE)
+const ASTATE_SIZE, = size(INITIAL_ASTATE)
 # definitions of target quantum states
 ZPIBY2_1 = SA[1., 0, -1, 0] / sqrt(2)
 ZPIBY2_2 = SA[0., 1, 0, 1] / sqrt(2)
@@ -228,13 +230,86 @@ const DT_IDX = D2CONTROLS_DT2_IDX[end] + 1:D2CONTROLS_DT2_IDX[end] + 1
 VERBOSE = true
 SAVE = true
 
-struct Model <: AbstractModel
-    n :: Int
-    m :: Int
+# Use type parameter `TO` to specify whether or not the model is Time Optimal
+struct Model{TO} <: AbstractModel 
+    # make sure `TO` is a boolean by defining the inner constructor
+    Model(TO::Bool=true) = new{TO}()
+end
+RobotDynamics.state_dim(::Model) = ASTATE_SIZE 
+RobotDynamics.control_dim(::Model{true}) = CONTROL_COUNT + 1
+RobotDynamics.control_dim(::Model{false}) = CONTROL_COUNT
+
+function RobotDynamics.discrete_dynamics(
+        ::Type{RK4}, 
+        model::Model{true}, 
+        x::StaticVector,
+        u::StaticVector,
+        t::Real,
+        dt::Real
+    )
+
+    println("using dt from controls")
+    u = control(z)
+    dt = u[end]
+
+    k1 = dynamics(model, x,        u, t       )*dt
+	k2 = dynamics(model, x + k1/2, u, t + dt/2)*dt
+	k3 = dynamics(model, x + k2/2, u, t + dt/2)*dt
+    k4 = dynamics(model, x + k3,   u, t + dt  )*dt
+	x + (k1 + 2k2 + 2k3 + k4)/6 
 end
 
+# time-optimal dynamics
+function RobotDynamics.dynamics(model::Model{true}, astate, acontrols, time)
+    negi_h = (
+        FQ_NEGI_H0_ISO
+        + astate[CONTROLS_IDX][1] * NEGI_H1_ISO
+    )
+    delta_state1 = negi_h * astate[STATE1_IDX]
+    delta_state2 = negi_h * astate[STATE2_IDX]
+    delta_int_control = astate[CONTROLS_IDX]
+    delta_control = astate[DCONTROLS_DT_IDX]
+    delta_dcontrol_dt = acontrols[D2CONTROLS_DT2_IDX]
+    # int_gamma is a bad thing that I want to be small. the
+    # value of amp_t1_spline is proportional to the value of astate[CONTROLS_IDX][1]
+    # so making int_gamma small is often at odds with keeping the controls small
+    delta_int_gamma = amp_t1_spline(astate[CONTROLS_IDX][1])^(-1)
+    return [
+        delta_state1;
+        delta_state2;
+        delta_int_control;
+        delta_control;
+        delta_dcontrol_dt;
+        delta_int_gamma;
+        # I have been doing time optimal problems by multiplying the dynamics
+        # by the dt in the acontrols vector, and telling TO that my
+        # dt is 1.
+    ] .* acontrols[DT_IDX][1]^2
+end
 
-Base.size(model::Model) = (model.n, model.m)
+# non time-optimal dynamics
+#   NOTE: you could easily reduce code duplication by defining a single utility
+#         dynamics function (e.g. `_dynamics`), and call it for both.
+function RobotDynamics.dynamics(model::Model, astate, acontrols, time)
+    negi_h = (
+        FQ_NEGI_H0_ISO
+        + astate[CONTROLS_IDX][1] * NEGI_H1_ISO
+    )
+    delta_state1 = negi_h * astate[STATE1_IDX]
+    delta_state2 = negi_h * astate[STATE2_IDX]
+    delta_int_control = astate[CONTROLS_IDX]
+    delta_control = astate[DCONTROLS_DT_IDX]
+    delta_dcontrol_dt = acontrols[D2CONTROLS_DT2_IDX]
+    delta_int_gamma = amp_t1_spline(astate[CONTROLS_IDX][1])^(-1)
+    return [
+        delta_state1;
+        delta_state2;
+        delta_int_control;
+        delta_control;
+        delta_dcontrol_dt;
+        delta_int_gamma;
+    ]
+end
 
 
 # Running this function with the default arguments given here reproduces
@@ -250,61 +325,13 @@ function run_traj(;evolution_time=60., gate_type=xpiby2,
     # contexts that I don't understand yet due to the eval statements. There
     # might be another way to define the dynamics function conditionally
     # like this but I do not know one yet.
-    if time_optimal
-        expr = :(
-            function RobotDynamics.dynamics(model::Model, astate, acontrols, time)
-            negi_h = (
-                FQ_NEGI_H0_ISO
-                + astate[CONTROLS_IDX][1] * NEGI_H1_ISO
-            )
-            delta_state1 = negi_h * astate[STATE1_IDX]
-            delta_state2 = negi_h * astate[STATE2_IDX]
-            delta_int_control = astate[CONTROLS_IDX]
-            delta_control = astate[DCONTROLS_DT_IDX]
-            delta_dcontrol_dt = acontrols[D2CONTROLS_DT2_IDX]
-            # int_gamma is a bad thing that I want to be small. the
-            # value of amp_t1_spline is proportional to the value of astate[CONTROLS_IDX][1]
-            # so making int_gamma small is often at odds with keeping the controls small
-            delta_int_gamma = amp_t1_spline(astate[CONTROLS_IDX][1])^(-1)
-            return [
-                delta_state1;
-                delta_state2;
-                delta_int_control;
-                delta_control;
-                delta_dcontrol_dt;
-                delta_int_gamma;
-                # I have been doing time optimal problems by multiplying the dynamics
-                # by the dt in the acontrols vector, and telling TO that my
-                # dt is 1.
-            ] .* acontrols[DT_IDX][1]^2
-        end
-        )
-        eval(expr)
-    else
-        expr = :(
-            function RobotDynamics.dynamics(model::Model, astate, acontrols, time)
-            negi_h = (
-                FQ_NEGI_H0_ISO
-                + astate[CONTROLS_IDX][1] * NEGI_H1_ISO
-            )
-            delta_state1 = negi_h * astate[STATE1_IDX]
-            delta_state2 = negi_h * astate[STATE2_IDX]
-            delta_int_control = astate[CONTROLS_IDX]
-            delta_control = astate[DCONTROLS_DT_IDX]
-            delta_dcontrol_dt = acontrols[D2CONTROLS_DT2_IDX]
-            delta_int_gamma = amp_t1_spline(astate[CONTROLS_IDX][1])^(-1)
-            return [
-                delta_state1;
-                delta_state2;
-                delta_int_control;
-                delta_control;
-                delta_dcontrol_dt;
-                delta_int_gamma;
-            ]
-        end
-        )
-        eval(expr)
-    end
+
+    # RESPONSE: You really don't want to call `eval` like this, it's almost always
+    #           bad practice to have `eval` within runtime code. There's several
+    #           ways to get around having different dynamics functions. One would be
+    #           to simply have two different models. I've implemented a slighly more 
+    #           "Julian" version leveraging the power of multiple dispatch.
+
     # Convert to trajectory optimization language.
     n = ASTATE_SIZE
     t0 = 0.
@@ -388,7 +415,7 @@ function run_traj(;evolution_time=60., gate_type=xpiby2,
     end
 
     # Generate initial trajectory.
-    model = Model(n, m)
+    model = Model(time_optimal)
     U0 = nothing
     if time_optimal
         # Default initial guess w/ optimization over dt.
@@ -447,6 +474,7 @@ function run_traj(;evolution_time=60., gate_type=xpiby2,
         # I would like this value to be as large as possible so int_gamma is as small as possible.
         # int_gamma is typically on the order of 1e-5 so this 1e7 is not that large.
         # I can typically afford to use 1e9 for similar problems.
+        # COMMENT: This is screaming "numerical ill-conditioning."
         fill(1e7, 1); # int_gamma
     ]))
     Qf = Q * N
@@ -487,7 +515,9 @@ function run_traj(;evolution_time=60., gate_type=xpiby2,
     end
 
     # Instantiate problem and solve.
-    prob = Problem{RobotDynamics.RK4}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
+    prob = Problem(model, obj, xf, evolution_time, x0=x0, 
+        constraints=constraints, integration=RK4)
+    initial_controls!(prob, U0)
     solver = nothing
     opts = SolverOptions(verbose=VERBOSE)
     if solver_type == alilqr
@@ -497,8 +527,10 @@ function run_traj(;evolution_time=60., gate_type=xpiby2,
     elseif solver_type == altro
         solver = ALTROSolver(prob, opts)
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
-        solver.solver_al.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
-        solver.solver_al.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
+        # Let ALTRO do this for you via `projected_newton_tolerance`
+        # solver.solver_al.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
+        # solver.solver_al.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
+        solver.opts.projected_newton_tolerance = AL_KICKOUT_TOLERANCE
         solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.solver_pn.opts.n_steps = PN_STEPS
         solver.solver_al.opts.iterations = 1

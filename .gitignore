@@ -2,25 +2,30 @@
 *~
 *\#
 
-# ignore binaries and raw data
-out
+# python
 __pycache__
+*.egg-info
+*.pyc
+*.ipynb_checkpoints
+
+# latex
 *.aux
 *.bbl
 *.blg
 *Notes.bib
-*.egg-info
 *.log
 *.out
 *.pdf
-*.pyc
-*.DS_Store
 !report/report.pdf
 !paper/paper.pdf
-*.ipynb_checkpoints
+
+# julia
+Manifest.toml
 
 # ignore local files
+out
 _test
+*.DS_Store
 
 
 

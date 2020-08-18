@@ -11,209 +11,178 @@ using TrajectoryOptimization
 const TO = TrajectoryOptimization
 
 WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
-include(joinpath(WDIR, "rbqoc.jl"))
+include(joinpath(WDIR, "src", "spin", "spin.jl"))
 
 # paths
-EXPERIMENT_META = "spin"
-EXPERIMENT_NAME = "spin15"
-SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
+const EXPERIMENT_META = "spin"
+const EXPERIMENT_NAME = "spin15"
+const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
 # Define the optimization.
-CONTROL_COUNT = 1
-DT_STATIC = DT_PREF
-DT_STATIC_INV = DT_PREF_INV
-DT_INIT = DT_PREF
-DT_INIT_INV = DT_PREF_INV
-# DT_INIT = 2e-2
-# DT_INIT_INV = 5e1
-DT_MIN = DT_INIT / 2
-DT_MAX = DT_INIT * 2
-CONSTRAINT_TOLERANCE = 1e-8
-AL_KICKOUT_TOLERANCE = 1e-7
-PN_STEPS = 5
+const DT_STATIC = DT_PREF
+const DT_STATIC_INV = DT_PREF_INV
+const DT_INIT = 5e-3
+const DT_INIT_INV = 2e2
+const DT_MIN = DT_INIT / 2
+const DT_MAX = DT_INIT * 2
+const CONSTRAINT_TOLERANCE = 1e-8
+const AL_KICKOUT_TOLERANCE = 1e-7
+const PN_STEPS = 5
+const MAX_PENALTY = 1e10
+const ILQR_DJ_TOL = 1e-4
 
 # Define the problem.
-INITIAL_STATE_1 = SA[1., 0, 0, 0]
-INITIAL_STATE_2 = SA[0., 1, 0, 0]
-STATE_SIZE, = size(INITIAL_STATE_1)
-INITIAL_ASTATE = [
-    INITIAL_STATE_1; # state_0
-    INITIAL_STATE_2;
-    @SVector zeros(CONTROL_COUNT); # int_control
-    @SVector zeros(CONTROL_COUNT); # control
-    @SVector zeros(CONTROL_COUNT); # dcontrol_dt
-    @SVector zeros(1); # int_gamma;
-]
-ASTATE_SIZE, = size(INITIAL_ASTATE)
-ZPIBY2_1 = SA[1., 0, -1, 0] / sqrt(2)
-ZPIBY2_2 = SA[0., 1, 0, 1] / sqrt(2)
-YPIBY2_1 = SA[1., 1, 0, 0] / sqrt(2)
-YPIBY2_2 = SA[-1., 1, 0, 0] / sqrt(2)
-XPIBY2_1 = SA[1., 0, 0, -1] / sqrt(2)
-XPIBY2_2 = SA[0., 1, -1, 0] / sqrt(2)
+const CONTROL_COUNT = 1
+const STATE_COUNT = 2
+const ASTATE_SIZE_BASE = STATE_COUNT * STATE_SIZE_ISO + 3 * CONTROL_COUNT
+const INITIAL_STATE1 = [1., 0, 0, 0]
+const INITIAL_STATE2 = [0., 1, 0, 0]
 # state indices
-STATE_1_IDX = 1:STATE_SIZE
-STATE_2_IDX = STATE_1_IDX[end] + 1:STATE_1_IDX[end] + STATE_SIZE
-INT_CONTROLS_IDX = STATE_2_IDX[end] + 1:STATE_2_IDX[end] + CONTROL_COUNT
-CONTROLS_IDX = INT_CONTROLS_IDX[end] + 1:INT_CONTROLS_IDX[end] + CONTROL_COUNT
-DCONTROLS_DT_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
-INT_GAMMA_IDX = DCONTROLS_DT_IDX[end] + 1:DCONTROLS_DT_IDX[end] + 1
+const STATE1_IDX = 1:STATE_SIZE_ISO
+const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + STATE_SIZE_ISO
+const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
+const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
+const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
+const INTGAMMA_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + 1
 # control indices
-D2CONTROLS_DT2_IDX = 1:CONTROL_COUNT
-DT_IDX = D2CONTROLS_DT2_IDX[end] + 1:D2CONTROLS_DT2_IDX[end] + 1
+const D2CONTROLS_IDX = 1:CONTROL_COUNT
+const DT_IDX = D2CONTROLS_IDX[end] + 1:D2CONTROLS_IDX[end] + 1
 
 
 # Specify logging.
-VERBOSE = true
-SAVE = true
+const VERBOSE = true
+const SAVE = true
 
-struct Model <: AbstractModel
-    n :: Int
-    m :: Int
+
+# Misc. constants
+const EMPTY_V = []
+
+
+# Define the model and dynamics.
+struct Model{DA, TO} <: AbstractModel
+    Model(DA::Bool=true, TO::Bool=true) = new{DA, TO}()
+end
+RobotDynamics.state_dim(::Model{false, TO}) where TO = ASTATE_SIZE_NODA
+RobotDynamics.state_dim(::Model{true, TO}) where TO = ASTATE_SIZE_NODA + 1
+RobotDynamics.control_dim(::Model{DA, false}) where DA = CONTROL_COUNT
+RobotDynamics.control_dim(::Model{DA, true}) where DA = CONTROL_COUNT + 1
+
+
+# base dynamics
+function RobotDynamics.dynamics(model::Model{DA, TO}, astate::StaticVector,
+                                acontrols::StaticVector, time::Real) where {DA, TO}
+    negi_h = (
+        FQ_NEGI_H0_ISO
+        + astate[CONTROLS_IDX][1] * NEGI_H1_ISO
+    )
+    delta_state1 = negi_h * astate[STATE1_IDX]
+    delta_state2 = negi_h * astate[STATE2_IDX]
+    delta_intcontrol = astate[CONTROLS_IDX]
+    delta_control = astate[DCONTROLS_IDX]
+    delta_dcontrol = acontrols[D2CONTROLS_IDX]
+    dastate = [
+        delta_state1;
+        delta_state2;
+        delta_intcontrol;
+        delta_control;
+        delta_dcontrol;
+    ]
+    if DA
+        push!(dastate, amp_t1_reduced_spline(astate[CONTROLS_IDX][1])^(-1))
+    end
+    if TO
+        dastate = dastate * acontrols[DT_IDX][1]^2
+    end
+    
+    return dastate
 end
 
 
-Base.size(model::Model) = (model.n, model.m)
-
-
-function run_traj(;evolution_time=20., gate_type=zpiby2,
+function run_traj(;evolution_time=60., gate_type=zpiby2,
                   initial_save_file_path=nothing,
                   initial_save_type=jl, time_optimal=false,
-                  solver_type=alilqr)
-    # Choose dynamics
-    if time_optimal
-        expr = :(
-        function RobotDynamics.dynamics(model::Model, astate, acontrols, time)
-            negi_h = (
-                FQ_NEGI_H0_ISO
-                + astate[CONTROLS_IDX][1] * NEGI_H1_ISO
-            )
-            delta_state_1 = negi_h * astate[STATE_1_IDX]
-            delta_state_2 = negi_h * astate[STATE_2_IDX]
-            delta_int_control = astate[CONTROLS_IDX]
-            delta_control = astate[DCONTROLS_DT_IDX]
-            delta_dcontrol_dt = acontrols[D2CONTROLS_DT2_IDX]
-            delta_int_gamma = amp_t1_spline(astate[CONTROLS_IDX][1])^(-1)
-            return [
-                delta_state_1;
-                delta_state_2;
-                delta_int_control;
-                delta_control;
-                delta_dcontrol_dt;
-                delta_int_gamma;
-            ] .* acontrols[DT_IDX][1]^2
-        end
-        )
-        eval(expr)
-    else
-        expr = :(
-            function RobotDynamics.dynamics(model::Model, astate, acontrols, time)
-            negi_h = (
-                FQ_NEGI_H0_ISO
-                + astate[CONTROLS_IDX][1] * NEGI_H1_ISO
-            )
-            delta_state_1 = negi_h * astate[STATE_1_IDX]
-            delta_state_2 = negi_h * astate[STATE_2_IDX]
-            delta_int_control = astate[CONTROLS_IDX]
-            delta_control = astate[DCONTROLS_DT_IDX]
-            delta_dcontrol_dt = acontrols[D2CONTROLS_DT2_IDX]
-            delta_int_gamma = amp_t1_spline(astate[CONTROLS_IDX][1])^(-1)
-            return [
-                delta_state_1;
-                delta_state_2;
-                delta_int_control;
-                delta_control;
-                delta_dcontrol_dt;
-                delta_int_gamma;
-            ]
-        end
-        )
-        eval(expr)
-    end
+                  decay_aware=false,
+                  solver_type=alilqr, sqrtbp=false)
     # Convert to trajectory optimization language.
-    n = ASTATE_SIZE
+    model = Model(decay_aware, time_optimal)
+    n = state_dim(model)
+    m = control_dim(model)
     t0 = 0.
-    x0 = INITIAL_ASTATE
-    if time_optimal
-        m = CONTROL_COUNT + 1
-    else
-        m = CONTROL_COUNT
-    end
+    x0 = SVector{n}([
+        INITIAL_STATE1; # state1
+        INITIAL_STATE2; # state2
+        zeros(CONTROL_COUNT); # int_control
+        zeros(CONTROL_COUNT); # control
+        zeros(CONTROL_COUNT); # dcontrol_dt
+        eval(:($decay_aware ? zeros(1) : EMPTY_V))
+    ])
+
     if gate_type == xpiby2
-        target_state_1 = XPIBY2_1
-        target_state_2 = XPIBY2_2
+        target_state_1 = Array(XPIBY2_ISO_1)
+        target_state_2 = Array(XPIBY2_ISO_2)
     elseif gate_type == ypiby2
-        target_state_1 = YPIBY2_1
-        target_state_2 = YPIBY2_2
+        target_state_1 = Array(YPIBY2_ISO_1)
+        target_state_2 = Array(YPIBY2_ISO_2)
     elseif gate_type == zpiby2
-        target_state_1 = ZPIBY2_1
-        target_state_2 = ZPIBY2_2
+        target_state_1 = Array(ZPIBY2_ISO_1)
+        target_state_2 = Array(ZPIBY2_ISO_2)
     end
-    xf = [
+    xf = SVector{n}([
         target_state_1;
         target_state_2;
-        @SVector zeros(CONTROL_COUNT); # int_control
-        @SVector zeros(CONTROL_COUNT); # control
-        @SVector zeros(CONTROL_COUNT); # dcontrol_dt
-        @SVector zeros(1); # int_gamma
-    ]
+        zeros(CONTROL_COUNT); # int_control
+        zeros(CONTROL_COUNT); # control
+        zeros(CONTROL_COUNT); # dcontrol_dt
+        eval(:($decay_aware ? zeros(1) : EMPTY_V))
+    ])
     
     # Bound the control amplitude.
     x_max = SVector{n}([
-        fill(Inf, STATE_SIZE);
-        fill(Inf, STATE_SIZE);
+        fill(Inf, STATE_SIZE_ISO);
+        fill(Inf, STATE_SIZE_ISO);
         fill(Inf, CONTROL_COUNT);
         fill(MAX_CONTROL_NORM_0, CONTROL_COUNT); # control
         fill(Inf, CONTROL_COUNT);
-        fill(Inf, 1)
+        eval(:($decay_aware ? fill(Inf, 1) : EMPTY_V))
     ])
     x_min = SVector{n}([
-        fill(-Inf, STATE_SIZE);
-        fill(-Inf, STATE_SIZE);
+        fill(-Inf, STATE_SIZE_ISO);
+        fill(-Inf, STATE_SIZE_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(-MAX_CONTROL_NORM_0, CONTROL_COUNT); # control
         fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, 1)
+        eval(:($decay_aware ? fill(-Inf, 1) : EMPTY_V))
     ])
+
     # Controls start and end at 0.
     x_max_boundary = SVector{n}([
-        fill(Inf, STATE_SIZE);
-        fill(Inf, STATE_SIZE);
+        fill(Inf, STATE_SIZE_ISO);
+        fill(Inf, STATE_SIZE_ISO);
         fill(Inf, CONTROL_COUNT);
         fill(0, CONTROL_COUNT); # control
         fill(Inf, CONTROL_COUNT);
-        fill(Inf, 1)
+        eval(:($decay_aware ? fill(Inf, 1) : EMPTY_V))
     ])
     x_min_boundary = SVector{n}([
-        fill(-Inf, STATE_SIZE);
-        fill(-Inf, STATE_SIZE);
+        fill(-Inf, STATE_SIZE_ISO);
+        fill(-Inf, STATE_SIZE_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(0, CONTROL_COUNT); # control
         fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, 1)
+        eval(:($decay_aware ? fill(-Inf, 1) : EMPTY_V))
     ])
+
     # Bound dt.
-    if time_optimal
-        u_min = SVector{m}([
-            fill(-Inf, CONTROL_COUNT);
-            fill(sqrt(DT_MIN), 1); # dt
-        ])
-        u_max = SVector{m}([
-            fill(Inf, CONTROL_COUNT);
-            fill(sqrt(DT_MAX), 1); # dt
-        ])
-    else
-        u_min = SVector{m}([
-            fill(-Inf, CONTROL_COUNT);
-        ])
-        u_max = SVector{m}([
-            fill(Inf, CONTROL_COUNT);
-        ])
-    end
+    u_max = SVector{m}([
+        fill(Inf, CONTROL_COUNT);
+        eval(:($time_optimal ? fill(sqrt(DT_MAX), 1) : EMPTY_V)); # dt
+    ])
+    u_min = SVector{m}([
+        fill(-Inf, CONTROL_COUNT);
+        eval(:($time_optimal ? fill(sqrt(DT_MIN), 1) : EMPTY_V)); # dt
+    ])
 
     # Generate initial trajectory.
-    model = Model(n, m)
-    U0 = nothing
     if time_optimal
         # Default initial guess w/ optimization over dt.
         dt = 1
@@ -255,42 +224,38 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     ) for k = 1:N]
     Z = Traj(X0, U0, dt * ones(N))
 
-
     # Define penalties.
     Q = Diagonal(SVector{n}([
-        fill(1e1, STATE_SIZE); # state 0
-        fill(1e1, STATE_SIZE); # state 1
-        fill(1e2, CONTROL_COUNT); # int
-        fill(1e2, CONTROL_COUNT); # control
-        fill(1e0, CONTROL_COUNT); # dcontrol_dt
-        fill(1e5, 1); # int_gamma
+        fill(1e0, STATE_SIZE_ISO); # state 0
+        fill(1e0, STATE_SIZE_ISO); # state 1
+        fill(1e0, CONTROL_COUNT); # int
+        fill(1e0, CONTROL_COUNT); # control
+        fill(1e-1, CONTROL_COUNT); # dcontrol_dt
+        eval(:($decay_aware ? fill(1e-1, 1) : EMPTY_V)); # int_gamma
     ]))
     Qf = Q * N
-    if time_optimal
-        R = Diagonal(SVector{m}([
-            fill(1e0, CONTROL_COUNT); # d2control_dt2
-            fill(5e2, 1); # dt
-        ]))
-    else
-        R = Diagonal(SVector{m}([
-            fill(1e-1, CONTROL_COUNT); # d2control_dt2
-        ]))
-    end
+    R = Diagonal(SVector{m}([
+        fill(1e-1, CONTROL_COUNT); # d2control_dt2
+        eval(:($time_optimal ? fill(5e3, 1) : EMPTY_V)); # dt
+    ]))
     obj = LQRObjective(Q, R, Qf, xf, N)
 
     # Must satisfy control amplitude bound.
     control_bnd = BoundConstraint(n, m, x_max=x_max, x_min=x_min)
+    # Controls must stop at zero.
+    control_bnd_boundary = BoundConstraint(n, m, x_max=x_max_boundary, x_min=x_min_boundary)
     # Must satisfy dt bound.
     dt_bnd = BoundConstraint(n, m, u_max=u_max, u_min=u_min)
-    # States must reach target. Controls must have zero net flux. Controls must stop at zero.
-    target_astate_constraint = GoalConstraint(xf, [STATE_1_IDX; STATE_2_IDX; INT_CONTROLS_IDX; CONTROLS_IDX])
+    # States must reach target. Controls must have zero net flux. 
+    target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
     # States must obey unit norm.
-    # normalization_constraint_1 = NormConstraint(n, m, 1, TO.Equality(), STATE_1_IDX)
-    # normalization_constraint_2 = NormConstraint(n, m, 1, TO.Equality(), STATE_2_IDX)
+    normalization_constraint_1 = NormConstraint(n, m, 1, TO.Equality(), STATE1_IDX)
+    normalization_constraint_2 = NormConstraint(n, m, 1, TO.Equality(), STATE2_IDX)
     
     constraints = ConstraintList(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)
-    add_constraint!(constraints, target_astate_constraint, N:N);
+    add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
+    add_constraint!(constraints, target_astate_constraint, N:N)
     # add_constraint!(constraints, normalization_constraint_1, 2:N-1)
     # add_constraint!(constraints, normalization_constraint_2, 2:N-1)
     if time_optimal
@@ -298,23 +263,25 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     end
 
     # Instantiate problem and solve.
-    prob = Problem{RobotDynamics.RK4}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
-    solver = nothing
+    prob = Problem{RobotDynamics.RK6}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
     opts = SolverOptions(verbose=VERBOSE)
     if solver_type == alilqr
         solver = AugmentedLagrangianSolver(prob, opts)
+        solver.solver_uncon.opts.square_root = sqrtbp
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
-        # solver.opts.penalty_initial = AL_INITIAL_PENALTY
+        solver.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
+        solver.opts.penalty_max = MAX_PENALTY
     elseif solver_type == altro
         solver = ALTROSolver(prob, opts)
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
+        solver.solver_al.solver_uncon.opts.square_root = sqrtbp
         solver.solver_al.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
         solver.solver_al.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
-        solver.solver_al.solver_uncon.opts.square_root = true
+        solver.solver_al.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
+        solver.solver_al.opts.penalty_max = MAX_PENALTY
         solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.solver_pn.opts.n_steps = PN_STEPS
-        # solver.solver_al.opts.penalty_initial = AL_INITIAL_PENALTY
     end
     Altro.solve!(solver)
 
@@ -330,7 +297,7 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     R_raw = Array(R)
     R_arr = [R_raw[i, i] for i in 1:size(R_raw)[1]]
     cidx_arr = Array(CONTROLS_IDX)
-    d2cdt2idx_arr = Array(D2CONTROLS_DT2_IDX)
+    d2cidx_arr = Array(D2CONTROLS_IDX)
     dtidx_arr = Array(DT_IDX)
     # Square the dts.
     if time_optimal
@@ -346,7 +313,7 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
         h5open(save_file_path, "cw") do save_file
             write(save_file, "acontrols", acontrols_arr)
             write(save_file, "controls_idx", cidx_arr)
-            write(save_file, "d2controls_dt2_idx", d2cdt2idx_arr)
+            write(save_file, "d2controls_dt2_idx", d2cidx_arr)
             write(save_file, "dt_idx", dtidx_arr)
             write(save_file, "evolution_time", evolution_time)
             write(save_file, "astates", astates_arr)
