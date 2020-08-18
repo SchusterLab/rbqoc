@@ -1,5 +1,5 @@
 """
-spin11.jl - derivative robustness
+spin12.jl - derivative robustness
 """
 
 using Altro
@@ -10,149 +10,159 @@ using StaticArrays
 using TrajectoryOptimization
 const TO = TrajectoryOptimization
 
-include(joinpath(ENV["ROBUST_QOC_PATH"], "rbqoc.jl"))
+WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
+include(joinpath(WDIR, "src", "spin", "spin.jl"))
 
 # paths
-EXPERIMENT_META = "spin"
-EXPERIMENT_NAME = "spin12"
-WDIR = ENV["RBQOC_PATH"]
-SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
+const EXPERIMENT_META = "spin"
+const EXPERIMENT_NAME = "spin12"
+const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
 # Define the optimization.
-CONTROL_COUNT = 1
-SORDER = 2
-DT_STATIC = DT_PREF
-DT_STATIC_INV = DT_PREF_INV
-# DT_STATIC = 2e-2
-# DT_STATIC_INV = 5e1
-CONSTRAINT_TOLERANCE = 1e-8
-AL_KICKOUT_TOLERANCE = 1e-7
-PN_STEPS = 5
+const DT_STATIC = DT_PREF
+const DT_STATIC_INV = DT_PREF_INV
+const CONSTRAINT_TOLERANCE = 1e-8
+const AL_KICKOUT_TOLERANCE = 1e-7
+const PN_STEPS = 5
+const MAX_PENALTY = 1e10
+const ILQR_DJ_TOL = 1e-4
 
 # Define the problem.
-INITIAL_STATE1 = SA[1., 0, 0, 0]
-INITIAL_STATE2 = SA[0., 1, 0, 0]
-STATE_COUNT = 2
-INITIAL_ASTATE = [
-    INITIAL_STATE1; # state1
-    INITIAL_STATE1; # s1state1
-    INITIAL_STATE1; # s2state1
-    INITIAL_STATE2; # state2
-    INITIAL_STATE2; # s1state2
-    INITIAL_STATE2; # s2state2
-    @SVector zeros(3 * CONTROL_COUNT); # intcontrol, control, dcontrol
-]
-ASTATE_SIZE, = size(INITIAL_ASTATE)
+const CONTROL_COUNT = 1
+const STATE_COUNT = 2
+const ASTATE_SIZE_BASE = STATE_COUNT * STATE_SIZE_ISO + 3 * CONTROL_COUNT
+const INITIAL_STATE1 = [1., 0, 0, 0]
+const INITIAL_STATE2 = [0., 1, 0, 0]
 # state indices
-STATE1_IDX = 1:STATE_SIZE_ISO
-S1STATE1_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + STATE_SIZE_ISO
-S2STATE1_IDX = S1STATE1_IDX[end] + 1:S1STATE1_IDX[end] + STATE_SIZE_ISO
-STATE2_IDX = S2STATE1_IDX[end] + 1:S2STATE1_IDX[end] + STATE_SIZE_ISO
-S1STATE2_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + STATE_SIZE_ISO
-S2STATE2_IDX = S1STATE2_IDX[end] + 1:S1STATE2_IDX[end] + STATE_SIZE_ISO
-INTCONTROLS_IDX = S2STATE2_IDX[end] + 1:S2STATE2_IDX[end] + CONTROL_COUNT
-CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
-DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
+const STATE1_IDX = 1:STATE_SIZE_ISO
+const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + STATE_SIZE_ISO
+const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
+const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
+const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
+const S1STATE1_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + STATE_SIZE_ISO
+const S1STATE2_IDX = S1STATE1_IDX[end] + 1:S1STATE1_IDX[end] + STATE_SIZE_ISO
+const S2STATE1_IDX = S1STATE2_IDX[end] + 1:S1STATE2_IDX[end] + STATE_SIZE_ISO
+const S2STATE2_IDX = S2STATE1_IDX[end] + 1:S2STATE1_IDX[end] + STATE_SIZE_ISO
 # control indices
-D2CONTROLS_IDX = 1:CONTROL_COUNT
-
+const D2CONTROLS_IDX = 1:CONTROL_COUNT
 
 # Specify logging.
-VERBOSE = true
-SAVE = true
+const VERBOSE = true
+const SAVE = true
 
-struct Model <: AbstractModel
-    n :: Int
-    m :: Int
+# Misc. constants
+EMPTY_V = []
+
+
+# Define the dynamics.
+struct Model{SO} <: AbstractModel
+    Model(SO::Int64=0) = new{SO}()
 end
+RobotDynamics.state_dim(::Model{SO}) where SO = (
+    ASTATE_SIZE_BASE + SO * STATE_COUNT * STATE_SIZE_ISO
+)
+RobotDynamics.control_dim(::Model{SO}) where SO = CONTROL_COUNT
 
 
-Base.size(model::Model) = (model.n, model.m)
-
-
-function RobotDynamics.dynamics(model::Model, astate, acontrols, time)
+function RobotDynamics.dynamics(model::Model{SO}, astate::StaticVector,
+                                acontrols::StaticVector, time::Real) where SO
     negi_hc = (
         astate[CONTROLS_IDX][1] * NEGI_H1_ISO
     )
     negi_s0h = FQ_NEGI_H0_ISO + negi_hc
-    negi_s1h = S1FQ_NEGI_H0_ISO + negi_hc
-    negi_s2h = S2FQ_NEGI_H0_ISO + negi_hc
     delta_state1 = negi_s0h * astate[STATE1_IDX]
-    delta_s1state1 = negi_s1h * astate[S1STATE1_IDX]
-    delta_s2state1 = negi_s2h * astate[S2STATE1_IDX]
     delta_state2 = negi_s0h * astate[STATE2_IDX]
-    delta_s1state2 = negi_s1h * astate[S1STATE2_IDX]
-    delta_s2state2 = negi_s2h * astate[S2STATE2_IDX]
     delta_intcontrol = astate[CONTROLS_IDX]
     delta_control = astate[DCONTROLS_IDX]
     delta_dcontrol = acontrols[D2CONTROLS_IDX]
-    return [
+    delta_astate = [
         delta_state1;
-        delta_s1state1;
-        delta_s2state1;
         delta_state2;
-        delta_s1state2;
-        delta_s2state2;
         delta_intcontrol;
         delta_control;
         delta_dcontrol;
     ]
+    
+    if SO == 2
+        negi_s1h = S1FQ_NEGI_H0_ISO + negi_hc
+        negi_s2h = S2FQ_NEGI_H0_ISO + negi_hc
+        delta_s1state1 = negi_s1h * astate[S1STATE1_IDX]
+        delta_s1state2 = negi_s1h * astate[S1STATE2_IDX]
+        delta_s2state1 = negi_s2h * astate[S2STATE1_IDX]
+        delta_s2state2 = negi_s2h * astate[S2STATE2_IDX]
+        push!(delta_astate, delta_s1state1)
+        push!(delta_astate, delta_s1state2)
+        push!(delta_astate, delta_s2state1)
+        push!(delta_astate, delta_s2state2)
+    end
+    
+    return delta_astate
 end
 
 
-function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr, postsample=false)
+function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=alilqr,
+                  postsample=false, sqrtbp=false, sample_order=0)
     dt = DT_STATIC
     N = Int(floor(evolution_time * DT_STATIC_INV)) + 1
-    n = ASTATE_SIZE
-    m = CONTROL_COUNT
+    model = Model(sample_order)
+    n = state_dim(model)
+    m = control_dim(model)
     t0 = 0.
     tf = evolution_time
-    x0 = INITIAL_ASTATE
+    x0 = SVector{n}([
+        INITIAL_STATE1;
+        INITIAL_STATE2;
+        zeros(3 * CONTROL_COUNT);
+        repeat([INITIAL_STATE1; INITIAL_STATE2], sample_order);
+    ])
+    
     if gate_type == xpiby2
-        target_state_1 = XPIBY2_ISO_1
-        target_state_2 = XPIBY2_ISO_2
+        target_state1 = Array(XPIBY2_ISO_1)
+        target_state2 = Array(XPIBY2_ISO_2)
     elseif gate_type == ypiby2
-        target_state_1 = YPIBY2_ISO_1
-        target_state_2 = YPIBY2_ISO_2
+        target_state1 = Array(YPIBY2_ISO_1)
+        target_state2 = Array(YPIBY2_ISO_2)
     elseif gate_type == zpiby2
-        target_state_1 = ZPIBY2_ISO_1
-        target_state_2 = ZPIBY2_ISO_2
+        target_state1 = Array(ZPIBY2_ISO_1)
+        target_state2 = Array(ZPIBY2_ISO_2)
     end
-    xf = [
-        target_state_1;
-        @SVector zeros(SORDER * STATE_SIZE_ISO);
-        target_state_2;
-        @SVector zeros(SORDER * STATE_SIZE_ISO);
-        @SVector zeros(3 * CONTROL_COUNT);
-    ]
+    xf = SVector{n}([
+        target_state1;
+        target_state2;
+        zeros(3 * CONTROL_COUNT);
+        repeat([target_state1; target_state2], sample_order);
+    ])
     # control amplitude constraint
     x_max = SVector{n}([
-        fill(Inf, STATE_COUNT * (1 + SORDER) * STATE_SIZE_ISO);
+        fill(Inf, STATE_COUNT * STATE_SIZE_ISO);
         fill(Inf, CONTROL_COUNT);
         fill(MAX_CONTROL_NORM_0, 1); # control
         fill(Inf, CONTROL_COUNT);
+        fill(Inf, sample_order * STATE_COUNT * STATE_SIZE_ISO);
     ])
     x_min = SVector{n}([
-        fill(-Inf, STATE_COUNT * (1 + SORDER) * STATE_SIZE_ISO);
+        fill(-Inf, STATE_COUNT * STATE_SIZE_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(-MAX_CONTROL_NORM_0, 1); # control
         fill(-Inf, CONTROL_COUNT);
+        fill(-Inf, sample_order * STATE_COUNT * STATE_SIZE_ISO);
     ])
     # controls start and end at 0
-    x_max_boundary = [
-        fill(Inf, STATE_COUNT * (1 + SORDER) * STATE_SIZE_ISO);
+    x_max_boundary = SVector{n}([
+        fill(Inf, STATE_COUNT * STATE_SIZE_ISO);
         fill(Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(Inf, CONTROL_COUNT);
-    ]
-    x_min_boundary = [
-        fill(-Inf, STATE_COUNT * (1 + SORDER) * STATE_SIZE_ISO);
+        fill(Inf, sample_order * STATE_COUNT * STATE_SIZE_ISO);
+    ])
+    x_min_boundary = SVector{n}([
+        fill(-Inf, STATE_COUNT * STATE_SIZE_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-    ]
+        fill(-Inf, sample_order * STATE_COUNT * STATE_SIZE_ISO);
+    ])
 
-    model = Model(n, m)
     U0 = [SVector{m}([
         fill(1e-4, CONTROL_COUNT);
     ]) for k = 1:N-1]
@@ -161,22 +171,18 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr, pos
     ]) for k = 1:N]
     Z = Traj(X0, U0, dt * ones(N))
 
-    Qs = 1e1
-    Qsn = 1e2
+    Qs = 1e0
+    Qss = 5e0
     Q = Diagonal(SVector{n}([
-        fill(Qs, STATE_SIZE_ISO); # state1
-        fill(Qsn, STATE_SIZE_ISO); # s1state1
-        fill(Qsn, STATE_SIZE_ISO); # s2state1
-        fill(Qs, STATE_SIZE_ISO); # state2
-        fill(Qsn, STATE_SIZE_ISO); # s1state2
-        fill(Qsn, STATE_SIZE_ISO); # s2state2
-        fill(1e2, 1); # int_control
-        fill(1e4, 1); # control
-        fill(1e1, 1); # dcontrol_dt
+        fill(Qs, STATE_COUNT * STATE_SIZE_ISO); # state1, state2
+        fill(1e0, 1); # int_control
+        fill(1e0, 1); # control
+        fill(1e-1, 1); # dcontrol_dt
+        fill(Qss, sample_order * STATE_COUNT * STATE_SIZE_ISO); # snstate1, snstate2
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([
-        fill(1e1, CONTROL_COUNT);
+        fill(1e-1, CONTROL_COUNT);
     ]))
     obj = LQRObjective(Q, R, Qf, xf, N)
 
@@ -194,8 +200,8 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr, pos
     add_constraint!(constraints, control_bnd, 2:N-2)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
     add_constraint!(constraints, target_astate_constraint, N:N);
-    add_constraint!(constraints, normalization_constraint_1, 2:N-1)
-    add_constraint!(constraints, normalization_constraint_2, 2:N-1)
+    # add_constraint!(constraints, normalization_constraint_1, 2:N-1)
+    # add_constraint!(constraints, normalization_constraint_2, 2:N-1)
 
     # Instantiate problem and solve.
     prob = Problem{RobotDynamics.RK6}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
@@ -203,13 +209,19 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr, pos
     solver = AugmentedLagrangianSolver(prob, opts)
     if solver_type == alilqr
         solver = AugmentedLagrangianSolver(prob, opts)
+        solver.solver_uncon.opts.square_root = sqrtbp
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
+        solver.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
+        solver.opts.penalty_max = MAX_PENALTY
     elseif solver_type == altro
         solver = ALTROSolver(prob, opts)
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
+        solver.solver_al.solver_uncon.opts.square_root = sqrtbp
         solver.solver_al.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
         solver.solver_al.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
+        solver.solver_al.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
+        solver.solver_al.opts.penalty_max = MAX_PENALTY
         solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.solver_pn.opts.n_steps = PN_STEPS
     end
@@ -233,7 +245,7 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr, pos
     
     # Save.
     if SAVE
-            save_file_path = generate_save_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
+        save_file_path = generate_save_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
         println("Saving this optimization to $(save_file_path)")
         h5open(save_file_path, "cw") do save_file
             write(save_file, "acontrols", acontrols_arr)

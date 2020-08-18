@@ -7,7 +7,8 @@ using Printf
 import Plots
 using Statistics
 
-include(joinpath(ENV["RBQOC_PATH"], "rbqoc.jl"))
+WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
+include(joinpath(WDIR, "src", "spin", "spin.jl"))
 
 # Configure paths.
 META_SAVE_PATH = joinpath(ENV["RBQOC_PATH"], "out", "spin")
@@ -18,10 +19,6 @@ SAVE_PATH = joinpath(META_SAVE_PATH, EXPERIMENT_NAME)
 ENV["GKSwstype"] = "nul"
 Plots.gr()
 
-# Constants
-SAMPLE_LEN = Integer(1e4)
-
-
 # Figure 1
 @enum PulseType begin
     qoc = 1
@@ -30,29 +27,30 @@ SAMPLE_LEN = Integer(1e4)
     sample = 4
 end
 
-PT_LIST = [analytic, qoc]
+const PT_LIST = [analytic, qoc]
 
-PT_STR = Dict(
+const PT_STR = Dict(
     qoc => "QOC",
     analytic => "Analytic",
     sample => "Sample",
     derivative => "Derivative"
 )
 
-MS_DATA = 4
-MS_POINT = 8
+const ALPHA_POINT = 0.4
+const MS_DATA = 4
+const MS_POINT = 8
 
-SAVE_FILE_PATH_KEY = 1
-SAVE_TYPE_KEY = 2
-DATA_FILE_PATH_KEY = 3
-COLOR_KEY = 4
-ACORDS_KEY = 5
+const SAVE_FILE_PATH_KEY = 1
+const SAVE_TYPE_KEY = 2
+const DATA_FILE_PATH_KEY = 3
+const COLOR_KEY = 4
+const ACORDS_KEY = 5
 
 
 ### ALL ###
 function plot_fidelity_by_gate_count(fidelitiess; inds=nothing, title="", ylims=(0, 1),
                                      yticks=(0:0.1:1), legend=nothing, yscale=:none,
-                                     labels=nothing, colors=nothing)
+                                     labels=nothing, colors=nothing, linestyles=nothing)
     plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     fig = Plots.plot(dpi=DPI_FINAL, ylims=ylims, yticks=yticks, title=title,
                      legend=legend, yscale=yscale)
@@ -64,7 +62,9 @@ function plot_fidelity_by_gate_count(fidelitiess; inds=nothing, title="", ylims=
     for (i, fidelities) in enumerate(fidelitiess)
         color = isnothing(colors) ? :auto : colors[i]
         label = isnothing(labels) ? nothing : labels[i]
-        Plots.plot!(fig, gate_count_axis[inds], fidelities[inds], label=label, color=color)
+        linestyle = isnothing(linestyles) ? :auto : linestyles[i]
+        Plots.plot!(fig, gate_count_axis[inds], fidelities[inds], label=label,
+                    color=color, linestyle=linestyle)
     end
     Plots.ylabel!("Fidelity")
     Plots.xlabel!("Gate Count")
@@ -75,7 +75,7 @@ end
 
 
 ### FIGURE 1 ###
-F1_GATE_COUNT = Integer(1.5e4)
+const F1_GATE_COUNT = Integer(1.5e4)
 F1_PULSE_DATA = Dict(
     zpiby2 => Dict(
         qoc => Dict(
@@ -94,9 +94,10 @@ F1_PULSE_DATA = Dict(
     ),
     ypiby2 => Dict(
         qoc => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00125_spin15.h5"),
-            SAVE_TYPE_KEY => jl,
             COLOR_KEY => :coral,
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00154_spin15.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00145_spin15.h5"),
+            SAVE_TYPE_KEY => samplejl,
         ),
         analytic => Dict(
             ACORDS_KEY => (0, 0.5),
@@ -108,9 +109,10 @@ F1_PULSE_DATA = Dict(
     ),
     xpiby2 => Dict(
         qoc => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00126_spin15.h5"),
-            SAVE_TYPE_KEY => samplejl,
             COLOR_KEY => :coral,
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00176_spin15.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00174_spin15.h5"),
+            SAVE_TYPE_KEY => jl,
         ),
         analytic => Dict(
             ACORDS_KEY => (0, 0.6),
@@ -163,18 +165,26 @@ function make_figure1a()
 end
 
 
+const GT_LS_1B = Dict(
+    zpiby2 => :solid,
+    ypiby2 => :dash,
+    xpiby2 => :dashdot,
+)
+
 function make_figure1b()
     # TODO: get data
     for gate_type in keys(F1_PULSE_DATA)
         for pulse_type in keys(F1_PULSE_DATA[gate_type])
             pulse_data = F1_PULSE_DATA[gate_type][pulse_type]
-            data_file_path = nothing
-            # pulse_data[DATA_FILE_PATH_KEY] = data_file_path
+            if !(DATA_FILE_PATH_KEY in keys(pulse_data))
+                # get data_file_path and write it to pulse data here
+                data_file_path = nothing
+            end
         end
     end
     
     # plot
-    fidelitiess = []; labels = []; colors = []; linestyles = nothing
+    fidelitiess = []; labels = []; colors = []; linestyles = []
     for gate_type in keys(F1_PULSE_DATA)
         for pulse_type in keys(F1_PULSE_DATA[gate_type])
             pulse_data = F1_PULSE_DATA[gate_type][pulse_type]
@@ -184,20 +194,26 @@ function make_figure1b()
             end
             color = pulse_data[COLOR_KEY]
             label = "$(GT_STR[gate_type]) $(PT_STR[pulse_type])"
+            linestyle = GT_LS_1B[gate_type]
+            push!(fidelitiess, fidelities)
+            push!(labels, label)
+            push!(colors, color)
+            push!(linestyles, linestyle)
         end
     end
     plot_file_path = plot_fidelity_by_gate_count(
         fidelitiess; ylims=(0.95, 1), yticks=0.95:0.01:1, legend=:bottomleft,
-        labels=labels, colors=colors
+        labels=labels, colors=colors, linestyles=linestyles
     )
     println("Plotted Figure1b to $(plot_file_path)")
 end
 
 
+const F1C_SAMPLE_LEN = Integer(1e4)
 function make_figure1c()
     # Collect data and plot.
     max_amp = MAX_CONTROL_NORM_0 / (2 * pi)
-    amps_fit = Array(range(0, stop=max_amp, length=SAMPLE_LEN))
+    amps_fit = Array(range(0, stop=max_amp, length=F1C_SAMPLE_LEN))
     t1s_fit =  map(amp_t1_spline, amps_fit)
     amps_data = -1 .* map(fbfq_amp, FBFQ_ARRAY)
     t1s_data = T1_ARRAY
@@ -233,21 +249,22 @@ end
 ### FIGURE 2 ###
 F2_PULSE_DATA = Dict(
     derivative => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00059_spin11.h5"),
+        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00086_spin11.h5"),
         SAVE_TYPE_KEY => jl,
         COLOR_KEY => :red,
-        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00060_spin11.h5")
+        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00087_spin11.h5")
     ),
     sample => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00040_spin12.h5"),
+        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00119_spin12.h5"),
         SAVE_TYPE_KEY => jl,
-        COLOR_KEY => :green
+        COLOR_KEY => :green,
+        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00123_spin12.h5")
     ),
     analytic => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00003_spin14.h5"),
+        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00004_spin14.h5"),
         SAVE_TYPE_KEY => py,
         COLOR_KEY => :lightskyblue,
-        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00026_spin14.h5"),
+        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00028_spin14.h5")
     ),
 )
 
@@ -260,8 +277,8 @@ function make_figure2a()
 end
 
 
-F2B_TRIAL_COUNT = Integer(1e3)
-F2B_FQ_DEV = 1e-1
+const F2B_TRIAL_COUNT = Integer(1e3)
+const F2B_FQ_DEV = 1e-1
 """
 Show gate error vs. detuning
 """
@@ -272,12 +289,12 @@ function make_figure2b()
     negi_h0s = [NEGI_H0_ISO * fq for fq in fqs]
 
     # sweep
-    gate_type = ypiby2
+    gate_type = xpiby2
     for pulse_type in keys(F2_PULSE_DATA)
-        if isnothing(F2_PULSE_DATA[pulse_type][DATA_FILE_PATH_KEY])
+        if !(DATA_FILE_PATH_KEY in keys(F2_PULSE_DATA[pulse_type]))
             save_file_path = F2_PULSE_DATA[pulse_type][SAVE_FILE_PATH_KEY]
             save_type = F2_PULSE_DATA[pulse_type][SAVE_TYPE_KEY]
-            data_file_path = run_sim_h0sweep_deqjl(ypiby2, negi_h0s; save_file_path=save_file_path,
+            data_file_path = run_sim_h0sweep_deqjl(gate_type, negi_h0s; save_file_path=save_file_path,
                                                    save_type=save_type)
             h5open(data_file_path, "r+") do data_file
                 write(data_file, "fqs", fqs)
@@ -288,17 +305,20 @@ function make_figure2b()
     end
 
     # plot
-    fig = Plots.plot(dpi=DPI)
+    fig = Plots.plot(dpi=DPI, yticks=[0.985, 0.99, 0.995, 1.00], ylim=(0.985, 1.0),
+                     xlim=(minimum(fq_devs), maximum(fq_devs)))
     for pulse_type in keys(F2_PULSE_DATA)
         pulse_data = F2_PULSE_DATA[pulse_type]
         label = "$(PT_STR[pulse_type])"
         color = pulse_data[COLOR_KEY]
         data_file_path = pulse_data[DATA_FILE_PATH_KEY]
+        println("$(data_file_path)")
         (fidelities,) = h5open(data_file_path, "r") do data_file
             fidelities = read(data_file, "fidelities")
             return (fidelities,)
         end
-        Plots.scatter!(fig, fq_devs, fidelities, label=label, color=color)
+        Plots.plot!(fig, fq_devs, fidelities, label=label, color=color)
+                    
     end
     plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     Plots.xlabel!(L"$\delta \omega_{q} / \omega_{q}$")
