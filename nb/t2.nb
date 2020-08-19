@@ -1,0 +1,75 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Mathematica 12.0' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       158,          7]
+NotebookDataLength[      2016,         67]
+NotebookOptionsPosition[      1509,         50]
+NotebookOutlinePosition[      1846,         65]
+CellTagsIndexPosition[      1803,         62]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+
+Cell[CellGroupData[{
+Cell[BoxData[{
+ RowBox[{"W", "=", 
+  RowBox[{
+   RowBox[{"4", "*", 
+    RowBox[{"Log", "[", "2", "]"}]}], "-", 
+   RowBox[{
+    RowBox[{"9", "/", "4"}], "*", 
+    RowBox[{"Log", "[", "3", "]"}]}]}]}], "\[IndentingNewLine]", 
+ RowBox[{"N", "[", 
+  RowBox[{"Sqrt", "[", "W", "]"}], "]"}]}], "Input",
+ CellChangeTimes->{{3.806258017275894*^9, 3.806258058654481*^9}},
+ CellLabel->"In[1]:=",ExpressionUUID->"815145e0-2da0-468b-b017-185cdf78632d"],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"4", " ", 
+   RowBox[{"Log", "[", "2", "]"}]}], "-", 
+  FractionBox[
+   RowBox[{"9", " ", 
+    RowBox[{"Log", "[", "3", "]"}]}], "4"]}]], "Output",
+ CellChangeTimes->{3.806258059458949*^9},
+ CellLabel->"Out[1]=",ExpressionUUID->"d66c6d0a-62c8-4e04-866c-415e5ef86b03"],
+
+Cell[BoxData["0.548371290948509`"], "Output",
+ CellChangeTimes->{3.806258059463599*^9},
+ CellLabel->"Out[2]=",ExpressionUUID->"27c674c4-1bfd-4a53-9dc3-4c7db420317f"]
+}, Open  ]]
+},
+WindowSize->{808, 911},
+WindowMargins->{{Automatic, 118}, {Automatic, 0}},
+FrontEndVersion->"12.0 for Mac OS X x86 (64-bit) (April 8, 2019)",
+StyleDefinitions->"Default.nb"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[CellGroupData[{
+Cell[580, 22, 441, 11, 52, "Input",ExpressionUUID->"815145e0-2da0-468b-b017-185cdf78632d"],
+Cell[1024, 35, 301, 8, 50, "Output",ExpressionUUID->"d66c6d0a-62c8-4e04-866c-415e5ef86b03"],
+Cell[1328, 45, 165, 2, 69, "Output",ExpressionUUID->"27c674c4-1bfd-4a53-9dc3-4c7db420317f"]
+}, Open  ]]
+}
+]
+*)
+
