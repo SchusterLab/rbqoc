@@ -9,6 +9,7 @@ using LinearAlgebra
 import Pkg
 using Plots
 using Printf
+using RobotDynamics
 
 # paths / venv
 WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
@@ -18,7 +19,6 @@ Pkg.activate(joinpath(WDIR))
 ENV["GKSwstype"] = "nul"
 Plots.gr()
 const DPI = 300
-const DPI_FINAL = Integer(2e3)
 const MS_SMALL = 2
 const MS_MED = 6
 const ALPHA = 0.2
@@ -36,6 +36,22 @@ end
     alilqr = 2
     altro = 3
 end
+
+
+@enum IntegratorType begin
+    rk2 = 1
+    rk3 = 2
+    rk4 = 3
+    rk6 = 4
+end
+
+
+const IT_RDI = Dict(
+    rk2 => RobotDynamics.RK2,
+    rk3 => RobotDynamics.RK3,
+    rk4 => RobotDynamics.RK4,
+    rk6 => RobotDynamics.RK6,
+)
 
 
 # methods

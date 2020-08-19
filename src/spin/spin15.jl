@@ -102,7 +102,8 @@ function run_traj(;evolution_time=60., gate_type=zpiby2,
                   initial_save_file_path=nothing,
                   initial_save_type=jl, time_optimal=false,
                   decay_aware=false,
-                  solver_type=alilqr, sqrtbp=false)
+                  solver_type=alilqr, sqrtbp=false,
+                  integrator_type=rk6)
     # Convert to trajectory optimization language.
     model = Model(decay_aware, time_optimal)
     n = state_dim(model)
@@ -231,12 +232,12 @@ function run_traj(;evolution_time=60., gate_type=zpiby2,
         fill(1e0, CONTROL_COUNT); # int
         fill(1e0, CONTROL_COUNT); # control
         fill(1e-1, CONTROL_COUNT); # dcontrol_dt
-        eval(:($decay_aware ? fill(1e-1, 1) : EMPTY_V)); # int_gamma
+        eval(:($decay_aware ? fill(5e-1, 1) : EMPTY_V)); # int_gamma
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([
         fill(1e-1, CONTROL_COUNT); # d2control_dt2
-        eval(:($time_optimal ? fill(5e3, 1) : EMPTY_V)); # dt
+        eval(:($time_optimal ? fill(5e2, 1) : EMPTY_V)); # dt
     ]))
     obj = LQRObjective(Q, R, Qf, xf, N)
 
@@ -263,7 +264,7 @@ function run_traj(;evolution_time=60., gate_type=zpiby2,
     end
 
     # Instantiate problem and solve.
-    prob = Problem{RobotDynamics.RK6}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
+    prob = Problem{IT_RDI[integrator_type]}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
     opts = SolverOptions(verbose=VERBOSE)
     if solver_type == alilqr
         solver = AugmentedLagrangianSolver(prob, opts)
@@ -323,6 +324,13 @@ function run_traj(;evolution_time=60., gate_type=zpiby2,
             write(save_file, "solver_type", Integer(solver_type))
             write(save_file, "cmax", cmax)
             write(save_file, "cmax_info", cmax_info)
+            write(save_file, "solver_type", Integer(solver_type))
+            write(save_file, "sqrtbp", Integer(sqrtbp))
+            write(save_file, "max_penalty", MAX_PENALTY)
+            write(save_file, "ctol", CONSTRAINT_TOLERANCE)
+            write(save_file, "alko", AL_KICKOUT_TOLERANCE)
+            write(save_file, "ilqr_dj_tol", ILQR_DJ_TOL)
+            write(save_file, "integrator_type", integrator_type)
         end
         if time_optimal
             # Sample the important metrics.

@@ -15,19 +15,17 @@ META_SAVE_PATH = joinpath(ENV["RBQOC_PATH"], "out", "spin")
 EXPERIMENT_NAME = "figures"
 SAVE_PATH = joinpath(META_SAVE_PATH, EXPERIMENT_NAME)
 
-# Plotting configuration.
+# Configure plotting.
 ENV["GKSwstype"] = "nul"
 Plots.gr()
 
-# Figure 1
+# types
 @enum PulseType begin
     qoc = 1
     analytic = 2
     derivative = 3
     sample = 4
 end
-
-const PT_LIST = [analytic, qoc]
 
 const PT_STR = Dict(
     qoc => "QOC",
@@ -36,24 +34,46 @@ const PT_STR = Dict(
     derivative => "Derivative"
 )
 
+const PT_MARKER = Dict(
+    sample => :circle,
+    derivative => :square,
+)
+
+const PT_COLOR = Dict(
+    analytic => :lightskyblue,
+    qoc => :coral,
+    sample => :green,
+    derivative => :red,
+)
+
+const GT_LIST = [zpiby2, ypiby2, xpiby2]
+const PT_LIST = [analytic, qoc]
+
+# plotting constants
 const ALPHA_POINT = 0.4
 const MS_DATA = 4
 const MS_POINT = 8
+const FS_AXIS_LABELS = 12
+const FS_AXIS_TICKS = 10
+const DPI_FINAL = Integer(1e3)
 
+# common dict keys
 const SAVE_FILE_PATH_KEY = 1
 const SAVE_TYPE_KEY = 2
 const DATA_FILE_PATH_KEY = 3
 const COLOR_KEY = 4
 const ACORDS_KEY = 5
+const MARKER_KEY = 6
 
 
 ### ALL ###
 function plot_fidelity_by_gate_count(fidelitiess; inds=nothing, title="", ylims=(0, 1),
                                      yticks=(0:0.1:1), legend=nothing, yscale=:none,
-                                     labels=nothing, colors=nothing, linestyles=nothing)
+                                     labels=nothing, colors=nothing, linestyles=nothing,
+                                     xlims=nothing)
     plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     fig = Plots.plot(dpi=DPI_FINAL, ylims=ylims, yticks=yticks, title=title,
-                     legend=legend, yscale=yscale)
+                     legend=legend, yscale=yscale, xlims=xlims)
     gate_count = size(fidelitiess[1])[1] - 1
     gate_count_axis = Array(0:1:gate_count)
     if isnothing(inds)
@@ -63,10 +83,10 @@ function plot_fidelity_by_gate_count(fidelitiess; inds=nothing, title="", ylims=
         color = isnothing(colors) ? :auto : colors[i]
         label = isnothing(labels) ? nothing : labels[i]
         linestyle = isnothing(linestyles) ? :auto : linestyles[i]
-        Plots.plot!(fig, gate_count_axis[inds], fidelities[inds], label=label,
+        Plots.plot!(fig, gate_count_axis[inds], 1 .- fidelities[inds], label=label,
                     color=color, linestyle=linestyle)
     end
-    Plots.ylabel!("Fidelity")
+    Plots.ylabel!("Gate Error")
     Plots.xlabel!("Gate Count")
     plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     Plots.savefig(fig, plot_file_path)
@@ -79,14 +99,12 @@ const F1_GATE_COUNT = Integer(1.5e4)
 F1_PULSE_DATA = Dict(
     zpiby2 => Dict(
         qoc => Dict(
-            COLOR_KEY => :coral,
-            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00105_spin15.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00099_spin15.h5"),
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00196_spin15.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00194_spin15.h5"),
             SAVE_TYPE_KEY => jl,
         ),
         analytic => Dict(
-            ACORDS_KEY => (0, 0.13),
-            COLOR_KEY => :lightskyblue,
+            ACORDS_KEY => (0, 0.25),
             DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00013_spin14.h5"),
             SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00000_spin14.h5"),
             SAVE_TYPE_KEY => py,
@@ -94,14 +112,12 @@ F1_PULSE_DATA = Dict(
     ),
     ypiby2 => Dict(
         qoc => Dict(
-            COLOR_KEY => :coral,
-            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00154_spin15.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00145_spin15.h5"),
-            SAVE_TYPE_KEY => samplejl,
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00188_spin15.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00185_spin15.h5"),
+            SAVE_TYPE_KEY => jl,
         ),
         analytic => Dict(
-            ACORDS_KEY => (0, 0.5),
-            COLOR_KEY => :lightskyblue,
+            ACORDS_KEY => (0, 0.4),
             DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00018_spin14.h5"),
             SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00003_spin14.h5"),
             SAVE_TYPE_KEY => py,
@@ -109,14 +125,12 @@ F1_PULSE_DATA = Dict(
     ),
     xpiby2 => Dict(
         qoc => Dict(
-            COLOR_KEY => :coral,
             DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00176_spin15.h5"),
             SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00174_spin15.h5"),
             SAVE_TYPE_KEY => jl,
         ),
         analytic => Dict(
-            ACORDS_KEY => (0, 0.6),
-            COLOR_KEY => :lightskyblue,
+            ACORDS_KEY => (0, 0.5),
             DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00022_spin14.h5"),
             SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00004_spin14.h5"),
             SAVE_TYPE_KEY => py,
@@ -146,7 +160,7 @@ function make_figure1a()
                 linestyle = :solid
             end
             data = F1_PULSE_DATA[gate_type][pulse_type]
-            color = data[COLOR_KEY]
+            color = PT_COLOR[pulse_type]
             label = "$(GT_STR[gate_type]) $(PT_STR[pulse_type])"
             save_file_path = data[SAVE_FILE_PATH_KEY]
             save_type = data[SAVE_TYPE_KEY]
@@ -159,7 +173,8 @@ function make_figure1a()
         push!(subfigs, subfig)
     end
     layout = @layout [a; b; c]
-    fig = Plots.plot(subfigs[1], subfigs[2], subfigs[3], layout=layout, dpi=DPI)
+    fig = Plots.plot(subfigs[1], subfigs[2], subfigs[3], layout=layout, dpi=DPI_FINAL,
+                     tickfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS)
     Plots.savefig(fig, plot_file_path)
     println("Saved Figure1a to $(plot_file_path)")
 end
@@ -185,14 +200,14 @@ function make_figure1b()
     
     # plot
     fidelitiess = []; labels = []; colors = []; linestyles = []
-    for gate_type in keys(F1_PULSE_DATA)
+    for gate_type in GT_LIST
         for pulse_type in keys(F1_PULSE_DATA[gate_type])
             pulse_data = F1_PULSE_DATA[gate_type][pulse_type]
             (fidelities,) = h5open(pulse_data[DATA_FILE_PATH_KEY], "r") do data_file
                 fidelities = read(data_file, "fidelities")
                 return (fidelities,)
             end
-            color = pulse_data[COLOR_KEY]
+            color = PT_COLOR[pulse_type]
             label = "$(GT_STR[gate_type]) $(PT_STR[pulse_type])"
             linestyle = GT_LS_1B[gate_type]
             push!(fidelitiess, fidelities)
@@ -202,39 +217,48 @@ function make_figure1b()
         end
     end
     plot_file_path = plot_fidelity_by_gate_count(
-        fidelitiess; ylims=(0.95, 1), yticks=0.95:0.01:1, legend=:bottomleft,
-        labels=labels, colors=colors, linestyles=linestyles
+        fidelitiess; ylims=(0, 0.05), yticks=0:0.01:0.05, legend=:topleft,
+        labels=labels, colors=colors, linestyles=linestyles,
+        xlims=(0, 1700)
     )
     println("Plotted Figure1b to $(plot_file_path)")
 end
 
 
 const F1C_SAMPLE_LEN = Integer(1e4)
+const GT_MK_1C = Dict(
+    zpiby2 => :diamond,
+    ypiby2 => :square,
+    xpiby2 => :utriangle,
+)
+const MS_F1C = 6
+const ALPHA_F1C = 1.
+
 function make_figure1c()
     # Collect data and plot.
-    max_amp = MAX_CONTROL_NORM_0 / (2 * pi)
+    max_amp = MAX_CONTROL_NORM_0
     amps_fit = Array(range(0, stop=max_amp, length=F1C_SAMPLE_LEN))
-    t1s_fit =  map(amp_t1_spline, amps_fit)
-    amps_data = -1 .* map(fbfq_amp, FBFQ_ARRAY)
+    t1s_fit =  map(amp_t1_spline_cubic, amps_fit)
+    amps_data = -1 .* map(fbfq_amp_lo, FBFQ_ARRAY)
     t1s_data = T1_ARRAY
     fig = Plots.plot(dpi=DPI_FINAL, legend=:bottomright, yscale=:log10)
     Plots.plot!(amps_fit, t1s_fit, label="Fit", color=:mediumaquamarine)
     Plots.scatter!(amps_data, t1s_data, label="Data", marker=(:circle, MS_DATA),
                    color=:mediumorchid)
-    for gate_type in keys(F1_PULSE_DATA)
+    for gate_type in GT_LIST
         for pulse_type in keys(F1_PULSE_DATA[gate_type])
             pulse_data = F1_PULSE_DATA[gate_type][pulse_type]
             (controls, _) = grab_controls(
                 pulse_data[SAVE_FILE_PATH_KEY];
                 save_type=pulse_data[SAVE_TYPE_KEY]
             )
-            controls = controls ./ (2 * pi)
             avg_amp = mean(map(abs, controls[:,1]))
-            avg_t1 = amp_t1_spline(avg_amp)
+            avg_t1 = amp_t1_spline_cubic(avg_amp)
             avg_label = "$(GT_STR[gate_type]) $(PT_STR[pulse_type])"
-            avg_color = pulse_data[COLOR_KEY]
+            avg_color = PT_COLOR[pulse_type]
+            marker = GT_MK_1C[gate_type]
             Plots.plot!([avg_amp], [avg_t1], label=avg_label,
-                        marker=(:star, MS_POINT), color=avg_color)
+                        marker=(marker, MS_F1C), color=avg_color, alpha=ALPHA_F1C)
         end
     end
     Plots.xlabel!("Avg. Amplitude (GHz)")
@@ -249,21 +273,18 @@ end
 ### FIGURE 2 ###
 F2_PULSE_DATA = Dict(
     derivative => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00086_spin11.h5"),
+        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00091_spin11.h5"),
         SAVE_TYPE_KEY => jl,
-        COLOR_KEY => :red,
-        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00087_spin11.h5")
+        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00092_spin11.h5")
     ),
     sample => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00119_spin12.h5"),
+        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00132_spin12.h5"),
         SAVE_TYPE_KEY => jl,
-        COLOR_KEY => :green,
-        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00123_spin12.h5")
+        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00200_spin12.h5")
     ),
     analytic => Dict(
         SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00004_spin14.h5"),
         SAVE_TYPE_KEY => py,
-        COLOR_KEY => :lightskyblue,
         DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00028_spin14.h5")
     ),
 )
@@ -310,9 +331,8 @@ function make_figure2b()
     for pulse_type in keys(F2_PULSE_DATA)
         pulse_data = F2_PULSE_DATA[pulse_type]
         label = "$(PT_STR[pulse_type])"
-        color = pulse_data[COLOR_KEY]
+        color = PT_COLOR[pulse_type]
         data_file_path = pulse_data[DATA_FILE_PATH_KEY]
-        println("$(data_file_path)")
         (fidelities,) = h5open(data_file_path, "r") do data_file
             fidelities = read(data_file, "fidelities")
             return (fidelities,)
@@ -327,65 +347,62 @@ function make_figure2b()
     println("Plotted Figure2b to $(plot_file_path)")
 end
 
-F2C_GATE_TIMES = [19.47, 30., 40., 50., 60., 70., 80.]
+F2C_GATE_TIMES = [60, 70, 80, 90, 100, 110, 120]
 F2C_PULSE_DATA = Dict(
     sample => Dict(
         F2C_GATE_TIMES[1] => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00061_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00138_spin12.h5"),
             SAVE_TYPE_KEY => jl,
-            COLOR_KEY => :green,
         ),
         F2C_GATE_TIMES[2] => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00063_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00145_spin12.h5"),
             SAVE_TYPE_KEY => jl,
-            COLOR_KEY => :green,
         ),
         F2C_GATE_TIMES[3] => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00073_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00147_spin12.h5"),
             SAVE_TYPE_KEY => jl,
-            COLOR_KEY => :green,
         ),
         F2C_GATE_TIMES[4] => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00070_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00148_spin12.h5"),
             SAVE_TYPE_KEY => jl,
-            COLOR_KEY => :green,
         ),
         F2C_GATE_TIMES[5] => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00075_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00150_spin12.h5"),
             SAVE_TYPE_KEY => jl,
-            COLOR_KEY => :green,
         ),
         F2C_GATE_TIMES[6] => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00076_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00151_spin12.h5"),
             SAVE_TYPE_KEY => jl,
-            COLOR_KEY => :green,
         ),
         F2C_GATE_TIMES[7] => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00084_spin12.h5"), # TODO: update with latest if passing
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00153_spin12.h5"),
             SAVE_TYPE_KEY => jl,
-            COLOR_KEY => :green,
         ),
     ),
     # derivative => Dict(
     # ),
 )
 function make_figure2c()
+    gate_type = xpiby2
+    
     # get data and plot
-    fig = Plots.plot(dpi=DPI_FINAL)
+    fig = Plots.plot(dpi=DPI_FINAL, legend=:bottomright)
     for pulse_type in keys(F2C_PULSE_DATA)
         label = "$(PT_STR[pulse_type])"
-        for gate_time in F2C_GATE_TIMES
+        color = PT_COLOR[pulse_type]
+        marker = PT_MARKER[pulse_type]
+        for (i, gate_time) in enumerate(F2C_GATE_TIMES)
             # compute
             data = F2C_PULSE_DATA[pulse_type][gate_time]
             save_file_path = data[SAVE_FILE_PATH_KEY]
             save_type = data[SAVE_TYPE_KEY]
             data_file_path1 = run_sim_deqjl(
-                1, ypiby2; save_file_path=save_file_path,
+                1, gate_type; save_file_path=save_file_path,
                 save_type=save_type, dynamics_type=schroed, dt=1e-3,
                 negi_h0=S1FQ_NEGI_H0_ISO,
             )
             data_file_path2 = run_sim_deqjl(
-                1, ypiby2; save_file_path=save_file_path,
+                1, gate_type; save_file_path=save_file_path,
                 save_type=save_type, dynamics_type=schroed, dt=1e-3,
                 negi_h0=S2FQ_NEGI_H0_ISO,
             )
@@ -400,9 +417,9 @@ function make_figure2c()
             fidelity = mean([fidelity1, fidelity2])
 
             # plot
-            color = data[COLOR_KEY]
+            label = i == 1 ? label : nothing
             Plots.scatter!(fig, [gate_time], [fidelity], label=label, color=color,
-                           ms=MS_DATA)
+                           marker=(marker, MS_DATA))
         end
     end
     plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)

@@ -16,7 +16,7 @@ include(joinpath(WDIR, "src", "rbqoc.jl"))
 
 # paths
 const SPIN_OUT_PATH = joinpath(WDIR, "out", "spin")
-const FBFQ_DFQ_DATA_FILE_PATH = joinpath(SPIN_OUT_PATH, "figures", "dfq.h5")
+const FBFQ_DFQ_DATA_FILE_PATH = joinpath(SPIN_OUT_PATH, "figures", "misc", "dfq.h5")
 
 # simulation constants
 const DT_PREF = 1e-2
@@ -66,6 +66,8 @@ const FQ = 1.4e-2 #GHz
 const SIGMAFQ = FQ * 5e-2
 const S1FQ = FQ + SIGMAFQ
 const S2FQ = FQ - SIGMAFQ
+const S3FQ = FQ + 2 * SIGMAFQ
+const S4FQ = FQ - 2 * SIGMAFQ
 const MAX_CONTROL_NORM_0 = 5e-1 #GHz
 const FBFQ_A = 0.202407
 const FBFQ_B = 0.5
@@ -133,6 +135,8 @@ const NEGI_H1_ISO = pi * NEGI * SIGMAX_ISO
 const FQ_NEGI_H0_ISO = FQ * NEGI_H0_ISO
 const S1FQ_NEGI_H0_ISO = S1FQ * NEGI_H0_ISO
 const S2FQ_NEGI_H0_ISO = S2FQ * NEGI_H0_ISO
+const S3FQ_NEGI_H0_ISO = S3FQ * NEGI_H0_ISO
+const S4FQ_NEGI_H0_ISO = S4FQ * NEGI_H0_ISO
 const AYPIBY2_NEGI_H1_ISO = AYPIBY2 * NEGI_H1_ISO
 # relaxation dissipation ops
 # L_{0} = |g> <e|
@@ -196,6 +200,7 @@ drive amplitude.
 """
 @inline amp_fbfq(amplitude) = amplitude * FBFQ_A + FBFQ_B
 
+
 """
 amp_fbfq_lo - Compute flux by flux quantum
 from flux drive quantum. Flux by flux
@@ -206,6 +211,13 @@ Arguments
 amplitude :: Array(N) - amplitude in units of GHz (no 2 pi)
 """
 @inline amp_fbfq_lo(amplitude) = -abs(amplitude) * FBFQ_A + FBFQ_B
+
+
+"""
+fbfq_amp_lo - Compute the amplitude from the flux by
+flux quantum. Reflects over the flux frustration point.
+"""
+@inline fbfq_amp_lo(fbfq) = (fbfq - FBFQ_B) / FBFQ_A
 
 
 """
@@ -239,7 +251,10 @@ amplitude :: Array(N) - amplitude in units of GHz (no 2 pi)
 @inline amp_t1_spline(amplitude) = FBFQ_T1_SPLINE_ITP(amp_fbfq_lo(amplitude))
 
 
-@inline amp_t1_reduced_spline(amplitude)= FBFQ_T1_REDUCED_SPLINE_ITP(amp_fbfq_lo(amplitude))
+@inline amp_t1_reduced_spline(amplitude) = FBFQ_T1_REDUCED_SPLINE_ITP(amp_fbfq_lo(amplitude))
+
+
+@inline amp_t1_spline_cubic(amplitude) = FBFQ_T1_SPLINE_DIERCKX(amp_fbfq_lo(amplitude))
 
 
 """
