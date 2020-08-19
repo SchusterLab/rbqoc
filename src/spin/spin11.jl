@@ -79,34 +79,61 @@ function RobotDynamics.dynamics(model::Model{DO}, astate::StaticVector,
     delta_intcontrol = astate[CONTROLS_IDX]
     delta_control = astate[DCONTROLS_IDX]
     delta_dcontrol = acontrols[D2CONTROLS_IDX]
-    delta_astate = [
-        delta_state1;
-        delta_state2;
-        delta_intcontrol;
-        delta_control;
-        delta_dcontrol;
-    ]
 
     if DO == 2
         delta_dstate1 = NEGI_H0_ISO * astate[STATE1_IDX] + negi_h * astate[DSTATE1_IDX]
         delta_dstate2 = NEGI_H0_ISO * astate[STATE2_IDX] + negi_h * astate[DSTATE2_IDX]
         delta_d2state1 = 2 * NEGI_H0_ISO * astate[DSTATE1_IDX] + negi_h * astate[D2STATE1_IDX]
         delta_d2state2 = 2 * NEGI_H0_ISO * astate[DSTATE2_IDX] + negi_h * astate[D2STATE2_IDX]
-        # delta_d3state1 = 3 * NEGI_H0_ISO * astate[D2STATE1_IDX] + negi_h * astate[D3STATE1_IDX]
-        # delta_d3state2 = 3 * NEGI_H0_ISO * astate[D2STATE2_IDX] + negi_h * astate[D3STATE2_IDX]
-        push!(delta_astate, delta_dstate1)
-        push!(delta_astate, delta_dstate2)
-        push!(delta_astate, delta_d2state1)
-        push!(delta_astate, delta_d2state2)
+        delta_astate = [
+            delta_state1;
+            delta_state2;
+            delta_intcontrol;
+            delta_control;
+            delta_dcontrol;
+            delta_dstate1;
+            delta_dstate2;
+            delta_d2state1;
+            delta_d2state2;
+        ]
+    elseif DO == 3
+        delta_dstate1 = NEGI_H0_ISO * astate[STATE1_IDX] + negi_h * astate[DSTATE1_IDX]
+        delta_dstate2 = NEGI_H0_ISO * astate[STATE2_IDX] + negi_h * astate[DSTATE2_IDX]
+        delta_d2state1 = 2 * NEGI_H0_ISO * astate[DSTATE1_IDX] + negi_h * astate[D2STATE1_IDX]
+        delta_d2state2 = 2 * NEGI_H0_ISO * astate[DSTATE2_IDX] + negi_h * astate[D2STATE2_IDX]
+        delta_d3state1 = 3 * NEGI_H0_ISO * astate[D2STATE1_IDX] + negi_h * astate[D3STATE1_IDX]
+        delta_d3state2 = 3 * NEGI_H0_ISO * astate[D2STATE2_IDX] + negi_h * astate[D3STATE2_IDX]
+        delta_astate = [
+            delta_state1;
+            delta_state2;
+            delta_intcontrol;
+            delta_control;
+            delta_dcontrol;
+            delta_dstate1;
+            delta_dstate2;
+            delta_d2state1;
+            delta_d2state2;
+            delta_d3state1;
+            delta_d3state2;
+        ]
+    else
+        delta_astate = [
+            delta_state1;
+            delta_state2;
+            delta_intcontrol;
+            delta_control;
+            delta_dcontrol;
+        ]
     end
 
     return delta_astate
 end
 
 
-function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr,
+function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
                   postsample=false, initial_save_file_path=nothing,
-                  initial_save_type=jl, sqrtbp=false, derivative_order=0)
+                  initial_save_type=jl, sqrtbp=false, derivative_order=0,
+                  integrator_type=rk6, max_penalty=MAX_PENALTY, qs=nothing)
     model = Model(derivative_order)
     n = state_dim(model)
     m = control_dim(model)
@@ -192,22 +219,21 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr,
     ]) for k = 1:N]
     Z = Traj(X0, U0, dt * ones(N))
 
-    Qs = 1e0
-    Qd1s = 1e-5
-    Qd2s =1e-9
-    Qd3s = 1e-12
+    if isnothing(qs)
+        qs = zeros(8)
+    end
     Q = Diagonal(SVector{n}([
-        fill(Qs, STATE_COUNT * STATE_SIZE_ISO); # state1, state2
-        fill(1e0, 1); # int_control
-        fill(1e0, 1); # control
-        fill(1e-1, 1); # dcontrol_dt
-        eval(:($derivative_order >= 1 ? fill(Qd1s, STATE_COUNT * STATE_SIZE_ISO) : EMPTY_V)); # dstate1, dstate2
-        eval(:($derivative_order >= 2 ? fill(Qd2s, STATE_COUNT * STATE_SIZE_ISO) : EMPTY_V)); # d2state1, d2state2
-        eval(:($derivative_order >= 3 ? fill(Qd2s, STATE_COUNT * STATE_SIZE_ISO) : EMPTY_V)); # d3state1, d3state2
+        fill(qs[1], STATE_COUNT * STATE_SIZE_ISO); # state1, state2
+        fill(qs[2], 1); # int_control
+        fill(qs[3], 1); # control
+        fill(qs[4], 1); # dcontrol_dt
+        fill(qs[5], eval(:($derivative_order >= 1 ? $STATE_COUNT * $STATE_SIZE_ISO : 0))); # dstate<1,2>
+        fill(qs[6], eval(:($derivative_order >= 2 ? $STATE_COUNT * $STATE_SIZE_ISO : 0))); # d2state<1,2>
+        fill(qs[7], eval(:($derivative_order >= 3 ? $STATE_COUNT * $STATE_SIZE_ISO : 0))); # d3state<1,2>
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([
-        fill(1e-1, CONTROL_COUNT);
+        fill(qs[8], CONTROL_COUNT);
     ]))
     obj = LQRObjective(Q, R, Qf, xf, N)
 
@@ -225,11 +251,11 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr,
     add_constraint!(constraints, control_bnd, 2:N-2)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
     add_constraint!(constraints, target_astate_constraint, N:N);
-    # add_constraint!(constraints, normalization_constraint_1, 2:N-1)
-    # add_constraint!(constraints, normalization_constraint_2, 2:N-1)
+    add_constraint!(constraints, normalization_constraint_1, 2:N-1)
+    add_constraint!(constraints, normalization_constraint_2, 2:N-1)
 
     # Instantiate problem and solve.
-    prob = Problem{RobotDynamics.RK6}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
+    prob = Problem{IT_RDI[integrator_type]}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
     opts = SolverOptions(verbose=VERBOSE)
     solver = AugmentedLagrangianSolver(prob, opts)
     if solver_type == alilqr
@@ -238,7 +264,7 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr,
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
         solver.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
-        solver.opts.penalty_max = MAX_PENALTY
+        solver.opts.penalty_max = max_penalty
     elseif solver_type == altro
         solver = ALTROSolver(prob, opts)
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
@@ -246,7 +272,7 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr,
         solver.solver_al.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
         solver.solver_al.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
         solver.solver_al.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
-        solver.solver_al.opts.penalty_max = MAX_PENALTY
+        solver.solver_al.opts.penalty_max = max_penalty
         solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.solver_pn.opts.n_steps = PN_STEPS
     end
@@ -284,6 +310,15 @@ function run_traj(;gate_type=ypiby2, evolution_time=20., solver_type=alilqr,
             write(save_file, "cmax", cmax)
             write(save_file, "cmax_info", cmax_info)
             write(save_file, "dt", dt)
+            write(save_file, "derivative_order", derivative_order)
+            write(save_file, "solver_type", Integer(solver_type))
+            write(save_file, "sqrtbp", Integer(sqrtbp))
+            write(save_file, "max_penalty", max_penalty)
+            write(save_file, "ctol", CONSTRAINT_TOLERANCE)
+            write(save_file, "alko", AL_KICKOUT_TOLERANCE)
+            write(save_file, "ilqr_dj_tol", ILQR_DJ_TOL)
+            write(save_file, "integrator_type", integrator_type)
+            write(save_file, "gate_type", Integer(gate_type))
         end
 
         if postsample
