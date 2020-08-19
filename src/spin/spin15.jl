@@ -98,12 +98,13 @@ function RobotDynamics.dynamics(model::Model{DA, TO}, astate::StaticVector,
 end
 
 
-function run_traj(;evolution_time=60., gate_type=zpiby2,
+function run_traj(;evolution_time=20., gate_type=zpiby2,
                   initial_save_file_path=nothing,
                   initial_save_type=jl, time_optimal=false,
                   decay_aware=false,
-                  solver_type=alilqr, sqrtbp=false,
-                  integrator_type=rk6)
+                  solver_type=altro, sqrtbp=false,
+                  integrator_type=rk6, max_penalty=MAX_PENALTY,
+                  qs=[1e0, 1e0, 1e0, 1e-1, 5e1, 1e-1, 1e2])
     # Convert to trajectory optimization language.
     model = Model(decay_aware, time_optimal)
     n = state_dim(model)
@@ -227,17 +228,16 @@ function run_traj(;evolution_time=60., gate_type=zpiby2,
 
     # Define penalties.
     Q = Diagonal(SVector{n}([
-        fill(1e0, STATE_SIZE_ISO); # state 0
-        fill(1e0, STATE_SIZE_ISO); # state 1
-        fill(1e0, CONTROL_COUNT); # int
-        fill(1e0, CONTROL_COUNT); # control
-        fill(1e-1, CONTROL_COUNT); # dcontrol_dt
-        eval(:($decay_aware ? fill(5e-1, 1) : EMPTY_V)); # int_gamma
+        fill(qs[1], STATE_COUNT * STATE_SIZE_ISO); # state1, state2
+        fill(qs[2], CONTROL_COUNT); # int
+        fill(qs[3], CONTROL_COUNT); # control
+        fill(qs[4], CONTROL_COUNT); # dcontrol_dt
+        fill(qs[5], eval(:($decay_aware ? 1 : 0))); # int_gamma
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([
-        fill(1e-1, CONTROL_COUNT); # d2control_dt2
-        eval(:($time_optimal ? fill(5e2, 1) : EMPTY_V)); # dt
+        fill(qs[6], CONTROL_COUNT); # d2control_dt2
+        fill(qs[7], eval(:($time_optimal ? 1 : 0))); # dt
     ]))
     obj = LQRObjective(Q, R, Qf, xf, N)
 
@@ -272,7 +272,7 @@ function run_traj(;evolution_time=60., gate_type=zpiby2,
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
         solver.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
-        solver.opts.penalty_max = MAX_PENALTY
+        solver.opts.penalty_max = max_penalty
     elseif solver_type == altro
         solver = ALTROSolver(prob, opts)
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
@@ -280,7 +280,7 @@ function run_traj(;evolution_time=60., gate_type=zpiby2,
         solver.solver_al.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
         solver.solver_al.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
         solver.solver_al.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
-        solver.solver_al.opts.penalty_max = MAX_PENALTY
+        solver.solver_al.opts.penalty_max = max_penalty
         solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.solver_pn.opts.n_steps = PN_STEPS
     end
@@ -321,16 +321,16 @@ function run_traj(;evolution_time=60., gate_type=zpiby2,
             write(save_file, "Q", Q_arr)
             write(save_file, "Qf", Qf_arr)
             write(save_file, "R", R_arr)
-            write(save_file, "solver_type", Integer(solver_type))
             write(save_file, "cmax", cmax)
             write(save_file, "cmax_info", cmax_info)
             write(save_file, "solver_type", Integer(solver_type))
             write(save_file, "sqrtbp", Integer(sqrtbp))
-            write(save_file, "max_penalty", MAX_PENALTY)
+            write(save_file, "max_penalty", max_penalty)
             write(save_file, "ctol", CONSTRAINT_TOLERANCE)
             write(save_file, "alko", AL_KICKOUT_TOLERANCE)
             write(save_file, "ilqr_dj_tol", ILQR_DJ_TOL)
-            write(save_file, "integrator_type", integrator_type)
+            write(save_file, "integrator_type", Integer(integrator_type))
+            write(save_file, "gate_type", Integer(gate_type))
         end
         if time_optimal
             # Sample the important metrics.
