@@ -251,8 +251,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     add_constraint!(constraints, control_bnd, 2:N-2)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
     add_constraint!(constraints, target_astate_constraint, N:N);
-    add_constraint!(constraints, normalization_constraint_1, 2:N-1)
-    add_constraint!(constraints, normalization_constraint_2, 2:N-1)
+    # add_constraint!(constraints, normalization_constraint_1, 2:N-1)
+    # add_constraint!(constraints, normalization_constraint_2, 2:N-1)
 
     # Instantiate problem and solve.
     prob = Problem{IT_RDI[integrator_type]}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
@@ -317,7 +317,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
             write(save_file, "ctol", CONSTRAINT_TOLERANCE)
             write(save_file, "alko", AL_KICKOUT_TOLERANCE)
             write(save_file, "ilqr_dj_tol", ILQR_DJ_TOL)
-            write(save_file, "integrator_type", integrator_type)
+            write(save_file, "integrator_type", Integer(integrator_type))
             write(save_file, "gate_type", Integer(gate_type))
         end
 

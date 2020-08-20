@@ -25,29 +25,45 @@ Plots.gr()
     analytic = 2
     derivative = 3
     sample = 4
+    derivative2 = 5
+    sample2 = 6
 end
 
 const PT_STR = Dict(
     qoc => "QOC",
-    analytic => "Analytic",
-    sample => "Sample",
-    derivative => "Derivative"
+    analytic => "Anl.",
+    sample => "S-2",
+    derivative => "D-2",
+    derivative2 => "D-3",
+    sample2 => "S-4"
 )
 
 const PT_MARKER = Dict(
     sample => :circle,
-    derivative => :square,
+    sample2 => :square,
+    derivative2 => :utriangle,
+    derivative => :diamond,
 )
 
 const PT_COLOR = Dict(
     analytic => :lightskyblue,
     qoc => :coral,
-    sample => :green,
-    derivative => :red,
+    sample => :limegreen,
+    sample2 => :darkgreen,
+    derivative => :crimson,
+    derivative2 => :firebrick,
+)
+
+const PT_LINESTYLE = Dict(
+    analytic => :solid,
+    qoc => :solid,
+    sample => :solid,
+    sample2 => :dash,
+    derivative => :solid,
+    derivative2 => :dash,
 )
 
 const GT_LIST = [zpiby2, ypiby2, xpiby2]
-const PT_LIST = [analytic, qoc]
 
 # plotting constants
 const ALPHA_POINT = 0.4
@@ -55,6 +71,9 @@ const MS_DATA = 4
 const MS_POINT = 8
 const FS_AXIS_LABELS = 12
 const FS_AXIS_TICKS = 10
+const FS_ANNOTATE = 10
+const FS_LEGEND = 10
+const FG_COLOR_LEGEND = nothing
 const DPI_FINAL = Integer(1e3)
 
 # common dict keys
@@ -64,6 +83,8 @@ const DATA_FILE_PATH_KEY = 3
 const COLOR_KEY = 4
 const ACORDS_KEY = 5
 const MARKER_KEY = 6
+const LCORDS_KEY = 7
+const DATA2_FILE_PATH_KEY = 8
 
 
 ### ALL ###
@@ -73,7 +94,9 @@ function plot_fidelity_by_gate_count(fidelitiess; inds=nothing, title="", ylims=
                                      xlims=nothing)
     plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     fig = Plots.plot(dpi=DPI_FINAL, ylims=ylims, yticks=yticks, title=title,
-                     legend=legend, yscale=yscale, xlims=xlims)
+                     legend=legend, yscale=yscale, xlims=xlims,
+                     tickfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS,
+                     legendfontsize=FS_LEGEND, foreground_color_legend=FG_COLOR_LEGEND)
     gate_count = size(fidelitiess[1])[1] - 1
     gate_count_axis = Array(0:1:gate_count)
     if isnothing(inds)
@@ -138,7 +161,7 @@ F1_PULSE_DATA = Dict(
     ),
 )
 
-
+const F1A_PT_LIST = [analytic, qoc]
 function make_figure1a()
     plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     save_file_paths = []; save_types = []; labels = []; colors = [];
@@ -146,14 +169,14 @@ function make_figure1a()
     for (i, gate_type) in enumerate(instances(GateType))
         subfig = Plots.plot()
         if i == 2
-            Plots.ylabel!(subfig, "Amplitude (GHz)")
+            Plots.ylabel!(subfig, latexstring("\$a \\ \\textrm{(GHz)}\$"))
         elseif i == 3
-            Plots.xlabel!(subfig, "Time (ns)")
+            Plots.xlabel!(subfig, latexstring("\$t \\ \\textrm{(ns)}\$"))
         end
         text_ = GT_STR[gate_type]
         (ax, ay) = F1_PULSE_DATA[gate_type][analytic][ACORDS_KEY]
-        Plots.annotate!(subfig, ax, ay, text(text_, 10))
-        for pulse_type in PT_LIST
+        Plots.annotate!(subfig, ax, ay, text(text_, FS_ANNOTATE))
+        for pulse_type in F1A_PT_LIST
             if pulse_type == analytic
                 linestyle = :solid
             elseif pulse_type == qoc
@@ -174,7 +197,8 @@ function make_figure1a()
     end
     layout = @layout [a; b; c]
     fig = Plots.plot(subfigs[1], subfigs[2], subfigs[3], layout=layout, dpi=DPI_FINAL,
-                     tickfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS)
+                     ticksfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS,
+                     legendfontsize=FS_LEGEND, foreground_color_legend=FG_COLOR_LEGEND)
     Plots.savefig(fig, plot_file_path)
     println("Saved Figure1a to $(plot_file_path)")
 end
@@ -241,9 +265,12 @@ function make_figure1c()
     t1s_fit =  map(amp_t1_spline_cubic, amps_fit)
     amps_data = -1 .* map(fbfq_amp_lo, FBFQ_ARRAY)
     t1s_data = T1_ARRAY
-    fig = Plots.plot(dpi=DPI_FINAL, legend=:bottomright, yscale=:log10)
-    Plots.plot!(amps_fit, t1s_fit, label="Fit", color=:mediumaquamarine)
-    Plots.scatter!(amps_data, t1s_data, label="Data", marker=(:circle, MS_DATA),
+    t1s_data_err = T1_ARRAY_ERR
+    fig = Plots.plot(dpi=DPI_FINAL, legend=:bottomright, yscale=:log10,
+                     tickfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS,
+                     legendfontsize=FS_LEGEND, foreground_color_legend=FG_COLOR_LEGEND)
+    Plots.plot!(amps_fit, t1s_fit, label=nothing, color=:mediumaquamarine)
+    Plots.scatter!(amps_data, t1s_data, yerror=t1s_data_err, label=nothing, marker=(:circle, MS_DATA),
                    color=:mediumorchid)
     for gate_type in GT_LIST
         for pulse_type in keys(F1_PULSE_DATA[gate_type])
@@ -261,7 +288,7 @@ function make_figure1c()
                         marker=(marker, MS_F1C), color=avg_color, alpha=ALPHA_F1C)
         end
     end
-    Plots.xlabel!("Avg. Amplitude (GHz)")
+    Plots.xlabel!(latexstring("\$ {<a>}_{t} \\textrm{(GHz)} \$"))
     Plots.ylabel!(latexstring("\$T_1 \\ \\textrm{(ns)}\$"))
     Plots.xlims!((-0.02, max_amp))
     plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
@@ -275,31 +302,81 @@ F2_PULSE_DATA = Dict(
     derivative => Dict(
         SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00091_spin11.h5"),
         SAVE_TYPE_KEY => jl,
-        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00092_spin11.h5")
+        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00092_spin11.h5"),
+        LCORDS_KEY => (45, 0.2),
+    ),
+    derivative2 => Dict(
+        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00110_spin11.h5"),
+        SAVE_TYPE_KEY => jl,
+        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00111_spin11.h5"),
+        LCORDS_KEY => (45, 0.2),
     ),
     sample => Dict(
         SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00132_spin12.h5"),
         SAVE_TYPE_KEY => jl,
-        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00200_spin12.h5")
+        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00200_spin12.h5"),
+        LCORDS_KEY => (30, 0.2),
     ),
     analytic => Dict(
         SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00004_spin14.h5"),
         SAVE_TYPE_KEY => py,
-        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00028_spin14.h5")
+        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00028_spin14.h5"),
+        LCORDS_KEY => (20, 0.05),
+    ),
+    sample2 => Dict(
+        SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00229_spin12.h5"),
+        SAVE_TYPE_KEY => jl,
+        DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00231_spin12.h5"),
+        LCORDS_KEY => (30, 0.2),
     ),
 )
 
-
+F2A_PT_LIST = [[analytic], [sample, sample2,], [derivative, derivative2]]
 """
 Show the pulses.
 """
 function make_figure2a()
-    return
+    plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
+    save_file_paths = []; save_types = []; labels = []; colors = [];
+    subfigs = []
+    for (i, pulse_types) in enumerate(F2A_PT_LIST)
+        subfig = Plots.plot()
+        if i == 2
+            Plots.ylabel!(subfig, latexstring("\$a \\ \\textrm{(GHz)}\$"))
+        elseif i == 3
+            Plots.xlabel!(subfig, latexstring("\$ t \\ \\textrm{(ns)}\$"))
+        end
+        for (j, pulse_type) in enumerate(pulse_types)
+            data = F2_PULSE_DATA[pulse_type]
+            color = PT_COLOR[pulse_type]
+            label = "$(PT_STR[pulse_type])"
+            linestyle = PT_LINESTYLE[pulse_type]
+            save_file_path = data[SAVE_FILE_PATH_KEY]
+            save_type = data[SAVE_TYPE_KEY]
+            (controls, evolution_time) = grab_controls(save_file_path; save_type=save_type)
+            (control_eval_count, control_count) = size(controls)
+            control_eval_times = Array(1:1:control_eval_count) * DT_PREF
+            Plots.plot!(subfig, control_eval_times, controls[:,1], color=color, label=label,
+                        linestyle=linestyle, legend=:none)
+        end
+        push!(subfigs, subfig)
+    end
+    layout = @layout [a; b; c]
+    fig = Plots.plot(
+        subfigs[1], subfigs[2], subfigs[3], layout=layout, dpi=DPI_FINAL,
+        ticksfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS,
+        legendfontsize=FS_LEGEND, foreground_color_legend=FG_COLOR_LEGEND,
+        legend=:outerbottomright
+    )
+    Plots.savefig(fig, plot_file_path)
+    println("Saved Figure1a to $(plot_file_path)")
 end
 
 
 const F2B_TRIAL_COUNT = Integer(1e3)
 const F2B_FQ_DEV = 1e-1
+# TODO: add derivative2
+const PT_LIST_F2B = [analytic, sample, sample2, derivative, derivative2]
 """
 Show gate error vs. detuning
 """
@@ -326,68 +403,272 @@ function make_figure2b()
     end
 
     # plot
-    fig = Plots.plot(dpi=DPI, yticks=[0.985, 0.99, 0.995, 1.00], ylim=(0.985, 1.0),
-                     xlim=(minimum(fq_devs), maximum(fq_devs)))
-    for pulse_type in keys(F2_PULSE_DATA)
+    fig = Plots.plot(dpi=DPI_FINAL, yticks=[0, 0.0025, 0.005, 0.0075], ylim=(0., 0.0075),
+                     xlim=(minimum(fq_devs), maximum(fq_devs)), xticks=[-0.1, -0.05, 0, 0.05, 0.1],
+                     legend=:none,
+                     tickfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS,
+                     legendfontsize=FS_LEGEND, foreground_color_legend=FG_COLOR_LEGEND)
+    for pulse_type in PT_LIST_F2B
         pulse_data = F2_PULSE_DATA[pulse_type]
         label = "$(PT_STR[pulse_type])"
+        linestyle = PT_LINESTYLE[pulse_type]
         color = PT_COLOR[pulse_type]
         data_file_path = pulse_data[DATA_FILE_PATH_KEY]
         (fidelities,) = h5open(data_file_path, "r") do data_file
             fidelities = read(data_file, "fidelities")
             return (fidelities,)
         end
-        Plots.plot!(fig, fq_devs, fidelities, label=label, color=color)
+        Plots.plot!(fig, fq_devs, 1 .- fidelities, label=label, color=color,
+                    linestyle=linestyle)
                     
     end
     plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     Plots.xlabel!(L"$\delta \omega_{q} / \omega_{q}$")
-    Plots.ylabel!("Fidelity")
+    Plots.ylabel!("Gate Error")
     Plots.savefig(fig, plot_file_path)
     println("Plotted Figure2b to $(plot_file_path)")
 end
 
-F2C_GATE_TIMES = [60, 70, 80, 90, 100, 110, 120]
+F2C_GATE_TIMES = [50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160]
 F2C_PULSE_DATA = Dict(
     sample => Dict(
         F2C_GATE_TIMES[1] => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00138_spin12.h5"),
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00246_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00247_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00198_spin12.h5"),
             SAVE_TYPE_KEY => jl,
         ),
         F2C_GATE_TIMES[2] => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00145_spin12.h5"),
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00248_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00249_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00138_spin12.h5"),
             SAVE_TYPE_KEY => jl,
         ),
         F2C_GATE_TIMES[3] => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00147_spin12.h5"),
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00250_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00251_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00145_spin12.h5"),
             SAVE_TYPE_KEY => jl,
         ),
         F2C_GATE_TIMES[4] => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00148_spin12.h5"),
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00252_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00253_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00147_spin12.h5"),
             SAVE_TYPE_KEY => jl,
         ),
         F2C_GATE_TIMES[5] => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00150_spin12.h5"),
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00254_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00255_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00148_spin12.h5"),
             SAVE_TYPE_KEY => jl,
         ),
         F2C_GATE_TIMES[6] => Dict(
-            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00151_spin12.h5"),
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00256_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00257_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00150_spin12.h5"),
             SAVE_TYPE_KEY => jl,
         ),
         F2C_GATE_TIMES[7] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00258_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00259_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00151_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[8] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00260_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00261_spin12.h5"),
             SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00153_spin12.h5"),
             SAVE_TYPE_KEY => jl,
         ),
+        F2C_GATE_TIMES[9] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00262_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00263_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00197_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[10] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00264_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00265_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00201_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[11] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00266_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00267_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00202_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[12] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00268_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00269_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00203_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
     ),
-    # derivative => Dict(
-    # ),
+    sample2 => Dict(
+        F2C_GATE_TIMES[1] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00270_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00271_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00236_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[2] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00272_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00273_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00233_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[3] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00274_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00275_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00234_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[4] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00276_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00277_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00235_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[5] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00278_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00279_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00239_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[6] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00280_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00281_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00241_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[7] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00282_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00283_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00240_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[8] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00284_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00285_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00238_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[9] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00286_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00287_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00243_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[10] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00288_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00289_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00242_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[11] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00290_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00291_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00245_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[12] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00292_spin12.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00293_spin12.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin12/00244_spin12.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+    ),
+    derivative => Dict(
+        F2C_GATE_TIMES[1] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00117_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00118_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00105_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[2] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00119_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00120_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00098_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[3] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00121_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00122_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00100_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[4] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00123_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00124_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00099_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[5] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00125_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00126_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00101_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[6] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00127_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00128_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00102_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[7] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00129_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00130_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00103_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[8] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00131_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00132_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00107_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[9] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00133_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00134_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00104_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[10] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00135_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00136_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00106_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[11] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00137_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00138_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00108_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[12] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00139_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00140_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00109_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+    ),
 )
+const F2C_PT_LIST = [sample, sample2, derivative] # TODO: add derivative2
 function make_figure2c()
     gate_type = xpiby2
-    
     # get data and plot
-    fig = Plots.plot(dpi=DPI_FINAL, legend=:bottomright)
-    for pulse_type in keys(F2C_PULSE_DATA)
+    fig = Plots.plot(
+        dpi=DPI_FINAL, legend=:bottomleft,
+        ticksfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS,
+        legendfontsize=FS_LEGEND, foreground_color_legend=FG_COLOR_LEGEND,
+        ylims=[0, 0.005], yticks=[0., 0.001, 0.002, 0.003, 0.004, 0.005],
+        xticks=F2C_GATE_TIMES
+    )
+    Plots.xlabel!(fig, latexstring("\$t_{N} \\textrm{(ns)}\$"))
+    Plots.ylabel!(fig, latexstring("\$ \\textrm{Avg. Gate Error at} \\ \\omega_{q} "
+                                   * "\\pm 0.05 \\omega_{q}\$"))
+    for pulse_type in F2C_PT_LIST
         label = "$(PT_STR[pulse_type])"
         color = PT_COLOR[pulse_type]
         marker = PT_MARKER[pulse_type]
@@ -396,16 +677,24 @@ function make_figure2c()
             data = F2C_PULSE_DATA[pulse_type][gate_time]
             save_file_path = data[SAVE_FILE_PATH_KEY]
             save_type = data[SAVE_TYPE_KEY]
-            data_file_path1 = run_sim_deqjl(
-                1, gate_type; save_file_path=save_file_path,
-                save_type=save_type, dynamics_type=schroed, dt=1e-3,
-                negi_h0=S1FQ_NEGI_H0_ISO,
-            )
-            data_file_path2 = run_sim_deqjl(
-                1, gate_type; save_file_path=save_file_path,
-                save_type=save_type, dynamics_type=schroed, dt=1e-3,
-                negi_h0=S2FQ_NEGI_H0_ISO,
-            )
+            if !(DATA_FILE_PATH_KEY in keys(data))
+                data_file_path1 = run_sim_deqjl(
+                    1, gate_type; save_file_path=save_file_path,
+                    save_type=save_type, dynamics_type=schroed, dt=1e-3,
+                    negi_h0=S1FQ_NEGI_H0_ISO,
+                )
+            else
+                data_file_path1 = data[DATA_FILE_PATH_KEY]
+            end
+            if !(DATA2_FILE_PATH_KEY in keys(data))
+                data_file_path2 = run_sim_deqjl(
+                    1, gate_type; save_file_path=save_file_path,
+                    save_type=save_type, dynamics_type=schroed, dt=1e-3,
+                    negi_h0=S2FQ_NEGI_H0_ISO,
+                )
+            else
+                data_file_path2 = data[DATA2_FILE_PATH_KEY]
+            end
             (fidelity1,) = h5open(data_file_path1, "r") do data_file1
                 fidelity1 = read(data_file1, "fidelities")[end]
                 return (fidelity1,)
@@ -414,11 +703,11 @@ function make_figure2c()
                 fidelity2 = read(data_file2, "fidelities")[end]
                 return (fidelity2,)
             end
-            fidelity = mean([fidelity1, fidelity2])
+            gate_error = 1 - mean([fidelity1, fidelity2])
 
             # plot
             label = i == 1 ? label : nothing
-            Plots.scatter!(fig, [gate_time], [fidelity], label=label, color=color,
+            Plots.scatter!(fig, [gate_time], [gate_error], label=label, color=color,
                            marker=(marker, MS_DATA))
         end
     end
@@ -483,4 +772,11 @@ function make_figure3a()
     end
     plot_file_path = plot_fidelity_by_gate_count(fidelitiess; labels=labels, colors=colors)
     println("Plotted Figure3a to $(plot_file_path)")
+end
+
+
+function make_figure1()
+    make_figure1a()
+    make_figure1b()
+    make_figure1c()
 end
