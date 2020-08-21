@@ -74,11 +74,12 @@ end
 
 
 function fbfq_dfq_helin(fbfq)
+    dfbfq = fbfq - 0.5
     delta = 0.014 * 2 * pi / 2
     A = 0.15 * 2 * pi
     B = 0.06
-    dfq = (2 * A^2 * abs(fbfq) / B / sqrt(A^2 * fbfq^2 + B^2 * delta^2))
-    return dfq
+    dfq = (2 * A^2 * dfbfq / B / sqrt(A^2 * dfbfq^2 + B^2 * delta^2))
+    return dfq / (2 * pi)
 end
 
 function fit_dfq(;plot=false, save=false, pull=false)
@@ -91,12 +92,12 @@ function fit_dfq(;plot=false, save=false, pull=false)
     else
         fqs = zeros(size(FBFQ_SAMPLES)[1])
         dfqs = zeros(size(FBFQ_SAMPLES)[1])
-        # dfqhs = zeros(size(FBFQ_SAMPLES)[1])
+        dfqhs = zeros(size(FBFQ_SAMPLES)[1])
         for (i, fbfq) in enumerate(FBFQ_SAMPLES)
             fqs[i] = fbfq_fq(fbfq)
             (dfq,) = Zygote.gradient(fbfq_fq, fbfq)
             dfqs[i] = real(dfq)
-            # dfqhs[i] = fbfq_dfq_helin(fbfq)
+            dfqhs[i] = fbfq_dfq_helin(fbfq)
         end
     end
 
@@ -120,7 +121,7 @@ function fit_dfq(;plot=false, save=false, pull=false)
         Plots.scatter!(fig, FBFQ_SAMPLES, dfqs, label="dfq", alpha=ALPHA, markersize=MS)
         # Plots.plot!(fig, FBFQ_SAMPLES, dfqs_poly, label="dfq poly")
         Plots.plot!(fig, FBFQ_SAMPLES, dfqs_dierckx, label="dfq dierckx")
-        # Plots.plot!(fig, FBFQ_SAMPLES, dfqhs, label="dfqh")
+        Plots.plot!(fig, FBFQ_SAMPLES, dfqhs, label="dfqh")
         Plots.xlabel!(L"$\Phi / \Phi_{0}$")
         Plots.ylabel!("Amp (GHz)")
         Plots.savefig(fig, DFQ_PLOT_FILE_PATH)

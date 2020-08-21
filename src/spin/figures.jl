@@ -653,8 +653,82 @@ F2C_PULSE_DATA = Dict(
             SAVE_TYPE_KEY => jl,
         ),
     ),
+    derivative2 => Dict(
+        F2C_GATE_TIMES[1] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00148_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00149_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00141_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[2] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00150_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00151_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00114_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[3] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00152_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00153_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00115_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[4] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00154_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00155_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00113_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[5] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00156_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00157_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00143_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[6] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00158_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00159_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00145_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[7] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00160_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00161_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00112_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[8] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00162_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00163_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00116_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[9] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00164_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00165_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00147_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[10] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00166_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00167_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00142_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[11] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00168_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00169_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00144_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+        F2C_GATE_TIMES[12] => Dict(
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00170_spin11.h5"),
+            DATA2_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00171_spin11.h5"),
+            SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin11/00146_spin11.h5"),
+            SAVE_TYPE_KEY => jl,
+        ),
+    ),
 )
-const F2C_PT_LIST = [sample, sample2, derivative] # TODO: add derivative2
+const F2C_PT_LIST = [sample, sample2, derivative, derivative2]
 function make_figure2c()
     gate_type = xpiby2
     # get data and plot
