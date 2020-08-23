@@ -27,7 +27,21 @@
 
 %% ABSTRACT
 \begin{abstract}
-  This is a paper about robust quantum optimal control.
+  %% - 1 + 2 topic importance
+  %% - 1 what I have done
+  %% - few sentences about primary results
+  The ability to engineer high fidelity operations on quantum processors in the presence of
+  decoherence and systematic errors remains the primary challenge to achieving quantum advantage.
+  Quantum optimal control (QOC) techniques have been developed to mitigate deleterious effects
+  by manipulating the time-dependent parameters controlling the system. These techniques often
+  target a single error channel and may be incompatible with experimental constraints. 
+  In this work, we develop techniques to simultaneously mitigate
+  longitudinal relaxation and pure dephasing in a framework that may impose arbitrary
+  experimental constraints.
+  Optimizing a gate set for a fluxonium qubit as an example, we achieve a factor of 4 increase in
+  longitudinal relaxation times and outperform
+  existing dynamic decoupling methods in mitigating pure dephasing, achieving
+  high fidelity gates in the presence of parameter spreads up to $5\%$.
 \end{abstract}
 
 \maketitle
@@ -35,74 +49,92 @@
 
 %% S1
 \section{Introduction}
-(Existing work) The leading model of universal
-quantum computation is gate-based. The Quantum Optimal Control (QOC)
-literature has saught to construct techniques for engineering waveforms to manipulate
-quantum systems with high fidelity.
-Analytic methods
-have been demonstrated to construct quantum gates
-\cite{zhang2020universal, huang2020engineering, han2020experimental,
-  xu2020nonadiabatic, carlini2005quantum}.
-Most methods rely on solving the time-dependent
-Schroedinger equation analytically or deriving equations of motion
-from a suitable Lagrangian.
+%% P1 - general field, lots of citation. cite reviews, original qoc.
+%% P2 - exhaustively find all papers, what people have done to address the issues
+%% P3 - what we do is. maybe add a rant about how
+%% QOC is classical control theory but we've ignored that field
+%% P4 - outline
+(The field) The field of quantum optimal control (QOC) is concerned
+with improving the efficiency and accuracy with which quantum systems
+are manipulated.
+Early QOC techniques were proposed for nuclear magnetic resonance experiments
+\cite{khaneja2005optimal}, and applications now include superconducting
+qubits \cite{heeres2017implementing,
+  leng2019robust, leung2017speedup, xu2020nonadiabatic},
+neutral atoms and ion traps \cite{van2016optimal}, nitrogen-vacancy centers in
+diamonds \cite{rembold2020introduction}, and Bose-Einstien condensates
+\cite{sorensen2018quantum}.
+In quantum control theory, as in classical control theory,
+optimization is performed
+to minimize an objective function. Relevant for the field
+of quantum computation is the task of achieving high fidelity quantum gates.
+In this application, the objective function includes contributions from the
+gate error associated with the state transfer of the system as well as contributions
+due to the decoherence of the system, such as the evolution time of the gate.
+The decision variables of the optimization problem are the time-dependent control
+parameters, particular to the quantum system, that govern its evolution.
 
-Some analytical methods
-have been presented to address realistic experimental constraints.
+(Existing work) Many analytic and numerical techniques have been developed to control
+quantum systems. Analytic methods rely on solving the time-dependent
+Schroedinger equation analytically or deriving equations of motion
+from a suitable Lagrangian \cite{zhang2020universal, huang2020engineering, han2020experimental,
+  xu2020nonadiabatic, carlini2005quantum}. Analytic methods
+have been presented to address decoherence in quantum systems.
 Considering the dynamical and geometric phases of state
 evolution has led to methods for achieving
-robustness to pure dephasing in quantum systems
+robustness to dynamical errors and mitigating pure dephasing
 \cite{xu2020nonadiabatic, han2020experimental, merrill2014progress}.
-Additionally, suitable choices of bases have been demonstrated that
-allow the experimentalist to infer tradeoffs in longitudinal
+Additionally, suitable choices of bases have been proposed that
+allow the experimentalist to infer tradeoffs in longitudinal relaxation
 and pure dephasing coherence times \cite{huang2020engineering}.
 To date, however, no analytical method has been presented
-to construct a gate while satisfying all relevant experimental
+to construct a gate while satisfying arbitrary experimental
 constraints. Furthermore, most analytic methods have only
 been demonstrated in the two-level approximation and become
 cumbersome to solve for larger Hilbert space sizes.
 
 Numerical quantum control techniques have developed in parallel
-with the analytic frameworks. Numerical quantum control
-techniques integrate the time-dependent Schroedinger
-equation and use sensitivity analysis to optimize target metrics
-of the quantum gate, such as fidelity
-\cite{leung2017speedup,  goerz2019krotov, doria2011optimal,
+with analytic frameworks.
+Most numerical techniques proposed for QOC are indirect shooting
+methods where an initial guess for the control trajectory is forward-simulated,
+e.g. under the time-dependent-Schroedinger-equation,
+and first-order gradients are computed for a functional evaluated
+on the state of the evolved system \cite{leung2017speedup,  goerz2019krotov, doria2011optimal,
   abdelhafez2019gradient, machnes2015gradient, leng2019robust}.
-These techniques typically employ zeroth- or first-order
-optimizers and make no garauntees of optimality.
-Further, they formulate the quantum control
+Most techniques formulate the
 problem as unconstrained or use
 projective gradient methods to enforce constraints
 \cite{machnes2015gradient}.
 The latter approach relies on constructing
 bases for constraint spaces--which is not always feasible--and
-may hinder convergence.
+may hinder convergence. Methods for mitigating decoherence using numerical
+techniques have employed master equation dynamics (citation needed),
+Monte Carlo style trajectories \cite{abdelhafez2019gradient},
+and proposals have been made to simulate multiple trajectories
+\cite{reinhold2019controlling, rembold2020introduction}.
 
-(This work) We employ the trajectory optimization
-literature to formulate the quantum
+(This work) In this work, we employ state of the art
+trajectory optimization methods
+to formulate the quantum
 optimal control problem as a constrained optimization problem.
 The trajectory optimization framework allows us to handle arbitrary
 constraints on the evolution of the quantum state. Additionally,
-we introduce methods for constructing gates robust to longitudinal
-relaxation and pure dephasing, the dominant barriers to experimentally
+we introduce methods for constructing gates that mitigate longitudinal
+relaxation and are robust to experimental errors, and therefore
+pure dephasing, the dominant barriers to experimentally
 realizing practical quantum computing.
 
-We study the quantum optimal control problem on the fluxonium qubit.
-We outline experimentally realistic constraints and map them to
-the trajectory optimization framework. For the device we study
-we achieve a 2.5x decrease in longitudinal relaxation probability.
-We present two methods for achieving robustness to pure dephasing,
-and compare them to existing dynamic decoupling methods. We find that 
-our methods mitigate dephasing by order X over dynamic decoupling.
-
-(Outline)  First we formulate the quantum optimal control problem
-in the trajectory optimization framework. Then, we introduce the dynamics
-of the fluxonium device and outline experimental considerations
-relevant to gate construction. Next we outline a method for
-making the optimization longitudinal relaxation aware. Finally, we present
-some methods for engineering robustness to pure dephasing and
-compare them to existing techniques.
+(Outline) As an example, we study the quantum optimal control problem on
+the fluxonium qubit presented in \cite{zhang2020universal}.
+We describe experimentally realistic constraints and map them to
+the trajectory optimization framework. Next, we
+outline a method for making the optimization longitudinal
+relaxation aware. We achieve a 4x decrease in longitudinal relaxation times
+over the baseline gate set.
+We present two methods for achieving robustness to pure dephasing
+and compare them to existing dynamic decoupling methods. We find that
+the methods we employ outperform dynamic decoupling, producing
+high fidelity gates at system parameter spreads of $5\%$.
 
 
 %% S2
@@ -207,21 +239,21 @@ updates, see \cite{howell2019altro}.
 
 
 %% F4.1
-%% TODO: Update images. Use new gates constructed with
-%% spline T1 and use smaller sim times.
-\begin{figure*}[ht]
-  \begin{subfigure}{.3\linewidth}
-    \includegraphics[width=\linewidth]{assets/00045_spin16.png}
+\begin{figure}[ht]
+  \begin{subfigure}{\linewidth}
+    \includegraphics[width=\linewidth]{assets/f1a.png}
   \end{subfigure}
-  \begin{subfigure}{.3\linewidth}
-    \includegraphics[width=\linewidth]{assets/00047_spin16.png}
+  \begin{subfigure}{\linewidth}
+    \includegraphics[width=\linewidth]{assets/f1b.png}
   \end{subfigure}
-  \begin{subfigure}{.3\linewidth}
-    \includegraphics[width=\linewidth]{assets/00049_spin16.png}
+  \begin{subfigure}{\linewidth}
+    \includegraphics[width=\linewidth]{assets/f1c.png}
   \end{subfigure}
-  \caption{Master equation simulation with $T_{1}$ dissipation for all basis gates,
-    comparing the performance of the analytic gates and the $T_{1}$ optimized QOC gates.}
-\end{figure*}
+  \caption{(a) $T_{1}$ optimized gates (orange) and analytic gates (blue). (b) Master equation simulation with $T_{1}$ dissipation
+    for all gates, over the course of concatenated gate applications. (c) $T_{1}$ interpolation function used in optimization
+    and the corresponding $T_{1}$ times for the average absolute amplitude of each gate.}
+\end{figure}
+
 
 %% S3
 \section{QOC on the Fluxonium}
@@ -323,7 +355,7 @@ pure dephasing.
 
 
 %% S4
-\section{Robustness to Longitudinal Relaxation}
+\section{Longitudinal Relaxation Awareness}
 (Strategy) We seek to minimize the probability
 that the qubit decays as a result of longitudinal
 relaxation. To this end we add the
@@ -385,14 +417,15 @@ of time as shown in Fig. 1.
 %% long idle times at the flux frustration point for Z/2 and X/2. It
 %% might be a more fair comparison to show gates that have better T1s
 %% and as good flux noise mitigation.
+
 \begin{table}[ht]
   \begin{tabular}{c | c | c | c}
     & Analytic  & QOC &\\
     Gate & $P_{1}\ (10^{-5})$ & $P_{1}\ (10^{-5})$ & Speedup\\
     \hline
-    Z/2 & 5.745 & 2.144 & 2.680\\
-    Y/2 & 5.253 & 2.011 & 2.612\\
-    X/2 & 16.251 & 6.234 & 2.607\\
+    Z/2 & 5.745 & 1.469 & 3.911\\
+    Y/2 & 5.253 & 1.400 & 3.752\\
+    X/2 & 16.251 & 6.946 & 2.340\\
   \end{tabular}
   \caption{Probability of longitudinal relaxation for each gate
     evaluated at the gate's duration.}
@@ -400,39 +433,41 @@ of time as shown in Fig. 1.
 
 
 %% F5.1
-%% TODO: Make this figure for real. Add inset to second figure
-%% to show high performing variants at high time steps
-\begin{figure}
+\begin{figure}[ht]
   \begin{subfigure}{\linewidth}
     \label{fig:5.1:a}
-    \includegraphics[width=\linewidth]{assets/00005_spin12_hpsweep.png}
+    \includegraphics[width=\linewidth]{assets/f2a.png}
   \end{subfigure}
   
   \begin{subfigure}{\linewidth}
-    \includegraphics[width=\linewidth]{assets/00006_spin12_hpsweep.png}
     \label{fig:5.1:b}
+    \includegraphics[width=\linewidth]{assets/f2b.png}
   \end{subfigure}
-  \caption{\centering Robustness to qubit frequency detuning for
-    the (2, 4)-point sampling method, (2\textsuperscript{nd}, 3\textsuperscript{rd})
-    order derivative method, and CORPSE pulses for the $R_{x}(\pi/2)$ gate.
-    (a) Gate fidelity as a function of the qubit frequency detuning.
-    (b) Gate fidelity at one standard deviation from the nominal qubit frequency
-    as a function of time.
+  
+  \begin{subfigure}{\linewidth}
+    \includegraphics[width=\linewidth]{assets/f2c.png}
+    \label{fig:5.1:c}
+  \end{subfigure}
+  
+  \caption{\centering (a) $X/2$ gates constructed from the analytic, (2, 4)-point
+    sampling, and (2, 3)-derivative robustness methods at a gate duration of $56.8 (ns)$.
+    (b) Gate error as a function of qubit frequency detuning from the nominal frequency.
+    (c) Average gate error at one standard deviation from the nominal qubit frequency as
+    a function fo the gate duration.
   }
 \end{figure}
 
 %% F5.2
 %% TODO: Make this figure.
-\begin{figure}
+\begin{figure}[ht]
   \includegraphics[width=\linewidth]{assets/t2_temp.jpg}
   \caption{Robustness to $T_{\phi}$-type noise for the
     the (2, 4)-point sampling method, (2\textsuperscript{nd}, 3\textsuperscript{rd})
     order derivative method, and B2CORPSE pulse for the $R_{x}(\pi/2)$ gate.}
 \end{figure}
 
-
 %% S5
-\section{Robustness to Pure Dephasing}
+\section{Robustness to Parameter Deviations}
 (Strategy) For the fluxonium, pure dephasing acts
 along the flux axis. Low frequency 1/$f$ noise,
 Johnson-Nyquist current noise present in the flux bias
