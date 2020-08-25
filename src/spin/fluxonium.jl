@@ -3,6 +3,8 @@ fluxonium.jl - do some calculations for fluxonium
 """
 
 using Dierckx
+using Distributions
+using FFTW
 using HDF5
 using Interpolations
 using LaTeXStrings
@@ -14,47 +16,35 @@ using Printf
 using StaticArrays
 using Zygote
 
+WDIR = get(ENV, "RBQOC_PATH", "../../")
+include(joinpath(WDIR, "src", "spin", "spin.jl"))
+
 # Construct paths.
-EXPERIMENT_META = "spin"
-EXPERIMENT_NAME = "figures"
-WDIR = ENV["ROBUST_QOC_PATH"]
-SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
-DFQ_PLOT_FILE_PATH = joinpath(SAVE_PATH, "dfq.png")
-DFQ_DATA_FILE_PATH = joinpath(SAVE_PATH, "dfq.h5")
-
-# Plotting configuration.
-ENV["GKSwstype"] = "nul"
-Plots.gr()
-DPI = 300
-MS = 2
-ALPHA = 0.2
-
-# Define experimental constants.
-# E / h e-9
-EC = 0.479
-EL = 0.132
-EJ = 3.395
+const EXPERIMENT_META = "spin"
+const EXPERIMENT_NAME = "figures"
+const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
+const DFQ_PLOT_FILE_PATH = joinpath(SAVE_PATH, "dfq.png")
+const DFQ_DATA_FILE_PATH = joinpath(SAVE_PATH, "dfq.h5")
+const DELTAFQ_PLOT_FILE_PATH = joinpath(SAVE_PATH, "deltafq.png")
 
 ## SYSTEM DEFINITION ##
 # FLUXONIUM_STATE_COUNT is the state count used in the T1 calculations
-FLUXONIUM_STATE_COUNT = 110
-FLUXONIUM_LEVELS = Array(range(0., stop=FLUXONIUM_STATE_COUNT - 1,
+const FLUXONIUM_STATE_COUNT = 110
+const FLUXONIUM_LEVELS = Array(range(0., stop=FLUXONIUM_STATE_COUNT - 1,
                                length=FLUXONIUM_STATE_COUNT))
-SQRT_FLUXONIUM_LEVELS_TRUNC = map(sqrt, FLUXONIUM_LEVELS[2:FLUXONIUM_STATE_COUNT])
-ANNIHILATE = diagm(1 => SQRT_FLUXONIUM_LEVELS_TRUNC)
-CREATE = diagm(-1 => SQRT_FLUXONIUM_LEVELS_TRUNC)
-E_PLASMA = sqrt(8 * EL * EC)
-PHI_OSC = (8 * EC / EL)^(1//4)
-PHI_OP = PHI_OSC * 2^(-1//2) * (CREATE + ANNIHILATE)
-H_EXP_RAW = exp(1im * PHI_OP)
-H_LC = diagm(E_PLASMA * FLUXONIUM_LEVELS)
+const SQRT_FLUXONIUM_LEVELS_TRUNC = map(sqrt, FLUXONIUM_LEVELS[2:FLUXONIUM_STATE_COUNT])
+const ANNIHILATE = diagm(1 => SQRT_FLUXONIUM_LEVELS_TRUNC)
+const CREATE = diagm(-1 => SQRT_FLUXONIUM_LEVELS_TRUNC)
+const PHI_OP = PHI_OSC * 2^(-1//2) * (CREATE + ANNIHILATE)
+const H_EXP_RAW = exp(1im * PHI_OP)
+const H_LC = diagm(E_PLASMA * FLUXONIUM_LEVELS)
 
 ## DOMEGA FIT ##
-FBFQ_MIN = 0.3987965
-FBFQ_MAX = 1 - FBFQ_MIN
-FBFQ_SAMPLE_COUNT = Integer(1e3)
-FBFQ_SAMPLES = Array(range(FBFQ_MIN, stop=FBFQ_MAX, length=FBFQ_SAMPLE_COUNT))
-FBFQ_DFQ_POLYDEG = 10
+const FBFQ_MIN = 0.3987965
+const FBFQ_MAX = 1 - FBFQ_MIN
+const FBFQ_SAMPLE_COUNT = Integer(1e3)
+const FBFQ_SAMPLES = Array(range(FBFQ_MIN, stop=FBFQ_MAX, length=FBFQ_SAMPLE_COUNT))
+const FBFQ_DFQ_POLYDEG = 10
 
 function fbfq_hamiltonian(fbfq)
     reduced_flux = 2 * pi * fbfq
@@ -81,6 +71,7 @@ function fbfq_dfq_helin(fbfq)
     dfq = (2 * A^2 * dfbfq / B / sqrt(A^2 * dfbfq^2 + B^2 * delta^2))
     return dfq / (2 * pi)
 end
+
 
 function fit_dfq(;plot=false, save=false, pull=false)
     if pull
@@ -126,4 +117,39 @@ function fit_dfq(;plot=false, save=false, pull=false)
         Plots.ylabel!("Amp (GHz)")
         Plots.savefig(fig, DFQ_PLOT_FILE_PATH)
     end
+end
+
+
+function generate_flux_noise(;plot=false, dtinv=1e2, dt=1e-2)
+    h_ff = fbfq_hamiltonian(0.5)
+    evecs = eigvecs(Hermitian(h_ff))
+    gphie_ff = evecs[:,1]' * PHI_OP * evecs[:, 2]
+    dfq_dfbfq = 4 * pi * gphie_ff * EL
+    Random.seed!(0)
+    delta_fqs = FBFQ_NAMP * dfq_dfbfq * rand(FBFQ_NDIST, FBFQ_SAMPLE_COUNT)
+    # delta_fqs = FBFQ_NAMP * dfq_dfbfq * rand(Uniform(0, 1), FBFQ_SAMPLE_COUNT)
+    delta_fqs_fft = fft(delta_fqs)
+    freqs = fftfreq(FBFQ_SAMPLE_COUNT, dtinv)
+    delta_fqs_fft_pink = delta_fqs_fft[2:end] ./ freqs[2:end]
+    delta_fqs_pink = ifft(delta_fqs_fft_pink)
+    ts = range(0, stop=FBFQ_SAMPLE_COUNT - 1, length=FBFQ_SAMPLE_COUNT) * dt
+    if plot
+        subfig1 = Plots.plot()
+        Plots.plot!(subfig1, freqs, map(abs, delta_fqs_fft), label="white")
+        Plots.plot!(subfig1, freqs[2:end], map(abs, delta_fqs_fft_pink), label="pink")
+        Plots.ylabel!(L"\textrm{(a.u.)}")
+        Plots.xlabel!(L"f \; \textrm{(GHz)}")
+        
+        subfig2 = Plots.plot()
+        Plots.plot!(subfig2, ts, delta_fqs, label="white")
+        Plots.plot!(subfig2, ts[2:end], map(abs, delta_fqs_pink), label="pink")
+        Plots.ylabel!(L"\Delta f_{q} \; \textrm{(GHz)}")
+        Plots.xlabel!(L"t \; \textrm{(ns)}")
+
+        layout = @layout [a; b]
+        fig = Plots.plot(subfig1, subfig2, dpi=DPI, layout=layout)
+        Plots.savefig(fig, DELTAFQ_PLOT_FILE_PATH)
+        println("plotted to $(DELTAFQ_PLOT_FILE_PATH)")
+    end
+    return freqs
 end

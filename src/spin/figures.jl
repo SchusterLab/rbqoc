@@ -89,7 +89,7 @@ const DATA2_FILE_PATH_KEY = 8
 
 ### ALL ###
 function plot_fidelity_by_gate_count(fidelitiess; inds=nothing, title="", ylims=(0, 1),
-                                     yticks=(0:0.1:1), legend=nothing, yscale=:none,
+                                     yticks=(0:0.1:1), legend=:best, yscale=:auto,
                                      labels=nothing, colors=nothing, linestyles=nothing,
                                      xlims=nothing)
     plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
@@ -104,8 +104,8 @@ function plot_fidelity_by_gate_count(fidelitiess; inds=nothing, title="", ylims=
     end
     for (i, fidelities) in enumerate(fidelitiess)
         color = isnothing(colors) ? :auto : colors[i]
-        label = isnothing(labels) ? nothing : labels[i]
-        linestyle = isnothing(linestyles) ? :auto : linestyles[i]
+        label = isnothing(labels) ? "" : labels[i]
+        linestyle = isnothing(linestyles) ? :solid : linestyles[i]
         Plots.plot!(fig, gate_count_axis[inds], 1 .- fidelities[inds], label=label,
                     color=color, linestyle=linestyle)
     end
@@ -122,39 +122,39 @@ const F1_GATE_COUNT = Integer(1.5e4)
 F1_PULSE_DATA = Dict(
     zpiby2 => Dict(
         qoc => Dict(
-            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00196_spin15.h5"),
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00201_spin15.h5"),
             SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00194_spin15.h5"),
             SAVE_TYPE_KEY => jl,
         ),
         analytic => Dict(
             ACORDS_KEY => (0, 0.25),
-            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00013_spin14.h5"),
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00043_spin14.h5"),
             SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00000_spin14.h5"),
             SAVE_TYPE_KEY => py,
         ),
     ),
     ypiby2 => Dict(
         qoc => Dict(
-            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00188_spin15.h5"),
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00200_spin15.h5"),
             SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00185_spin15.h5"),
             SAVE_TYPE_KEY => jl,
         ),
         analytic => Dict(
             ACORDS_KEY => (0, 0.4),
-            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00018_spin14.h5"),
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00041_spin14.h5"),
             SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00003_spin14.h5"),
             SAVE_TYPE_KEY => py,
         )
     ),
     xpiby2 => Dict(
         qoc => Dict(
-            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00176_spin15.h5"),
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00202_spin15.h5"),
             SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin15/00174_spin15.h5"),
             SAVE_TYPE_KEY => jl,
         ),
         analytic => Dict(
             ACORDS_KEY => (0, 0.5),
-            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00022_spin14.h5"),
+            DATA_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00042_spin14.h5"),
             SAVE_FILE_PATH_KEY => joinpath(META_SAVE_PATH, "spin14/00004_spin14.h5"),
             SAVE_TYPE_KEY => py,
         )
