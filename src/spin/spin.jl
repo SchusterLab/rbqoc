@@ -6,6 +6,7 @@ using Dates
 using Dierckx
 using DifferentialEquations
 using Distributions
+using FFTW
 using HDF5
 using Random
 using StaticArrays
@@ -40,7 +41,6 @@ end
     zpiby2nodis = 9
     zpiby2t1 = 10
     schroeddf = 11
-    xpiby2df = 12
     xpiby2da = 13
     xpiby2t2 = 14
     lindbladt2 = 15
@@ -57,24 +57,20 @@ const DT_STR = Dict(
     lindbladnodis => "Lindblad No Dissipation",
     lindbladt1 => "Lindblad T_1 Dissipation",
     lindbladt1 => "Lindblad T_2 Dissipation",
-    schroeddf => "Schroedinger FQ Flux Noise",
 )
 
 const DT_ST = Dict(
     schroed => st_state,
-    schroeddf => st_state,
     lindbladnodis => st_density,
     lindbladt1 => st_density,
     lindbladt2 => st_density,
-    lindbladdf => st_density,
     ypiby2nodis => st_density,
     ypiby2t1 => st_density,
     xpiby2nodis => st_density,
     xpiby2t1 => st_density,
     zpiby2nodis => st_density,
     zpiby2t1 => st_density,
-    xpiby2df => st_density,
-    xpiby2da => st_density,
+    xpiby2da => st_state,
     xpiby2t2 => st_density,
 )
 
@@ -83,6 +79,15 @@ const GT_STR = Dict(
     ypiby2 => "Y/2",
     xpiby2 => "X/2",
 )
+
+struct SimParams
+    controls :: Array{Float64, 2}
+    control_knot_count :: Int64
+    controls_dt_inv :: Int64
+    negi_h0 :: StaticMatrix
+    nos :: Array{Float64, 1}
+    sim_dt_inv :: Int64
+end
 
 # other constants
 const DEQJL_MAXITERS = 1e10
@@ -111,7 +116,8 @@ const FBFQ_NAMP = 5.21e-6 # flux noise amplitude
 const FBFQ_NDIST = Normal(0., 1.)
 const GAMMAC = 1 / 3e5 #GHz(T_c = 300 us)
 const SQRTLNIR = 4
-const GAMMAF_PREFACTOR = FBFQ_NAMP * SQRTLNIR * 2 * Pi
+const NAMP_PREFACTOR = FBFQ_NAMP / FBFQ_A
+const GAMMAF_PREFACTOR = FBFQ_NAMP * SQRTLNIR * 2 * pi
 # coefficients are listed in descending order
 # raw coefficients are in units of seconds
 const FBFQ_T1_COEFFS = [
@@ -311,6 +317,7 @@ control hamiltonian subject to flux noise
 @inline ap_negi_h1(amp, namp_dist) = fbfq_amp(amp_fbfq(amp) + FBFQ_NAMP * rand(namp_dist)) * NEGI_H1_ISO
 
 
+# simulation dynamics
 """
 Schroedinger dynamics.
 """
@@ -367,31 +374,6 @@ function dynamics_lindbladt2_deqjl(state, (controls, control_knot_count, dt_inv,
 end
 
 
-function dynamics_lindbladdf_deqjl(state, (controls, control_knot_count, dt_inv, negi_h0, namp_dist), t)
-    knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
-    negi_h = (
-        fqp_negi_h0(amp_dfq(controls[knot_point][1]), namp_dist)
-        + controls[knot_point][1] * NEGI_H1_ISO
-    )
-    return (
-        negi_h * state - state * negi_h
-    )
-end
-
-
-function dynamics_schroeddf_deqjl(state, (controls, control_knot_count, dt_inv, negi_h0, namp_dist), t)
-    knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
-    fq = FQ + amp_dfq(controls[knot_point][1]) * FBFQ_NAMP * rand(namp_dist)
-    negi_h = (
-        fq * NEGI_H0_ISO
-        + controls[knot_point][1] * NEGI_H1_ISO
-    )
-    return (
-        negi_h * state
-    )
-end
-
-
 const TTOT_ZPIBY2 = 17.857142857142858
 const GAMMA_ZPIBY2 = amp_t1_spline(0)^(-1)
 @inline dynamics_zpiby2nodis_deqjl(
@@ -424,23 +406,6 @@ const T2_YPIBY2 = T1_YPIBY2 + TZ_YPIBY2
 # t1 noise
 const GAMMA11_YPIBY2 = amp_t1_spline(AYPIBY2)^(-1)
 const GAMMA12_YPIBY2 = amp_t1_spline(0)^(-1)
-# flux noise via hamiltonian
-const DFQ1_YPIBY2 = amp_dfq(AYPIBY2)
-const DFQ2_YPIBY2 = amp_dfq(0)
-const DFQ3_YPIBY2 = amp_dfq(-AYPIBY2)
-const FQP_H01_YPIBY2 = (FQ + amp_dfq(AYPIBY2) * FBFQ_NAMP * 1e2) * NEGI_H0_ISO
-const FQP_H03_YPIBY2 = (FQ + amp_dfq(-AYPIBY2) * FBFQ_NAMP * 1e2) * NEGI_H0_ISO
-const FQP_H1_YPIBY2 = FQP_H01_YPIBY2 + H11_YPIBY2
-const FQP_H2_YPIBY2 = FQ_NEGI_H0_ISO
-const FQP_H3_YPIBY2 = FQP_H03_YPIBY2 + H13_YPIBY2
-# const FQP_H1_YPIBY2 = S1FQ_NEGI_H0_ISO + H11_YPIBY2
-# const FQP_H2_YPIBY2 = FQ_NEGI_H0_ISO
-# const FQP_H3_YPIBY2 = S1FQ_NEGI_H0_ISO + H13_YPIBY2
-const AP_H11_YPIBY2 = fbfq_amp(amp_fbfq(AYPIBY2) + FBFQ_NAMP) * NEGI_H1_ISO
-const AP_H13_YPIBY2 = fbfq_amp(amp_fbfq(AYPIBY2) + FBFQ_NAMP) * NEGI_H1_ISO
-const AP_H1_YPIBY2 = FQ_NEGI_H0_ISO + AP_H11_YPIBY2
-const AP_H2_YPIBY2 = FQ_NEGI_H0_ISO
-const AP_H3_YPIBY2 = FQ_NEGI_H0_ISO + AP_H13_YPIBY2
 function dynamics_ypiby2nodis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0, namp_dist), t)
     t = t - Int(floor(t / TTOT_YPIBY2)) * TTOT_YPIBY2
     if t <= T1_YPIBY2
@@ -508,6 +473,9 @@ function dynamics_xpiby2nodis_deqjl(density, (controls, control_knot_count, dt_i
 end
 
 
+"""
+t1 dissipation via lindblad
+"""
 function dynamics_xpiby2t1_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0, namp_dist), t)
     t = t - Int(floor(t / TTOT_XPIBY2)) * TTOT_XPIBY2
     if t <= T1_XPIBY2
@@ -540,94 +508,30 @@ function dynamics_xpiby2t1_deqjl(density, (controls, control_knot_count, dt_inv,
 end
 
 
-function dynamics_xpiby2df_deqjl(state, (controls, control_knot_count,
-                                         dt_inv, negi_h0, namp_dist), t)
-    t = t - Int(floor(t / TTOT_XPIBY2)) * TTOT_XPIBY2
-    if t <= T1_XPIBY2
-        # negi_h = H11_YPIBY2 + fqp_negi_h0(DFQ1_YPIBY2, namp_dist)
-        negi_h = FQP_H1_YPIBY2
-    elseif t <= T2_XPIBY2
-        # negi_h = fqp_negi_h0(DFQ2_YPIBY2, namp_dist)
-        negi_h = FQP_H2_YPIBY2;
-    elseif t <= T3_XPIBY2
-        # negi_h = H13_YPIBY2 + fqp_negi_h0(DFQ3_YPIBY2, namp_dist)
-        negi_h = FQP_H3_YPIBY2
-    elseif t <= T4_XPIBY2
-        # negi_h = fqp_negi_h0(DFQ2_YPIBY2, namp_dist)
-        negi_h = FQP_H2_YPIBY2
-    elseif t <= T5_XPIBY2
-        # negi_h = H13_YPIBY2 + fqp_negi_h0(DFQ3_YPIBY2, namp_dist)
-        negi_h = FQP_H3_YPIBY2
-    elseif t <= T6_XPIBY2
-        # negi_h = fqp_negi_h0(DFQ2_YPIBY2, namp_dist)
-        negi_h = FQP_H2_YPIBY2
+"""
+flux noise via amplitude fluctuation
+"""
+function dynamics_xpiby2da_deqjl(state :: StaticVector, params :: SimParams, time :: Float64)
+    controls_time = time - Int(floor(time / TTOT_XPIBY2)) * TTOT_XPIBY2
+    knot_point = Int(floor(time * params.sim_dt_inv)) + 1
+    delta_a = NAMP_PREFACTOR * params.nos[knot_point]
+    if controls_time <= T1_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (AYPIBY2 + delta_a) * NEGI_H1_ISO
+    elseif controls_time <= T2_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (delta_a) * NEGI_H1_ISO
+    elseif controls_time <= T3_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (-AYPIBY2 + delta_a) * NEGI_H1_ISO
+    elseif controls_time <= T4_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (delta_a) * NEGI_H1_ISO
+    elseif controls_time <= T5_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (-AYPIBY2 + delta_a) * NEGI_H1_ISO
+    elseif controls_time <= T6_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (delta_a) * NEGI_H1_ISO
     else
-        # negi_h = H11_YPIBY2 + fqp_negi_h0(DFQ1_YPIBY2, namp_dist)
-        negi_h = FQP_H1_YPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (AYPIBY2 + delta_a) * NEGI_H1_ISO
     end
     return(
-        negi_h * state - state * negi_h
-    )
-end
-
-
-function dynamics_xpiby2da_deqjl(state, (controls, control_knot_count,
-                                         dt_inv, negi_h0, namp_dist), t)
-    t = t - Int(floor(t / TTOT_XPIBY2)) * TTOT_XPIBY2
-    knot_point = Int(floor(t * dt_inv))
-    da = FBFQ_NAMP * namp_dist[knot_point]
-    if t <= T1_XPIBY2
-        negi_h = FQ_NEGI_H0_ISO + (AYPIBY2 + da) * NEGI_H1_ISO
-    elseif t <= T2_XPIBY2
-        negi_h = AP_H2_YPIBY2
-    elseif t <= T3_XPIBY2
-        # negi_h = FQ_NEGI_H0 + ap_negi_h1(-AYPIBY2, namp_dist)
-        negi_h = AP_H3_YPIBY2
-    elseif t <= T4_XPIBY2
-        negi_h = AP_H2_YPIBY2
-    elseif t <= T5_XPIBY2
-        # negi_h = FQ_NEGI_H0 + ap_negi_h1(-AYPIBY2, namp_dist)
-        negi_h = AP_H3_YPIBY2
-    elseif t <= T6_XPIBY2
-        negi_h = AP_H2_YPIBY2
-    else
-        # negi_h = FQ_NEGI_H0 + ap_negi_h1(AYPIBY2, namp_dist)
-        negi_h = AP_H1_YPIBY2
-    end
-    return(
-        negi_h * state - state * negi_h
-    )
-end
-
-
-function dynamics_xpiby2t2_deqjl(state, (controls, control_knot_count,
-                                         dt_inv, negi_h0, namp_dist), t)
-    t = t - Int(floor(t / TTOT_XPIBY2)) * TTOT_XPIBY2
-    if t <= T1_XPIBY2
-        negi_h = H1_YPIBY2
-        gammaf = GAMMAF1_YPIBY2
-    elseif t <= T2_XPIBY2
-        negi_h = H2_YPIBY2
-        gammaf = GAMMAF2_YPIBY2
-    elseif t <= T3_XPIBY2
-        negi_h = H3_YPIBY2
-        gammaf = GAMMAF3_YPIBY2
-    elseif t <= T4_XPIBY2
-        negi_h = H2_YPIBY2
-        gammaf = GAMMAF2_YPIBY2
-    elseif t <= T5_XPIBY2
-        negi_h = H3_YPIBY2
-        gammaf = GAMMAF3_YPIBY2
-    elseif t <= T6_XPIBY2
-        negi_h = H2_YPIBY2
-        gammaf = GAMMAF2_YPIBY2
-    else
-        negi_h = H1_YPIBY2
-        gammaf = GAMMAF1_YPIBY2
-    end
-    return(
-        negi_h * state - state * negi_h
-        + (GAMMAC + 2 * gammaf^2 * t) * NEG_DOP_ISO .* state
+        negi_h * state
     )
 end
 
@@ -635,20 +539,16 @@ end
 # dynamics lookup
 const DT_DYN = Dict(
     schroed => dynamics_schroed_deqjl,
-    schroeddf => dynamics_schroeddf_deqjl,
     lindbladnodis => dynamics_lindbladnodis_deqjl,
     lindbladt1 => dynamics_lindbladt1_deqjl,
     lindbladt2 => dynamics_lindbladt2_deqjl,
-    lindbladdf => dynamics_lindbladdf_deqjl,
     ypiby2nodis => dynamics_ypiby2nodis_deqjl,
     ypiby2t1 => dynamics_ypiby2t1_deqjl,
     xpiby2nodis => dynamics_xpiby2nodis_deqjl,
     xpiby2t1 => dynamics_xpiby2t1_deqjl,
     zpiby2nodis => dynamics_zpiby2nodis_deqjl,
     zpiby2t1 => dynamics_zpiby2t1_deqjl,
-    xpiby2df => dynamics_xpiby2df_deqjl,
     xpiby2da => dynamics_xpiby2da_deqjl,
-    xpiby2t2 => dynamics_xpiby2t2_deqjl,
 )
 
 
@@ -660,9 +560,7 @@ const DT_GTM = Dict(
     ypiby2t1 => TTOT_YPIBY2,
     xpiby2nodis => TTOT_XPIBY2,
     xpiby2t1 => TTOT_XPIBY2,
-    xpiby2df => TTOT_XPIBY2,
     xpiby2da => TTOT_XPIBY2,
-    xpiby2t2 => TTOT_XPIBY2,
 )
 
 
@@ -674,9 +572,7 @@ const DT_EN = Dict(
     ypiby2t1 => "spin14",
     xpiby2nodis => "spin14",
     xpiby2t1 => "spin14",
-    xpiby2df => "spin14",
     xpiby2da => "spin14",
-    xpiby2t2 => "spin14",
 )
 
 
@@ -705,7 +601,7 @@ end
 
 
 function gen_rand_state_iso(;seed=0)
-    if seed == -1
+    if seed == 0
         state = [1, 1] / sqrt(2)
     else
         Random.seed!(seed)
@@ -718,7 +614,7 @@ end
 
 
 function gen_rand_density_iso(;seed=0)
-    if seed == -1
+    if seed == 0
         state = [1, 1] / sqrt(2)
     else
         Random.seed!(seed)
@@ -736,30 +632,60 @@ end
 
 
 """
+Generate noise with the spectral density
+SΦ(ω) = AΦ^2 / |f|
+"""
+function pink_noise(count, namp, dt_inv; seed=0)
+    Random.seed!(seed)
+    # square root of the spectral density is the
+    # fourier transform of the noise
+    pink_noise_ = fftfreq(count, dt_inv)
+    # avoid division by zero
+    deleteat!(pink_noise_, 1)
+    for i in 1:length(pink_noise_)
+        pink_noise_[i] = namp / abs(sqrt(pink_noise_[i]))
+    end
+    fft!(pink_noise_)
+    # add the zero element back
+    push!(pink_noise_, 0)
+    return noise_pink
+end
+
+
+"""
 run_sim_deqjl - Apply a gate multiple times and measure the fidelity
 after each application. Save the output.
 
 Arguments:
 save_file_path :: String - The file path to grab the controls from
+dt_inv :: Int64 - must be an integer and a power of 10
 """
 function run_sim_deqjl(
     gate_count, gate_type;
     save_file_path=nothing,
     controls_dt_inv=DT_PREF_INV,
     adaptive=DEQJL_ADAPTIVE, dynamics_type=lindbladnodis,
-    dt=DT_PREF, save=true, save_type=jl, seed=-1,
+    dt=DT_PREF, save=true, save_type=jl, seed=0,
     solver=DifferentialEquations.Vern9, print_seq=false, print_final=false,
     negi_h0=FQ_NEGI_H0_ISO, namp_dist=FBFQ_NDIST)
     start_time = Dates.now()
     # grab
     if isnothing(save_file_path)
-        controls = control_knot_count = nothing
+        controls = Array{Float64, 2}([0 0])
+        control_knot_count = 0
         gate_time = DT_GTM[dynamics_type]
     else
         (controls, gate_time) = grab_controls(save_file_path; save_type=save_type)
         control_knot_count = Int(floor(gate_time * controls_dt_inv))
     end
+    dt_inv = 1 / dt
     save_times = Array(0:1:gate_count) * gate_time
+    evolution_time = gate_time * gate_count
+    knot_count = Int(ceil(evolution_time * dt_inv))
+
+    # get noise offsets
+    nos = pink_noise(knot_count, namp_dist, dt_inv; seed=seed)
+    # nos = zeros(knot_count)
     
     # integrate
     dynamics = DT_DYN[dynamics_type]
@@ -769,11 +695,10 @@ function run_sim_deqjl(
     elseif state_type == st_density
         initial_state =  gen_rand_density_iso(;seed=seed)
     end
-    Random.seed!(seed < 0 ? 0 : seed)
-    tspan = (0., gate_time * gate_count)
-    p = (controls, control_knot_count, controls_dt_inv, negi_h0,
-         namp_dist)
-    prob = ODEProblem(dynamics, initial_state, tspan, p)
+    tspan = (0., evolution_time)
+    params = SimParams(controls, control_knot_count, controls_dt_inv, negi_h0,
+                       nos, dt_inv)
+    prob = ODEProblem(dynamics, initial_state, tspan, params)
     result = solve(prob, solver(), dt=dt, saveat=save_times,
                    maxiters=DEQJL_MAXITERS, adaptive=adaptive)
 
