@@ -3,16 +3,11 @@ fluxonium.jl - do some calculations for fluxonium
 """
 
 using Dierckx
-using Distributions
 using FFTW
 using HDF5
-using Interpolations
 using LaTeXStrings
 using LinearAlgebra
-using TrajectoryOptimization
-using Polynomials
 import Plots
-using Printf
 using StaticArrays
 using Zygote
 
@@ -25,7 +20,8 @@ const EXPERIMENT_NAME = "figures"
 const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 const DFQ_PLOT_FILE_PATH = joinpath(SAVE_PATH, "dfq.png")
 const DFQ_DATA_FILE_PATH = joinpath(SAVE_PATH, "dfq.h5")
-const DELTAFQ_PLOT_FILE_PATH = joinpath(SAVE_PATH, "deltafq.png")
+const PINK_PLOT_FILE_PATH = joinpath(SAVE_PATH, "pink.png")
+const PINKFW_PLOT_FILE_PATH = joinpath(SAVE_PATH, "pinkfw.png")
 
 ## SYSTEM DEFINITION ##
 # FLUXONIUM_STATE_COUNT is the state count used in the T1 calculations
@@ -120,36 +116,107 @@ function fit_dfq(;plot=false, save=false, pull=false)
 end
 
 
-function generate_flux_noise(;plot=false, dtinv=1e2, dt=1e-2)
-    h_ff = fbfq_hamiltonian(0.5)
-    evecs = eigvecs(Hermitian(h_ff))
-    gphie_ff = evecs[:,1]' * PHI_OP * evecs[:, 2]
-    dfq_dfbfq = 4 * pi * gphie_ff * EL
-    Random.seed!(0)
-    delta_fqs = FBFQ_NAMP * dfq_dfbfq * rand(FBFQ_NDIST, FBFQ_SAMPLE_COUNT)
-    # delta_fqs = FBFQ_NAMP * dfq_dfbfq * rand(Uniform(0, 1), FBFQ_SAMPLE_COUNT)
-    delta_fqs_fft = fft(delta_fqs)
-    freqs = fftfreq(FBFQ_SAMPLE_COUNT, dtinv)
-    delta_fqs_fft_pink = delta_fqs_fft[2:end] ./ freqs[2:end]
-    delta_fqs_pink = ifft(delta_fqs_fft_pink)
-    ts = range(0, stop=FBFQ_SAMPLE_COUNT - 1, length=FBFQ_SAMPLE_COUNT) * dt
+function plot_pink_noise_from_white(count; ndist=FBFQ_NDIST, dt_inv=1e2, plot=false, seed=0,
+                                    namp=NAMP_PREFACTOR)
+    Random.seed!(seed)
+    freqs = fftfreq(count, dt_inv)
+    times = (0:count-1) ./ dt_inv
+    time = count / dt_inv
+    
+    white_noise = rand(ndist, count)
+    pink_noise_ = Array{Complex{Float64}, 1}(white_noise)
+    # transform white noise to frequency domain
+    fft!(pink_noise_)
+    white_fft = Array{Float64, 1}(map(abs, pink_noise_)) / count
+    # square root of the spectral density is the
+    # fourier transform of the noise
+    # normalize by count
+    for i in 2:length(pink_noise_)
+        pink_noise_[i] = pink_noise_[i] / (sqrt(abs(freqs[i])) * count)
+    end
+    # normalize to dt_inv, this is the fft value at f=0
+    pink_noise_[1] = dt_inv / count
+    pink_fft = Array{Float64, 1}(map(abs, pink_noise_))
+    # transform to time domain
+    ifft!(pink_noise_)
+    # take modulus, normalize by count
+    for i = 1:length(pink_noise_)
+        pink_noise_[i] = abs(pink_noise_[i]) * count
+    end
+    pink_noise_ = Array{Float64, 1}(pink_noise_)
+    
+    # get delta_fq for plotting
+    fnoise = pink_noise_ * namp
+
+    if plot
+        # inds = 1:length(pink_fft)
+        inds = 1:Int(1e4):length(pink_fft)
+        subfig1 = Plots.plot()
+        Plots.plot!(subfig1, freqs[inds], pink_fft[inds], label="pink")
+        Plots.plot!(subfig1, freqs[inds], white_fft[inds], label="white")
+        Plots.xlabel!(L"f \; \textrm{(GHz)}")
+        Plots.ylabel!(L"|\hat{x}(f)| \; \textrm{(a.u.)}")
+        subfig2 = Plots.plot()
+        Plots.plot!(subfig2, times[inds], pink_noise_[inds], label="pink")
+        Plots.plot!(subfig2, times[inds], white_noise[inds], label="white")
+        Plots.xlabel!(L"t \; \textrm{(ns)}")
+        Plots.ylabel!(L"x(t) \; \textrm{(a.u.)}")
+        subfig3 = Plots.plot()
+        Plots.plot!(subfig3, times[inds], fnoise[inds], label=:none)
+        Plots.xlabel!(L"t \; \textrm{(ns)}")
+        Plots.ylabel!(L"\Delta f_{q} \; \textrm{(GHz)}")
+        layout = @layout [a; b; c]
+        fig = Plots.plot(subfig1, subfig2, subfig3, dpi=DPI, layout=layout)
+        Plots.savefig(fig, PINKFW_PLOT_FILE_PATH)
+    end
+
+    return fnoise
+end
+
+
+function plot_pink_noise_from_density(count; dt_inv=1e2, namp=NAMP_PREFACTOR, plot=false, seed=0,
+                                      ndist=FBFQ_NDIST)
+    Random.seed!(seed)
+    times = Array(0:1:count-1) / dt_inv
+    time = count / dt_inv
+    freqs = fftfreq(count, dt_inv)
+    
+    white_noise = rand(ndist, count)
+    pink_noise_ = Array{Complex{Float64}, 1}(freqs)
+
+    pink_noise_[1] = dt_inv
+    for i = 2:length(pink_noise_)
+        pink_noise_[i] = 1 / sqrt(abs(pink_noise_[i]))
+    end
+    pink_fft = Array{Float64, 1}(pink_noise_)
+    
+    ifft!(pink_noise_)
+    for i = 1:length(pink_noise_)
+        pink_noise_[i] = abs(pink_noise_[i]) / count
+    end
+    pink_noise_ = Array{Float64, 1}(pink_noise_)
+
+
+    fnoise = pink_noise * namp
+    
     if plot
         subfig1 = Plots.plot()
-        Plots.plot!(subfig1, freqs, map(abs, delta_fqs_fft), label="white")
-        Plots.plot!(subfig1, freqs[2:end], map(abs, delta_fqs_fft_pink), label="pink")
-        Plots.ylabel!(L"\textrm{(a.u.)}")
+        Plots.plot!(subfig1, freqs, pink_fft, label="pink")
         Plots.xlabel!(L"f \; \textrm{(GHz)}")
-        
+        Plots.ylabel!(L"|\hat{x}(f)| \; \textrm{(a.u.)}")
         subfig2 = Plots.plot()
-        Plots.plot!(subfig2, ts, delta_fqs, label="white")
-        Plots.plot!(subfig2, ts[2:end], map(abs, delta_fqs_pink), label="pink")
-        Plots.ylabel!(L"\Delta f_{q} \; \textrm{(GHz)}")
+        Plots.plot!(subfig2, times, pink_noise, label="pink")
         Plots.xlabel!(L"t \; \textrm{(ns)}")
-
-        layout = @layout [a; b]
-        fig = Plots.plot(subfig1, subfig2, dpi=DPI, layout=layout)
-        Plots.savefig(fig, DELTAFQ_PLOT_FILE_PATH)
-        println("plotted to $(DELTAFQ_PLOT_FILE_PATH)")
+        Plots.ylabel!(L"x(t) \; \textrm{(a.u.)}")
+        subfig3 = Plots.plot()
+        Plots.plot!(subfig3, times, fnoise, label=:none)
+        Plots.xlabel!(L"t \; \textrm{(ns)}")
+        Plots.ylabel!(L"\Delta f_{q} \; \textrm{(GHz)}")
+        layout = @layout [a; b; c]
+        fig = Plots.plot(subfig1, subfig2, subfig3, dpi=DPI, layout=layout)
+        Plots.savefig(fig, PINK_PLOT_FILE_PATH)
     end
-    return freqs
+
+    return fnoise
 end
+    

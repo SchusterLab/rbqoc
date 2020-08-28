@@ -59,6 +59,7 @@ const EMPTY_V = []
 
 
 # Define the model and dynamics.
+# DA = decay aware, TO = time optimal
 struct Model{DA, TO} <: AbstractModel
     Model(DA::Bool=true, TO::Bool=true) = new{DA, TO}()
 end

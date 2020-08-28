@@ -22,6 +22,7 @@ const FBFQ_DFQ_DATA_FILE_PATH = joinpath(SPIN_OUT_PATH, "figures", "misc", "dfq.
 # simulation constants
 const DT_PREF = 1e-2
 const DT_PREF_INV = 1e2
+const DT_NOISE_INV = 1e1
 
 # types
 @enum GateType begin
@@ -45,6 +46,8 @@ end
     xpiby2t2 = 14
     lindbladt2 = 15
     lindbladdf = 16
+    zpiby2da = 17
+    schroedda = 18
 end
 
 @enum StateType begin
@@ -61,6 +64,7 @@ const DT_STR = Dict(
 
 const DT_ST = Dict(
     schroed => st_state,
+    schroedda => st_state,
     lindbladnodis => st_density,
     lindbladt1 => st_density,
     lindbladt2 => st_density,
@@ -72,6 +76,7 @@ const DT_ST = Dict(
     zpiby2t1 => st_density,
     xpiby2da => st_state,
     xpiby2t2 => st_density,
+    zpiby2da => st_state,
 )
 
 const GT_STR = Dict(
@@ -85,7 +90,8 @@ struct SimParams
     control_knot_count :: Int64
     controls_dt_inv :: Int64
     negi_h0 :: StaticMatrix
-    nos :: Array{Float64, 1}
+    noise_offsets :: Array{Float64, 1}
+    noise_dt_inv :: Int64
     sim_dt_inv :: Int64
 end
 
@@ -333,6 +339,20 @@ function dynamics_schroed_deqjl(state, (controls, control_knot_count, dt_inv, ne
 end
 
 
+function dynamics_schroedda_deqjl(state::StaticVector, params::SimParams, time::Float64)
+    control_knot_point = (Int(floor(time * params.controls_dt_inv)) % params.control_knot_count) + 1
+    noise_knot_point = Int(floor(time * params.noise_dt_inv)) + 1
+    delta_a = params.noise_offsets[noise_knot_point]
+    negi_h = (
+        FQ_NEGI_H0_ISO
+        + (params.controls[control_knot_point][1] + delta_a) * NEGI_H1_ISO
+    )
+    return (
+        negi_h * state
+    )
+end
+
+
 function dynamics_lindbladnodis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0, namp_dist), t)
     knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
     negi_h = (
@@ -389,6 +409,11 @@ const GAMMA_ZPIBY2 = amp_t1_spline(0)^(-1)
     FQ_NEGI_H0_ISO * density - density * FQ_NEGI_H0_ISO
     + GAMMA_ZPIBY2 * (G_E * density * E_G + NEG_E_E_BY2 * density + density * NEG_E_E_BY2
                 + E_G * density * G_E + NEG_G_G_BY2 * density + density * NEG_G_G_BY2)    
+)
+
+
+@inline dynamics_zpiby2da_deqjl(state::StaticVector, params::SimParams, time::Float64) = (
+    (FQ_NEGI_H0_ISO + params.noise_offsets[Int(floor(time * params.noise_dt_inv)) + 1] * NEGI_H1_ISO) * state
 )
 
 
@@ -513,8 +538,8 @@ flux noise via amplitude fluctuation
 """
 function dynamics_xpiby2da_deqjl(state :: StaticVector, params :: SimParams, time :: Float64)
     controls_time = time - Int(floor(time / TTOT_XPIBY2)) * TTOT_XPIBY2
-    knot_point = Int(floor(time * params.sim_dt_inv)) + 1
-    delta_a = NAMP_PREFACTOR * params.nos[knot_point]
+    noise_knot_point = Int(floor(time * params.noise_dt_inv)) + 1
+    delta_a = params.noise_offsets[noise_knot_point]
     if controls_time <= T1_XPIBY2
         negi_h = FQ_NEGI_H0_ISO + (AYPIBY2 + delta_a) * NEGI_H1_ISO
     elseif controls_time <= T2_XPIBY2
@@ -539,6 +564,7 @@ end
 # dynamics lookup
 const DT_DYN = Dict(
     schroed => dynamics_schroed_deqjl,
+    schroedda => dynamics_schroedda_deqjl,
     lindbladnodis => dynamics_lindbladnodis_deqjl,
     lindbladt1 => dynamics_lindbladt1_deqjl,
     lindbladt2 => dynamics_lindbladt2_deqjl,
@@ -549,6 +575,7 @@ const DT_DYN = Dict(
     zpiby2nodis => dynamics_zpiby2nodis_deqjl,
     zpiby2t1 => dynamics_zpiby2t1_deqjl,
     xpiby2da => dynamics_xpiby2da_deqjl,
+    zpiby2da => dynamics_zpiby2da_deqjl,
 )
 
 
@@ -556,6 +583,7 @@ const DT_DYN = Dict(
 const DT_GTM = Dict(
     zpiby2nodis => TTOT_ZPIBY2,
     zpiby2t1 => TTOT_ZPIBY2,
+    zpiby2da => TTOT_ZPIBY2,
     ypiby2nodis => TTOT_YPIBY2,
     ypiby2t1 => TTOT_YPIBY2,
     xpiby2nodis => TTOT_XPIBY2,
@@ -568,6 +596,7 @@ const DT_GTM = Dict(
 const DT_EN = Dict(
     zpiby2nodis => "spin14",
     zpiby2t1 => "spin14",
+    zpiby2da => "spin14",
     ypiby2nodis => "spin14",
     ypiby2t1 => "spin14",
     xpiby2nodis => "spin14",
@@ -632,23 +661,58 @@ end
 
 
 """
-Generate noise with the spectral density
-SΦ(ω) = AΦ^2 / |f|
+Generate the modulus of the noise with the rough
+spectral density Sxx(f) = |x̂(f)|^2 = 1 / |f|
 """
-function pink_noise(count, namp, dt_inv; seed=0)
+function pink_noise_from_white(count, dt_inv, ndist; seed=0)
     Random.seed!(seed)
+    freqs = fftfreq(count, dt_inv)
+    pink_noise_ = Array{Complex{Float64}, 1}(rand(ndist, count))
+    # transform white noise to frequency domain
+    fft!(pink_noise_)
     # square root of the spectral density is the
     # fourier transform of the noise
-    pink_noise_ = fftfreq(count, dt_inv)
-    # avoid division by zero
-    deleteat!(pink_noise_, 1)
-    for i in 1:length(pink_noise_)
-        pink_noise_[i] = namp / abs(sqrt(pink_noise_[i]))
+    # normalize by count
+    for i in 2:length(pink_noise_)
+        pink_noise_[i] = pink_noise_[i] / (sqrt(abs(freqs[i])) * count)
     end
-    fft!(pink_noise_)
-    # add the zero element back
-    push!(pink_noise_, 0)
-    return noise_pink
+    # normalize to dt_inv, this is the fft value at f=0
+    pink_noise_[1] = dt_inv / count
+    # transform to time domain
+    ifft!(pink_noise_)
+    # take modulus, normalize to count
+    for i = 1:length(pink_noise_)
+        pink_noise_[i] = abs(pink_noise_[i]) * count
+    end
+    pink_noise_ = Array{Float64, 1}(pink_noise_)
+
+    return pink_noise_
+end
+
+
+"""
+Generate the modulus of the noise with the exact
+spectral density Sxx(f) = |x̂(f)|^2 = 1 / |f|
+"""
+function pink_noise_from_spectrum(count, dt_inv)
+    time = count / dt_inv
+    pink_noise_ = Array{Complex{Float64}, 1}(fftfreq(count, dt_inv))
+    # square root of the spectral density is the
+    # fourier transform of the noise
+    for i in 2:length(pink_noise_)
+        pink_noise_[i] = 1 / sqrt(abs(pink_noise_[i]))
+    end
+    # normalize to dt_inv, this is the fft value at f=0
+    pink_noise_[1] = dt_inv
+    # transform to time domain
+    ifft!(pink_noise_)
+    # take modulus, normalize by count
+    for i = 1:length(pink_noise_)
+        pink_noise_[i] = abs(pink_noise_[i]) / count
+    end
+    pink_noise_ = Array{Float64, 1}(pink_noise_)
+
+    return pink_noise_
 end
 
 
@@ -667,7 +731,8 @@ function run_sim_deqjl(
     adaptive=DEQJL_ADAPTIVE, dynamics_type=lindbladnodis,
     dt=DT_PREF, save=true, save_type=jl, seed=0,
     solver=DifferentialEquations.Vern9, print_seq=false, print_final=false,
-    negi_h0=FQ_NEGI_H0_ISO, namp_dist=FBFQ_NDIST)
+    negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=FBFQ_NDIST,
+    noise_dt_inv=DT_NOISE_INV)
     start_time = Dates.now()
     # grab
     if isnothing(save_file_path)
@@ -684,8 +749,8 @@ function run_sim_deqjl(
     knot_count = Int(ceil(evolution_time * dt_inv))
 
     # get noise offsets
-    nos = pink_noise(knot_count, namp_dist, dt_inv; seed=seed)
-    # nos = zeros(knot_count)
+    noise_knot_count = Int(ceil(evolution_time * noise_dt_inv)) + 1
+    noise_offsets = (namp) * pink_noise_from_white(noise_knot_count, noise_dt_inv, ndist; seed=seed)
     
     # integrate
     dynamics = DT_DYN[dynamics_type]
@@ -697,7 +762,7 @@ function run_sim_deqjl(
     end
     tspan = (0., evolution_time)
     params = SimParams(controls, control_knot_count, controls_dt_inv, negi_h0,
-                       nos, dt_inv)
+                       noise_offsets, noise_dt_inv, dt_inv)
     prob = ODEProblem(dynamics, initial_state, tspan, params)
     result = solve(prob, solver(), dt=dt, saveat=save_times,
                    maxiters=DEQJL_MAXITERS, adaptive=adaptive)
@@ -778,7 +843,9 @@ function run_sim_deqjl(
             write(data_file, "run_time", string(run_time))
             write(data_file, "dt", dt)
             write(data_file, "negi_h0", Array(negi_h0))
-            write(data_file, "namp_dist", string(namp_dist))
+            write(data_file, "namp", namp)
+            write(data_file, "ndist", string(ndist))
+            write(data_file, "noise_dt_inv", noise_dt_inv)
         end
         println("Saved simulation to $(data_file_path)")
     end
