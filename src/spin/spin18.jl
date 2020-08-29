@@ -225,7 +225,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         fill(qs[3], 1); # control
         fill(qs[4], 1); # dcontrol
         fill(qs[5], eval(:($sample_order >= 2 ? 2 * $STATE_COUNT * $STATE_SIZE_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
-        fill(qs[6], eval(:($sample_order >= 4 ? 2 * $STATE_COUNT * $STATE_SIZE_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
+        fill(qs[6], eval(:($sample_order >= 4 ? 2 * $STATE_COUNT * $STATE_SIZE_ISO : 0))); # <s3,s4>state1, <s3,s4>state2
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([

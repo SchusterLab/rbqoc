@@ -70,7 +70,7 @@ const DT_ST = Dict(
     lindbladt2 => st_density,
     ypiby2nodis => st_density,
     ypiby2t1 => st_density,
-    xpiby2nodis => st_density,
+    xpiby2nodis => st_state,
     xpiby2t1 => st_density,
     zpiby2nodis => st_density,
     zpiby2t1 => st_density,
@@ -327,11 +327,11 @@ control hamiltonian subject to flux noise
 """
 Schroedinger dynamics.
 """
-function dynamics_schroed_deqjl(state, (controls, control_knot_count, dt_inv, negi_h0, namp_dist), t)
-    knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
+function dynamics_schroed_deqjl(state::StaticVector, params::SimParams, time::Float64)
+    controls_knot_point = (Int(floor(time * params.controls_dt_inv)) % params.control_knot_count) + 1
     negi_h = (
-        negi_h0
-        + controls[knot_point][1] * NEGI_H1_ISO
+        params.negi_h0
+        + params.controls[controls_knot_point][1] * NEGI_H1_ISO
     )
     return (
         negi_h * state
@@ -353,10 +353,10 @@ function dynamics_schroedda_deqjl(state::StaticVector, params::SimParams, time::
 end
 
 
-function dynamics_lindbladnodis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0, namp_dist), t)
+function dynamics_lindbladnodis_deqjl(state::StaticMatrix, params::SimParams, time::Float64)
     knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
     negi_h = (
-        negi_h0
+        params.negi_h0
         + controls[knot_point][1] * NEGI_H1_ISO
     )
     return (
@@ -474,26 +474,25 @@ const T3_XPIBY2 = T2_XPIBY2 + TX_YPIBY2
 const T4_XPIBY2 = T3_XPIBY2 + TTOT_ZPIBY2
 const T5_XPIBY2 = T4_XPIBY2 + TX_YPIBY2
 const T6_XPIBY2 = T5_XPIBY2 + TZ_YPIBY2
-function dynamics_xpiby2nodis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0,
-                                              namp_dist), t)
-    t = t - Int(floor(t / TTOT_XPIBY2)) * TTOT_XPIBY2
-    if t <= T1_XPIBY2
-        negi_h = negi_h0 + H11_YPIBY2
-    elseif t <= T2_XPIBY2
-        negi_h = negi_h0
-    elseif t <= T3_XPIBY2
-        negi_h = negi_h0 + H13_YPIBY2
-    elseif t <= T4_XPIBY2
-        negi_h = negi_h0
-    elseif t <= T5_XPIBY2
-        negi_h = negi_h0 + H13_YPIBY2
-    elseif t <= T6_XPIBY2
-        negi_h = negi_h0
+function dynamics_xpiby2nodis_deqjl(state::StaticVector, params::SimParams, time::Float64)
+    time = rem(time, TTOT_XPIBY2)
+    if time <= T1_XPIBY2
+        negi_h = params.negi_h0 + H11_YPIBY2
+    elseif time <= T2_XPIBY2
+        negi_h = params.negi_h0
+    elseif time <= T3_XPIBY2
+        negi_h = params.negi_h0 + H13_YPIBY2
+    elseif time <= T4_XPIBY2
+        negi_h = params.negi_h0
+    elseif time <= T5_XPIBY2
+        negi_h = params.negi_h0 + H13_YPIBY2
+    elseif time <= T6_XPIBY2
+        negi_h = params.negi_h0
     else
-        negi_h = negi_h0 + H11_YPIBY2
+        negi_h = params.negi_h0 + H11_YPIBY2
     end
     return(
-        negi_h * density - density * negi_h
+        negi_h * state
     )
 end
 
@@ -635,6 +634,7 @@ function gen_rand_state_iso(;seed=0)
     else
         Random.seed!(seed)
         state = rand(STATE_SIZE_NOISO) + 1im * rand(STATE_SIZE_NOISO)
+        state = state / sqrt(state'state)
     end
     return SVector{STATE_SIZE_ISO}(
         [real(state); imag(state)]
@@ -860,22 +860,23 @@ function run_sim_h0sweep_deqjl(
     gate_type, negi_h0s;
     save_file_path=nothing,
     controls_dt_inv=DT_PREF_INV,
-    deqjl_adaptive=false, dynamics_type=schroed,
-    dt=DT_PREF, save=true, save_type=jl, seed=-1,
+    adaptive=DEQJL_ADAPTIVE, dynamics_type=schroed,
+    dt=DT_PREF, save=true, save_type=jl, seed=0,
     solver=DifferentialEquations.Vern9, print_seq=false)
-    
     start_time = Dates.now()
     # grab
     if isnothing(save_file_path)
-        controls = control_knot_count = nothing
+        controls = Array{Float64, 2}([0 0])
+        control_knot_count = 0
         gate_time = DT_GTM[dynamics_type]
     else
         (controls, gate_time) = grab_controls(save_file_path; save_type=save_type)
-        # controls = controls ./ (2 * pi)
         control_knot_count = Int(floor(gate_time * controls_dt_inv))
     end
+    dt_inv = 1 / dt
+    knot_count = Int(ceil(gate_time * dt_inv))
     save_times = [0., gate_time]
-    
+
     # set up integration
     dynamics = DT_DYN[dynamics_type]
     state_type = DT_ST[dynamics_type]
@@ -896,15 +897,16 @@ function run_sim_h0sweep_deqjl(
         target_state = gate * initial_state * gate'
     end
     for i = 1:sample_count
-        dargs = (controls, control_knot_count, controls_dt_inv, negi_h0s[i])
-        prob = ODEProblem(dynamics, initial_state, tspan, dargs)
+        params = SimParams(controls, control_knot_count, controls_dt_inv, negi_h0s[i],
+                           [0.], 0., dt_inv)
+        prob = ODEProblem(dynamics, initial_state, tspan, params)
         result = solve(prob, solver(), dt=dt, saveat=save_times,
-                       maxiters=DEQJL_MAXITERS, adaptive=DEQJL_ADAPTIVE)
+                       maxiters=DEQJL_MAXITERS, adaptive=adaptive)
         final_state = result.u[end]
         if state_type == st_state
             fidelities[i] = fidelity_vec_iso2(final_state, target_state)
         elseif state_type == st_density
-            fidelities[i] = fidelity_mat_iso2(final_state, target_state)
+            fidelities[i] = fidelity_mat_iso(final_state, target_state)
         end
         if print_seq
             println("fidelities[$(i)] = $(fidelities[i])")

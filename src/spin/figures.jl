@@ -330,7 +330,7 @@ F2_PULSE_DATA = Dict(
     analytic => Dict(
         SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
         SAVE_TYPE_KEY => py,
-        DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin14/00028_spin14.h5"),
+        DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin14/00074_spin14.h5"),
         LCORDS_KEY => (20, 0.05),
     ),
     sample2 => Dict(
@@ -385,8 +385,7 @@ end
 
 const F2B_TRIAL_COUNT = Integer(1e3)
 const F2B_FQ_DEV = 1e-1
-# TODO: add derivative2
-const PT_LIST_F2B = [analytic, sample, sample2, derivative, derivative2]
+const F2B_PT_LIST = [analytic, sample, sample2, derivative, derivative2]
 """
 Show gate error vs. detuning
 """
@@ -398,17 +397,28 @@ function make_figure2b()
 
     # sweep
     gate_type = xpiby2
-    for pulse_type in keys(F2_PULSE_DATA)
-        if !(DATA_FILE_PATH_KEY in keys(F2_PULSE_DATA[pulse_type]))
-            save_file_path = F2_PULSE_DATA[pulse_type][SAVE_FILE_PATH_KEY]
-            save_type = F2_PULSE_DATA[pulse_type][SAVE_TYPE_KEY]
-            data_file_path = run_sim_h0sweep_deqjl(gate_type, negi_h0s; save_file_path=save_file_path,
-                                                   save_type=save_type)
+    for pulse_type in F2B_PT_LIST
+        # if !(DATA_FILE_PATH_KEY in keys(F2_PULSE_DATA[pulse_type]))
+        if true
+            if pulse_type == analytic
+                data_file_path = run_sim_h0sweep_deqjl(
+                    gate_type, negi_h0s; dynamics_type=xpiby2nodis, dt=1e-3
+                )
+            else
+                save_file_path = F2_PULSE_DATA[pulse_type][SAVE_FILE_PATH_KEY]
+                save_type = F2_PULSE_DATA[pulse_type][SAVE_TYPE_KEY]
+                data_file_path = run_sim_h0sweep_deqjl(
+                    gate_type, negi_h0s; save_file_path=save_file_path,
+                    dynamics_type=schroed, save_type=save_type, dt=1e-3
+                )
+            end
             h5open(data_file_path, "r+") do data_file
                 write(data_file, "fqs", fqs)
                 write(data_file, "pulse_type", Integer(pulse_type))
             end
             F2_PULSE_DATA[pulse_type][DATA_FILE_PATH_KEY] = data_file_path
+            println("datafp: $(data_file_path), gt: $(GT_STR[gate_type]), pt: $(PT_STR[pulse_type])")
+            return
         end
     end
 
@@ -418,7 +428,7 @@ function make_figure2b()
                      legend=:none,
                      tickfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS,
                      legendfontsize=FS_LEGEND, foreground_color_legend=FG_COLOR_LEGEND)
-    for pulse_type in PT_LIST_F2B
+    for pulse_type in F2B_PT_LIST
         pulse_data = F2_PULSE_DATA[pulse_type]
         label = "$(PT_STR[pulse_type])"
         linestyle = PT_LINESTYLE[pulse_type]

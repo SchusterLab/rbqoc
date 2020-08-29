@@ -1,5 +1,5 @@
 """
-spin12.jl - derivative robustness
+spin12.jl - sampling robustness
 """
 
 using Altro
