@@ -31,16 +31,16 @@
   %% - 1 what I have done
   %% - few sentences about primary results
   The ability to engineer high fidelity operations on quantum processors in the presence of
-  decoherence and systematic errors remains the primary challenge to achieving quantum advantage.
+  decoherence and systematic errors remains the primary challenge requisite to achieving quantum advantage.
   Quantum optimal control (QOC) techniques have been developed to mitigate deleterious effects
   by manipulating the time-dependent parameters controlling the system. These techniques often
   target a single error channel and may be incompatible with experimental constraints. 
   In this work, we develop techniques to simultaneously mitigate
-  longitudinal relaxation and pure dephasing in a framework that may impose arbitrary
+  longitudinal relaxation and pure dephasing in a framework that can handle arbitrary
   experimental constraints.
   Optimizing a gate set for a fluxonium qubit as an example, we achieve a factor of 4 increase in
   longitudinal relaxation times and outperform
-  existing dynamic decoupling methods in mitigating pure dephasing, achieving
+  existing dynamic decoupling methods in mitigating pure dephasing due to flux noise, achieving
   high fidelity gates in the presence of parameter spreads up to $5\%$.
 \end{abstract}
 
@@ -129,7 +129,7 @@ the fluxonium qubit presented in \cite{zhang2020universal}.
 We describe experimentally realistic constraints and map them to
 the trajectory optimization framework. Next, we
 outline a method for making the optimization longitudinal
-relaxation aware. We achieve a 4x decrease in longitudinal relaxation times
+relaxation aware. We achieve a 4x increase in longitudinal relaxation times
 over the baseline gate set.
 We present two methods for achieving robustness to pure dephasing
 and compare them to existing dynamic decoupling methods. We find that
@@ -238,12 +238,12 @@ functional there still exists a recurrence relation to calculate the optimal con
 updates, see \cite{howell2019altro}.
 
 
-%% F4.1
+%% F1
 \begin{figure}[ht]
-  \begin{subfigure}{\linewidth}
+  \begin{subfigure}{.49\linewidth}
     \includegraphics[width=\linewidth]{assets/f1a.png}
-  \end{subfigure}
-  \begin{subfigure}{\linewidth}
+  \end{subfigure}\hfill%
+  \begin{subfigure}{.49\linewidth}
     \includegraphics[width=\linewidth]{assets/f1b.png}
   \end{subfigure}
   \begin{subfigure}{\linewidth}
@@ -432,14 +432,13 @@ of time as shown in Fig. 1.
 \end{table}
 
 
-%% F5.1
+%% F2
 \begin{figure}[ht]
-  \begin{subfigure}{\linewidth}
+  \begin{subfigure}{.49\linewidth}
     \label{fig:5.1:a}
     \includegraphics[width=\linewidth]{assets/f2a.png}
-  \end{subfigure}
-  
-  \begin{subfigure}{\linewidth}
+  \end{subfigure}%
+  \begin{subfigure}{.49\linewidth}
     \label{fig:5.1:b}
     \includegraphics[width=\linewidth]{assets/f2b.png}
   \end{subfigure}
@@ -449,21 +448,32 @@ of time as shown in Fig. 1.
     \label{fig:5.1:c}
   \end{subfigure}
   
-  \caption{\centering (a) $X/2$ gates constructed from the analytic, (2, 4)-point
-    sampling, and (2, 3)-derivative robustness methods at a gate duration of $56.8 (ns)$.
+  \caption{\centering (a) $X/2$ gates robust to qubit frequency offsets
+    constructed using the analytic, (2, 4)-point
+    sampling, and (2, 3)-derivative methods at a gate duration of $56.8 (ns)$.
     (b) Gate error as a function of qubit frequency detuning from the nominal frequency.
     (c) Average gate error at one standard deviation from the nominal qubit frequency as
     a function fo the gate duration.
   }
 \end{figure}
 
-%% F5.2
-%% TODO: Make this figure.
+%% F3
 \begin{figure}[ht]
-  \includegraphics[width=\linewidth]{assets/t2_temp.jpg}
-  \caption{Robustness to $T_{\phi}$-type noise for the
-    the (2, 4)-point sampling method, (2\textsuperscript{nd}, 3\textsuperscript{rd})
-    order derivative method, and B2CORPSE pulse for the $R_{x}(\pi/2)$ gate.}
+  \begin{subfigure}{.5\linewidth}
+    \includegraphics[width=\linewidth]{assets/f3a.png}
+  \end{subfigure}%
+  \begin{subfigure}{.5\linewidth}
+    \includegraphics[width=\linewidth]{assets/f3c.png}
+  \end{subfigure}
+  
+  \begin{subfigure}{\linewidth}
+    \includegraphics[width=\linewidth]{assets/f3b.png}
+  \end{subfigure}
+  
+  \caption{\centering (a) $X/2$ gates robust to flux offsets constructed using the analytic,
+    (2, 4)-point sampling, and (2, 3)-derivative methods at a gate duration
+    of $56.8 (ns)$. (b) Mean gate error for 10 samples of 1/$f$ flux noise over 5000
+    gate applications. (c) Stochastic 1/$f$ flux noise.}
 \end{figure}
 
 %% S5
