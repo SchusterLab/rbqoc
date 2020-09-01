@@ -55,7 +55,7 @@ const IT_RDI = Dict(
 
 
 # methods
-function generate_save_file_path(extension, save_file_name, save_path)
+function generate_file_path(extension, save_file_name, save_path)
     # Ensure the path exists.
     mkpath(save_path)
 

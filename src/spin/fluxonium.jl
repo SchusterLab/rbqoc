@@ -51,6 +51,18 @@ function fbfq_hamiltonian(fbfq)
 end
 
 
+function fbfq_gphie(fbfq)
+    hamiltonian = fbfq_hamiltonian(fbfq)
+    evals, evecs = eigen(Hermitian(hamiltonian))
+    gphie = evecs[:, 1]' * PHI_OP * evecs[:, 2]
+    return gphie
+end
+
+
+# derivative of the 2-pi reduced amplitude w.r.t the external flux by flux quantum
+const DA_DFBFQ = 4 * pi * EL * fbfq_gphie(0.5)
+
+
 function fbfq_fq(fbfq)
     hamiltonian = fbfq_hamiltonian(fbfq)
     eigvals_ = eigvals(Hermitian(hamiltonian))

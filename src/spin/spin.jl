@@ -48,6 +48,7 @@ end
     lindbladdf = 16
     zpiby2da = 17
     schroedda = 18
+    empty = 19
 end
 
 @enum StateType begin
@@ -77,6 +78,7 @@ const DT_ST = Dict(
     xpiby2da => st_state,
     xpiby2t2 => st_density,
     zpiby2da => st_state,
+    empty => st_state,
 )
 
 const GT_STR = Dict(
@@ -109,17 +111,16 @@ const E_PLASMA = sqrt(8 * EL * EC)
 const PHI_OSC = (8 * EC / EL)^(1//4)
 # qubit frequency at flux frustration point
 const FQ = 1.4e-2 #GHz
-const SIGMAFQ = FQ * 5e-2
-const S1FQ = FQ + SIGMAFQ
-const S2FQ = FQ - SIGMAFQ
-const S3FQ = FQ + 2 * SIGMAFQ
-const S4FQ = FQ - 2 * SIGMAFQ
+const SP1FQ = FQ + FQ * 1e-2
+const SN1FQ = FQ - FQ * 1e-2
+const SP2FQ = FQ + FQ * 2e-2
+const SN2FQ = FQ - FQ * 2e-2
 const MAX_CONTROL_NORM_0 = 5e-1 #GHz
 const FBFQ_A = 0.202407
 const FBFQ_B = 0.5
 const AYPIBY2 = 1.25e-1 #GHz
 const FBFQ_NAMP = 5.21e-6 # flux noise amplitude
-const FBFQ_NDIST = Normal(0., 1.)
+const STD_NORMAL = Normal(0., 1.)
 const GAMMAC = 1 / 3e5 #GHz(T_c = 300 us)
 const SQRTLNIR = 4
 const NAMP_PREFACTOR = FBFQ_NAMP / FBFQ_A
@@ -187,10 +188,10 @@ const SIGMAZ_ISO = SA_F64[1   0   0   0;
 const NEGI_H0_ISO = pi * NEGI * SIGMAZ_ISO
 const NEGI_H1_ISO = pi * NEGI * SIGMAX_ISO
 const FQ_NEGI_H0_ISO = FQ * NEGI_H0_ISO
-const S1FQ_NEGI_H0_ISO = S1FQ * NEGI_H0_ISO
-const S2FQ_NEGI_H0_ISO = S2FQ * NEGI_H0_ISO
-const S3FQ_NEGI_H0_ISO = S3FQ * NEGI_H0_ISO
-const S4FQ_NEGI_H0_ISO = S4FQ * NEGI_H0_ISO
+const SP1FQ_NEGI_H0_ISO = SP1FQ * NEGI_H0_ISO
+const SN1FQ_NEGI_H0_ISO = SN1FQ * NEGI_H0_ISO
+const SP2FQ_NEGI_H0_ISO = SP2FQ * NEGI_H0_ISO
+const SN2FQ_NEGI_H0_ISO = SN2FQ * NEGI_H0_ISO
 const AYPIBY2_NEGI_H1_ISO = AYPIBY2 * NEGI_H1_ISO
 # relaxation dissipation ops
 # L_{0} = |g> <e|
@@ -282,7 +283,6 @@ amplitude.
 @inline amp_dfq(amplitude) = FBFQ_DFQ_SPLINE_DIERCKX(amp_fbfq(amplitude))
 
 
-
 """
 amp_t1_poly - Compute the t1 time for the given amplitude in units
 of nanoseconds.
@@ -300,8 +300,6 @@ for the given amplitude.
 Arguments
 amplitude :: Array(N) - amplitude in units of GHz (no 2 pi)
 """
-# amp_t1_spline(amplitude::Float64) = Dierckx.evaluate(FBFQ_T1_SPLINE_DIERCKX, amp_fbfq_lo(amplitude))
-# damp_t1_spline(amplitude::Float64) = Dierckx.derivative(FBFQ_T1_SPLINE_DIERCKX, amp_fbfq_lo(amplitude))
 @inline amp_t1_spline(amplitude) = FBFQ_T1_SPLINE_ITP(amp_fbfq_lo(amplitude))
 
 
@@ -353,8 +351,14 @@ function dynamics_schroedda_deqjl(state::StaticVector, params::SimParams, time::
 end
 
 
+const maxh1 = MAX_CONTROL_NORM_0 * NEGI_H1_ISO
+@inline dynamics_empty_deqjl(state::StaticVector, params::SimParams, time::Float64) = (
+    (params.negi_h0 + maxh1) * state
+)
+
+
 function dynamics_lindbladnodis_deqjl(state::StaticMatrix, params::SimParams, time::Float64)
-    knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
+    knot_point = (Int(floor(time * dt_inv)) % control_knot_count) + 1
     negi_h = (
         params.negi_h0
         + controls[knot_point][1] * NEGI_H1_ISO
@@ -575,6 +579,7 @@ const DT_DYN = Dict(
     zpiby2t1 => dynamics_zpiby2t1_deqjl,
     xpiby2da => dynamics_xpiby2da_deqjl,
     zpiby2da => dynamics_zpiby2da_deqjl,
+    empty => dynamics_empty_deqjl,
 )
 
 
@@ -588,6 +593,7 @@ const DT_GTM = Dict(
     xpiby2nodis => TTOT_XPIBY2,
     xpiby2t1 => TTOT_XPIBY2,
     xpiby2da => TTOT_XPIBY2,
+    empty => 160.,
 )
 
 
@@ -618,7 +624,7 @@ See e.q. 9.71 in [0]
 function fidelity_mat_iso(m1_, m2_)
     n = size(m1_)[1]
     nby2 = Integer(n/2)
-    i1 = 1: nby2
+    i1 = 1:nby2
     i2 = (nby2 + 1):n
     m1 = m1_[i1, i1] + 1im * m1_[i2, i1]
     m2 = m2_[i1, i1] + 1im * m2_[i2, i1]
@@ -634,7 +640,7 @@ function gen_rand_state_iso(;seed=0)
     else
         Random.seed!(seed)
         state = rand(STATE_SIZE_NOISO) + 1im * rand(STATE_SIZE_NOISO)
-        state = state / sqrt(state'state)
+        state = state / sqrt(Real(state'state))
     end
     return SVector{STATE_SIZE_ISO}(
         [real(state); imag(state)]
@@ -647,9 +653,10 @@ function gen_rand_density_iso(;seed=0)
         state = [1, 1] / sqrt(2)
     else
         Random.seed!(seed)
-        state = rand(STATE_SIZE_NOISO) + 1im * rand(STATE_SIZE_NOISO)        
+        state = rand(STATE_SIZE_NOISO) + 1im * rand(STATE_SIZE_NOISO)
+        state = state / sqrt(Real(state'state))
     end
-    density = (state * state') / abs(state' * state)
+    density = state * state'
     density_r = real(density)
     density_i = imag(density)
     density_iso = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}([
@@ -664,7 +671,7 @@ end
 Generate the modulus of the noise with the rough
 spectral density Sxx(f) = |x̂(f)|^2 = 1 / |f|
 """
-function pink_noise_from_white(count, dt_inv, ndist; seed=0)
+function pink_noise_from_white(count, dt_inv, ndist; seed=0, plot=false)
     Random.seed!(seed)
     freqs = fftfreq(count, dt_inv)
     pink_noise_ = Array{Complex{Float64}, 1}(rand(ndist, count))
@@ -685,6 +692,14 @@ function pink_noise_from_white(count, dt_inv, ndist; seed=0)
         pink_noise_[i] = abs(pink_noise_[i]) * count
     end
     pink_noise_ = Array{Float64, 1}(pink_noise_)
+
+    if plot
+        plot_file_path = generate_file_path("png", "figures", joinpath(SPIN_OUT_PATH, "figures"))
+        taxis = Array(0:1:size(pink_noise_)[1] - 1) / dt_inv
+        fig = Plots.plot(taxis, pink_noise_, dpi=DPI)
+        Plots.savefig(fig, plot_file_path)
+        println("Plotted noise to $(plot_file_path)")
+    end
 
     return pink_noise_
 end
@@ -728,11 +743,11 @@ function run_sim_deqjl(
     gate_count, gate_type;
     save_file_path=nothing,
     controls_dt_inv=DT_PREF_INV,
-    adaptive=DEQJL_ADAPTIVE, dynamics_type=lindbladnodis,
+    adaptive=DEQJL_ADAPTIVE, dynamics_type=schroed,
     dt=DT_PREF, save=true, save_type=jl, seed=0,
     solver=DifferentialEquations.Vern9, print_seq=false, print_final=false,
-    negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=FBFQ_NDIST,
-    noise_dt_inv=DT_NOISE_INV)
+    negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
+    noise_dt_inv=DT_NOISE_INV, seed_state=true)
     start_time = Dates.now()
     # grab
     if isnothing(save_file_path)
@@ -755,10 +770,11 @@ function run_sim_deqjl(
     # integrate
     dynamics = DT_DYN[dynamics_type]
     state_type = DT_ST[dynamics_type]
+    state_seed = seed_state ? seed : 0
     if state_type == st_state
-        initial_state = gen_rand_state_iso(;seed=seed)
+        initial_state = gen_rand_state_iso(;seed=state_seed)
     elseif state_type == st_density
-        initial_state =  gen_rand_density_iso(;seed=seed)
+        initial_state =  gen_rand_density_iso(;seed=state_seed)
     end
     tspan = (0., evolution_time)
     params = SimParams(controls, control_knot_count, controls_dt_inv, negi_h0,
@@ -830,7 +846,7 @@ function run_sim_deqjl(
     end
     data_file_path = nothing
     if save
-        data_file_path = generate_save_file_path("h5", experiment_name, save_path)
+        data_file_path = generate_file_path("h5", experiment_name, save_path)
         h5open(data_file_path, "w") do data_file
             write(data_file, "dynamics_type", Integer(dynamics_type))
             write(data_file, "gate_count", gate_count)
@@ -926,7 +942,7 @@ function run_sim_h0sweep_deqjl(
     end
     data_file_path = nothing
     if save
-        data_file_path = generate_save_file_path("h5", experiment_name, save_path)
+        data_file_path = generate_file_path("h5", experiment_name, save_path)
         h5open(data_file_path, "cw") do data_file
             write(data_file, "dynamics_type", Integer(dynamics_type))
             write(data_file, "gate_time", gate_time)
@@ -1010,4 +1026,3 @@ function t1_average(save_file_path; save_type=jl)
     
     return t1_avgs
 end
-

@@ -20,6 +20,7 @@ META_NAME = "spin"
 EXPERIMENT_NAME = "figures"
 SPIN_OUT_PATH = os.path.join(WDIR, "out", META_NAME)
 SAVE_PATH = os.path.join(WDIR, "out", META_NAME, EXPERIMENT_NAME)
+F3C_DATA_FILE_PATH = os.path.join(SAVE_PATH, "f3c.h5")
 
 # simulation
 DT_PREF = 1e-2
@@ -58,7 +59,7 @@ def grab_controls(save_file_path, save_type=SaveType.jl):
 #ENDDEF
 
 
-def generate_save_file_path(extension, save_file_name, save_path):
+def generate_file_path(extension, save_file_name, save_path):
     # Ensure the path exists.
     os.makedirs(save_path, exist_ok=True)
     
@@ -101,6 +102,8 @@ class PulseType(Enum):
     s4 = 4
     d2 = 5
     d3 = 6
+    s21 = 7
+    s41 = 8
 #ENDDEF
 
 PT_STR = {
@@ -110,6 +113,8 @@ PT_STR = {
     PulseType.s4: "S-4",
     PulseType.d2: "D-2",
     PulseType.d3: "D-3",
+    PulseType.s21: "S-21",
+    PulseType.s41: "S-41",
 }
 
 PT_COLOR = {
@@ -117,8 +122,10 @@ PT_COLOR = {
     PulseType.qoc: "red",
     PulseType.s2: "lime",
     PulseType.s4: "green",
-    PulseType.d2: "crimson",
-    PulseType.d3: "firebrick",
+    PulseType.d2: "red",
+    PulseType.d3: "darkred",
+    PulseType.s21: "black",
+    PulseType.s41: "black",
 }
 
 PT_LS = {
@@ -128,6 +135,8 @@ PT_LS = {
     PulseType.s4: "dashed",
     PulseType.d2: "solid",
     PulseType.d3: "dashed",
+    PulseType.s21: "solid",
+    PulseType.s41: "dashed",
 }
 
 DATAFP_KEY = 1
@@ -139,15 +148,19 @@ AVGT1_KEY = 6
 
 # GENERAL #
 def plot_fidelity_by_gate_count(
-        fidelitiess, inds=None, title="", ylim=(0, 1),
-        yticks=np.arange(0, 1.1, 0.1),
+        fidelitiess, inds=None, title="", ylim=None,
+        yticks=None,
         labels=None, colors=None, linestyles=None,
-        xlim=None, dpi=DPI, figlabel=None):
+        xlim=None, dpi=DPI, figlabel=None,
+        adjust=None):
     fig = plt.figure()
     gate_count = fidelitiess[0].shape[0] - 1
     gate_count_axis = np.arange(0, gate_count + 1)
     if inds is None:
         inds = np.arange(0, gate_count)
+    #ENDIF
+    if xlim is None:
+        xlim = (0., gate_count)
     #ENDIF
     for (i, fidelities) in enumerate(fidelitiess):
         color = None if colors is None else colors[i]
@@ -165,8 +178,13 @@ def plot_fidelity_by_gate_count(
     plt.xlim(xlim)
     plt.yticks(yticks)
     plt.legend()
-    plt.subplots_adjust(left=0.1, right=1., top=0.98, bottom=0.1, wspace=None, hspace=None)
-    plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
+    if adjust is None:
+        plt.subplots_adjust(left=0.1, right=0.97, bottom=0.1, top=0.98, wspace=None, hspace=None)
+    else:
+        plt.subplots_adjust(left=adjust[0], right=adjust[1], bottom=adjust[2],
+                            top=adjust[3], wspace=adjust[4], hspace=adjust[5])
+    #ENDIF
+    plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     plt.savefig(plot_file_path, dpi=dpi)
     return plot_file_path
 #ENDDEF
@@ -231,7 +249,7 @@ F1_DATA = {
 }
 
 def make_figure1a():
-    plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
+    plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     save_file_paths = list()
     save_types = list()
     labels = list()
@@ -284,7 +302,7 @@ F1B_ALPHA = 1.
 F1B_ALPHA_M = 1.
 F1B_DATA_PATH = os.path.join(SPIN_OUT_PATH, "figures/f1b.h5")
 def make_figure1b():
-    plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
+    plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     t1_normalize = 1e6 # us
     with h5py.File(F1B_DATA_PATH, "r") as data_file:
         amps_fit = data_file["amps_fit"][()]
@@ -371,18 +389,6 @@ F2_DATA = {
         DATAFP_KEY: os.path.join(SPIN_OUT_PATH, "spin14/00074_spin14.h5"),
         ACORDS_KEY: (2.5, 0.08),
     },
-    PulseType.s2: {
-        SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin12/00132_spin12.h5"),
-        SAVET_KEY: SaveType.jl,
-        DATAFP_KEY: os.path.join(SPIN_OUT_PATH, "spin12/00200_spin12.h5"),
-        ACORDS_KEY: (0.5, 0.4),
-    },
-    PulseType.s4: {
-        SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin12/00229_spin12.h5"),
-        SAVET_KEY: SaveType.jl,
-        DATAFP_KEY: os.path.join(SPIN_OUT_PATH, "spin12/00231_spin12.h5"),
-        ACORDS_KEY: (0.5, 0.4),
-    },
     PulseType.d2: {
         SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin11/00091_spin11.h5"),
         SAVET_KEY: SaveType.jl,
@@ -393,6 +399,18 @@ F2_DATA = {
         SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin11/00110_spin11.h5"),
         SAVET_KEY: SaveType.jl,
         DATAFP_KEY: os.path.join(SPIN_OUT_PATH, "spin11/00111_spin11.h5"),
+        ACORDS_KEY: (0.5, 0.4),
+    },
+    PulseType.s2: {
+        SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin12/00295_spin12.h5"),
+        SAVET_KEY: SaveType.jl,
+        DATAFP_KEY: os.path.join(SPIN_OUT_PATH, "spin12/00297_spin12.h5"),
+        ACORDS_KEY: (0.5, 0.4),
+    },
+    PulseType.s4: {
+        SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin12/00298_spin12.h5"),
+        SAVET_KEY: SaveType.jl,
+        DATAFP_KEY: os.path.join(SPIN_OUT_PATH, "spin12/00299_spin12.h5"),
         ACORDS_KEY: (0.5, 0.4),
     },
 }
@@ -438,7 +456,7 @@ def make_figure2a():
     axs[int(np.floor(subfigtot/2))].set_ylabel("$a$ (GHz)")
     axs[-1].set_xlabel("$t$ (ns)")
     plt.subplots_adjust(left=0.1, right=1, top=1, bottom=0.1, hspace=0., wspace=None)
-    plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
+    plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     plt.savefig(plot_file_path, dpi=DPI_FINAL)
     print("Saved Figure2a to {}"
           "".format(plot_file_path))
@@ -447,7 +465,8 @@ def make_figure2a():
 
 F2B_TRIAL_COUNT = int(1e3)
 F2B_FQ_DEV = 1e-1
-F2B_PT_LIST = [PulseType.analytic, PulseType.s2, PulseType.s4, PulseType.d2, PulseType.d3]
+F2B_PT_LIST = [PulseType.analytic, PulseType.s2, PulseType.s4, PulseType.d2,
+               PulseType.d3]
 F2B_LB = 1 + 1e-8
 def make_figure2b():
     fq = 1.4e-2
@@ -461,7 +480,7 @@ def make_figure2b():
     for (i, pulse_type) in enumerate(F2B_PT_LIST):
         pulse_data = F2_DATA[pulse_type]
         label = "{}".format(PT_STR[pulse_type])
-        linestyle = PT_LS[pulse_type]
+        linestyle = "solid" # PT_LS[pulse_type]
         color = PT_COLOR[pulse_type]
         data_file_path = pulse_data[DATAFP_KEY]
         with h5py.File(data_file_path, "r") as data_file:
@@ -492,14 +511,177 @@ def make_figure2b():
     plt.xlabel("$|\delta \omega_{q} / \omega_{q}| \; (\%)$")
     plt.ylabel("Mean Gate Error")
     plt.subplots_adjust(left=0.13, right=0.97, bottom=0.1, top=0.98, hspace=None, wspace=None)
-    plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
+    plt.text(0, 0.95, "(b)", transform=fig.transFigure)
+    plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     plt.savefig(plot_file_path, dpi=DPI)
     print("Plotted Figure2b to {}"
           "".format(plot_file_path))
 #ENDDEF
 
+
+# FIGURE 3 #
+
+F3_DATA = {
+    PulseType.analytic: {
+        SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
+        SAVET_KEY: SaveType.py,
+        DATAFP_KEY: [os.path.join(SPIN_OUT_PATH, "spin14", "{:05d}_spin14.h5".format(index)) for index in [
+            73, 86, 87, 88, 89, 90, 91, 92, 93, 94
+        ]],
+        ACORDS_KEY: (2.5, 0.08),
+    },
+    PulseType.s2: {
+        SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin18/00003_spin18.h5"),
+        SAVET_KEY: SaveType.jl,
+        DATAFP_KEY: [os.path.join(SPIN_OUT_PATH, "spin18", "{:05d}_spin18.h5".format(index)) for index in [
+            7, 36, 38, 40, 42, 43, 45, 48, 49, 51
+        ]],
+        ACORDS_KEY: (0.5, 0.4),
+    },
+    PulseType.s4: {
+        SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin18/00005_spin18.h5"),
+        SAVET_KEY: SaveType.jl,
+        DATAFP_KEY: [os.path.join(SPIN_OUT_PATH, "spin18", "{:05d}_spin18.h5".format(index)) for index in [
+            8, 35, 37, 39, 41, 44, 46, 47, 50, 52
+        ]],
+        ACORDS_KEY: (0.5, 0.4),
+    },
+    PulseType.d2: {
+        SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin17/00003_spin17.h5"),
+        SAVET_KEY: SaveType.jl,
+        DATAFP_KEY: [os.path.join(SPIN_OUT_PATH, "spin17", "{:05d}_spin17.h5".format(index)) for index in [
+            6, 33, 35, 37, 39, 41, 43, 45, 47, 50
+        ]],
+        ACORDS_KEY: (0.5, 0.4),
+    },
+    PulseType.d3: {
+        SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin17/00005_spin17.h5"),
+        SAVET_KEY: SaveType.jl,
+        DATAFP_KEY: [os.path.join(SPIN_OUT_PATH, "spin17", "{:05d}_spin17.h5".format(index)) for index in [
+            7, 34, 36, 38, 40, 42, 44, 46, 48, 49
+        ]],
+        ACORDS_KEY: (0.5, 0.4),
+    },
+}
+
+F3_PT_LIST = [PulseType.analytic, PulseType.s2, PulseType.s4, PulseType.d2, PulseType.d3]
+
+
+F3A_PT_LIST = [[PulseType.analytic], [PulseType.s2], [PulseType.s4], [PulseType.d2], [PulseType.d3]]
+def make_figure3a():
+    subfigtot = len(F3A_PT_LIST)
+    (fig, axs) = plt.subplots(subfigtot)
+    for (i, pulse_types) in enumerate(F3A_PT_LIST):
+        if i != subfigtot - 1:
+            axs[i].set_xticks([])
+        #ENDIF
+        for (j, pulse_type) in enumerate(pulse_types):
+            data = F3_DATA[pulse_type]
+            color = PT_COLOR[pulse_type]
+            label = "{}".format(PT_STR[pulse_type])
+            linestyle = "solid" #PT_LS[pulse_type]
+            save_file_path = data[SAVEFP_KEY]
+            save_type = data[SAVET_KEY]
+            (controls, evolution_time) = grab_controls(save_file_path, save_type=save_type)
+            (control_eval_count, control_count) = controls.shape
+            control_eval_times = np.arange(0, control_eval_count, 1) * DT_PREF
+            axs[i].plot(control_eval_times, controls[:, 0], color=color, label=label,
+                        linestyle=linestyle, zorder=2)
+            axs[i].set_xlim((0, 56.80))
+            if pulse_type == PulseType.analytic:
+                axs[i].set_ylim(-0.15, 0.15)
+                axs[i].set_yticks([-0.1, 0, 0.1])
+            else:
+                axs[i].set_ylim((-0.63, 0.63))
+                axs[i].set_yticks([-0.5, 0, 0.5])
+            #ENDIF
+            axs[i].axhline(0, color="grey", alpha=0.2, zorder=1, linewidth=0.8)
+            acords = data[ACORDS_KEY]
+            axs[i].text(acords[0], acords[1], label)
+        #ENDFOR
+    #ENDFOR
+    axs[0].text(-6.4, 0.1, "(a)")
+    axs[int(np.floor(subfigtot/2))].set_ylabel("$a$ (GHz)")
+    axs[-1].set_xlabel("$t$ (ns)")
+    plt.subplots_adjust(left=0.1, right=1, top=1, bottom=0.1, hspace=0., wspace=None)
+    plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
+    plt.savefig(plot_file_path, dpi=DPI_FINAL)
+    print("Saved Figure3a to {}"
+          "".format(plot_file_path))
+#ENDDEF
+
+
+def make_figure3b():
+    colors = list()
+    fidelitiess = list()
+    labels = list()
+    linestyles = list()
+    for (i, pulse_type) in enumerate(F3_PT_LIST):
+        data = F3_DATA[pulse_type]
+        color = PT_COLOR[pulse_type]
+        mfidelities = None
+        fcount = len(data[DATAFP_KEY])
+        for (j, data_file_path) in enumerate(data[DATAFP_KEY]):
+            with h5py.File(data_file_path, "r") as data_file:
+                fidelities = data_file["fidelities"][()]
+            #ENDWITH
+            if mfidelities is None:
+                mfidelities = fidelities
+            else:
+                mfidelities = mfidelities + fidelities
+            #ENDIF
+        #ENDFOR
+        mfidelities = mfidelities / fcount
+        label = "{}".format(PT_STR[pulse_type])
+        colors.append(color)
+        fidelitiess.append(mfidelities)
+        labels.append(label)
+        linestyles.append("solid") # PT_LS[pulse_type]
+    #ENDFOR
+    plot_file_path = plot_fidelity_by_gate_count(
+        fidelitiess, colors=colors, labels=labels, linestyles=linestyles,
+        adjust=[0.12, 0.97, 0.1, 1., None, None],
+        figlabel=[-700, 1.2e-2, "(b)"], dpi=DPI_FINAL
+    )
+    print("Plotted Figure3b to {}"
+            "".format(plot_file_path))
+#ENDDEF
+
+
+def make_figure3c():
+    with h5py.File(F3C_DATA_FILE_PATH, "r") as data_file:
+        noise = data_file["noise"][()]
+        times = data_file["times"][()]
+        noise_fft = data_file["noise_fft"][()]
+        freqs = data_file["freqs"][()]
+    #ENDWITH
+    noise_inds = np.arange(0, noise.shape[0], 30)
+    times = times[noise_inds] / 1e3
+    noise = noise[noise_inds] * 1e3
+    freqs = freqs * 1e3
+
+    (fig, axs) = plt.subplots(2)
+    axs[0].scatter(times, noise, s=0.1, alpha=0.8)
+    axs[0].set_xlim(times[0], times[-1])
+    axs[0].set_ylim(0, np.max(noise))
+    axs[0].set_xlabel("$t$ ($\mu$s)")
+    axs[0].set_ylabel("${\\xi}(t)$ (MHz)")
+    axs[1].scatter(freqs, noise_fft ** 2, s=0.1, alpha=0.8)
+    axs[1].set_xlim(-2.5e1, 2.5e1)
+    axs[1].set_ylim(0, 3e-7 ** 2)
+    axs[1].set_xlabel("$f$ (MHz)")
+    axs[1].set_ylabel("$|\hat{\\xi}(t)|^{2}$ (a.u.)")
+    fig.text(0.02, 0.97, "(c)")
+    plt.subplots_adjust(left=0.1, right=1., bottom=0.12, top=1., hspace=0.3, wspace=None)
+    plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
+    plt.savefig(plot_file_path, dpi=DPI)
+    print("Saved Figure3c to {}"
+          "".format(plot_file_path))
+#ENDDEF
+
+
 def main():
-    make_figure2b()
+    make_figure3c()
 #ENDDEF
 
 

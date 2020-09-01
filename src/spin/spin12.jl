@@ -24,7 +24,7 @@ const DT_STATIC_INV = DT_PREF_INV
 const CONSTRAINT_TOLERANCE = 1e-8
 const AL_KICKOUT_TOLERANCE = 1e-7
 const PN_STEPS = 5
-const MAX_PENALTY = 1e10
+const MAX_PENALTY = 1e11
 const ILQR_DJ_TOL = 1e-4
 
 # Define the problem.
@@ -81,8 +81,8 @@ function RobotDynamics.dynamics(model::Model{SO}, astate::StaticVector,
     delta_dcontrol = acontrols[D2CONTROLS_IDX]
 
     if SO == 2
-        negi_s1h = S1FQ_NEGI_H0_ISO + negi_hc
-        negi_s2h = S2FQ_NEGI_H0_ISO + negi_hc
+        negi_s1h = SP1FQ_NEGI_H0_ISO + negi_hc
+        negi_s2h = SN1FQ_NEGI_H0_ISO + negi_hc
         delta_s1state1 = negi_s1h * astate[S1STATE1_IDX]
         delta_s1state2 = negi_s1h * astate[S1STATE2_IDX]
         delta_s2state1 = negi_s2h * astate[S2STATE1_IDX]
@@ -99,10 +99,10 @@ function RobotDynamics.dynamics(model::Model{SO}, astate::StaticVector,
             delta_s2state2;
         ]
     elseif SO == 4
-        negi_s1h = S1FQ_NEGI_H0_ISO + negi_hc
-        negi_s2h = S2FQ_NEGI_H0_ISO + negi_hc
-        negi_s3h = S3FQ_NEGI_H0_ISO + negi_hc
-        negi_s4h = S4FQ_NEGI_H0_ISO + negi_hc
+        negi_s1h = SP1FQ_NEGI_H0_ISO + negi_hc
+        negi_s2h = SN1FQ_NEGI_H0_ISO + negi_hc
+        negi_s3h = SP2FQ_NEGI_H0_ISO + negi_hc
+        negi_s4h = SN2FQ_NEGI_H0_ISO + negi_hc
         delta_s1state1 = negi_s1h * astate[S1STATE1_IDX]
         delta_s1state2 = negi_s1h * astate[S1STATE2_IDX]
         delta_s2state1 = negi_s2h * astate[S2STATE1_IDX]

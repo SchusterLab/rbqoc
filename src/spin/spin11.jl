@@ -20,13 +20,10 @@ const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
 # Define the optimization.
 const CONTROL_COUNT = 1
-const DORDER = 3
-const DT_STATIC = DT_PREF
-const DT_STATIC_INV = DT_PREF_INV
 const CONSTRAINT_TOLERANCE = 1e-8
 const AL_KICKOUT_TOLERANCE = 1e-7
-const PN_STEPS = 5
-const MAX_PENALTY = 1e10
+const PN_STEPS = 2
+const MAX_PENALTY = 1e11
 const ILQR_DJ_TOL = 1e-4
 
 # Define the problem.
@@ -133,7 +130,8 @@ end
 function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
                   postsample=false, initial_save_file_path=nothing,
                   initial_save_type=jl, sqrtbp=false, derivative_order=0,
-                  integrator_type=rk6, max_penalty=MAX_PENALTY, qs=nothing)
+                  integrator_type=rk6, max_penalty=MAX_PENALTY, qs=nothing,
+                  smoke_test=false, dt=5e-3)
     model = Model(derivative_order)
     n = state_dim(model)
     m = control_dim(model)
@@ -192,8 +190,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     ]
 
     if isnothing(initial_save_file_path)
-        dt = DT_STATIC
-        N = Int(floor(evolution_time * DT_STATIC_INV)) + 1
+        dt_inv = 1 / dt
+        N = Int(floor(evolution_time * dt_inv)) + 1
         U0 = [SVector{m}(
             fill(1e-4, CONTROL_COUNT)
         ) for k = 1:N-1]
@@ -209,9 +207,10 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
             end
             return (d2controls, evolution_time)
         end
-        evolution_time = Int(floor(evolution_time * DT_STATIC_INV)) * DT_STATIC
-        dt = DT_STATIC
-        N = Int(floor(evolution_time * DT_STATIC_INV)) + 1
+        dt = DT_PREF
+        dt_inv = DT_PREF_INV
+        evolution_time = Int(floor(evolution_time * dt_inv)) * dt
+        N = Int(floor(evolution_time * dt_inv)) + 1
         U0 = [SVector{m}(d2controls[k, 1]) for k = 1:N-1]
     end
     X0 = [SVector{n}([
@@ -261,10 +260,14 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     if solver_type == alilqr
         solver = AugmentedLagrangianSolver(prob, opts)
         solver.solver_uncon.opts.square_root = sqrtbp
-        solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
-        solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
+        solver.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
+        solver.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
         solver.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
         solver.opts.penalty_max = max_penalty
+        if smoke_test
+            solver.opts.iterations = 1
+            solver.solver_uncon.opts.iterations = 1
+        end
     elseif solver_type == altro
         solver = ALTROSolver(prob, opts)
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
@@ -275,6 +278,11 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         solver.solver_al.opts.penalty_max = max_penalty
         solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.solver_pn.opts.n_steps = PN_STEPS
+        if smoke_test
+            solver.solver_al.opts.iterations = 1
+            solver.solver_al.solver_uncon.opts.iterations = 1
+            solver.solver_pn.opts.n_steps = 1
+        end
     end
     Altro.solve!(solver)
 
@@ -296,7 +304,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     
     # Save.
     if SAVE
-        save_file_path = generate_save_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
+        save_file_path = generate_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
         println("Saving this optimization to $(save_file_path)")
         h5open(save_file_path, "cw") do save_file
             write(save_file, "acontrols", acontrols_arr)
