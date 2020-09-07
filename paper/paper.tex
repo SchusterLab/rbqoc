@@ -31,29 +31,17 @@
   %% - 1 what I have done
   %% - few sentences about primary results
   The ability to engineer high fidelity operations on quantum processors in the presence of
-  systematic errors and decoherence remains the primary challenge requisite to achieving quantum advantage.
+  calibration errors and decoherence remains the primary challenge requisite to achieving quantum advantage.
   Quantum optimal control (QOC) techniques have proven effective in realizing high fidelity operations,
   but they require exquisite calibration to be performant. In this work we employ robust control techniques
-  to achieve high fidelity gates in the presence of parameter spreads up to 5$\%$.
+  to achieve gate errors two orders of magnitude lower than dynamic decoupling for parameter
+  spreads on the order of $1\%$. 
   Additionally, current QOC techniques mitigate decoherence effects due to longitudinal relaxation by integrating
-  Lindblad master equation dynamics, which drastically increase the computational complexity
+  Lindblad master equation dynamics, which exponentially increase the computational complexity
   of the optimization algorithm.
-  In this work we achieve a factor of $4$ increase in longitudinal relaxation times
+  In this work we achieve a factor of $5$ increase in longitudinal relaxation times
   for the gate set of a fluxonium qubit
   using a computationally efficient metric in optimizaiton.
-  
-  %% The ability to engineer high fidelity operations on quantum processors in the presence of
-  %% systematic errors and decoherence remains the primary challenge requisite to achieving quantum advantage.
-  %% Quantum optimal control (QOC) techniques have been developed to mitigate deleterious effects
-  %% by manipulating the time-dependent parameters controlling the system. These techniques often
-  %% target a single error channel and may be incompatible with experimental constraints. 
-  %% In this work, we develop techniques to simultaneously mitigate
-  %% longitudinal relaxation and pure dephasing in a framework that can handle arbitrary
-  %% experimental constraints.
-  %% Optimizing a gate set for a fluxonium qubit as an example, we achieve a factor of 4 increase in
-  %% longitudinal relaxation times and outperform
-  %% existing dynamic decoupling methods in mitigating pure dephasing due to flux noise, achieving
-  %% high fidelity gates in the presence of parameter spreads up to $5\%$.
 \end{abstract}
 
 \maketitle
@@ -254,10 +242,10 @@ updates, see \cite{howell2019altro}.
 
 %% F1
 \begin{figure}[ht]
-  \begin{subfigure}{.6\linewidth}
+  \begin{subfigure}{.55\linewidth}
     \includegraphics[width=\linewidth]{assets/f1a.png}
-  \end{subfigure}%
-    \begin{subfigure}{.4\linewidth}
+  \end{subfigure}\hfill
+  \begin{subfigure}{.4\linewidth}
     \includegraphics[width=\linewidth]{assets/f1b.png}
   \end{subfigure}
   
@@ -266,10 +254,10 @@ updates, see \cite{howell2019altro}.
   \end{subfigure}
   \caption{
     (a) $T_{1}$ optimized gates (red) and analytic gates (blue).
-    (b) $T_{1}$ interpolation function used in optimization
-    and the corresponding $T_{1}$ times for the average absolute amplitude of each gate.
+    (b) $T_{1}$ interpolation function used in optimization. Markers
+    denote the time-averaged, absolute amplitude of each gate.
     (c) Master equation simulation with $T_{1}$ dissipation
-    for all gates, over the course of concatenated gate applications.
+    over the course of concatenated gate applications.
   }
 \end{figure}
 
@@ -282,9 +270,9 @@ In the two-level
 approximation the system Hamiltonian takes the form
 \label{eq:hamiltonian}
 \begin{align}
-  H/h &= \omega_{q} \frac{\sigma_{z}}{2} + a(t) \frac{\sigma_{x}}{2}
+  H/h &= f_{q} \frac{\sigma_{z}}{2} + a(t) \frac{\sigma_{x}}{2}
 \end{align}
-where $\omega_{q}$ is the qubit frequency at the flux frustration point,
+where $f_{q}$ is the qubit frequency at the flux frustration point,
 $a$ is the flux drive amplitude, $h$ is Planck's constant, and $\sigma_{x}, \sigma_{y}$
 are Pauli matrices. The flux amplitude $a$ is experimentally
 realized by modulating the flux 
@@ -434,7 +422,7 @@ of time as shown in Fig. 1.
 \begin{table}[ht]
   \begin{tabular}{c | c | c | c}
     & Analytic  & QOC &\\
-    Gate & $P_{1}\ (10^{-5})$ & $P_{1}\ (10^{-5})$ & Ratio\\
+    Gate & $P_{1}\ (10^{-5})$ & $P_{1}\ (10^{-5})$ & $P_{1\textrm{A}} / P_{1\textrm{Q}}$\\
     \hline
     Z/2 & 5.745 & 1.149 & 5.000\\
     Y/2 & 5.253 & 1.157 & 4.540\\
@@ -447,9 +435,9 @@ of time as shown in Fig. 1.
 
 %% F2
 \begin{figure}[ht]
-  \begin{subfigure}{.6\linewidth}
+  \begin{subfigure}{.55\linewidth}
     \includegraphics[width=\linewidth]{assets/f2a.png}
-  \end{subfigure}%
+  \end{subfigure}\hfill
   \begin{subfigure}{.4\linewidth}
     \includegraphics[width=\linewidth]{assets/f2b.png}
   \end{subfigure}
@@ -458,12 +446,15 @@ of time as shown in Fig. 1.
     \includegraphics[width=\linewidth]{assets/f2c.png}
   \end{subfigure}
   
-  \caption{\centering (a) $X/2$ gates robust to qubit frequency offsets
-    constructed using the analytic, (2, 4)-point
-    sampling, and (2, 3)-derivative methods at a gate duration of $56.8 (ns)$.
-    (b) Gate error as a function of qubit frequency detuning from the nominal frequency.
-    (c) Average gate error at one standard deviation from the nominal qubit frequency as
-    a function fo the gate duration.
+  \caption{
+    (a) X/2 gates robust to qubit frequency detunings constructed using the
+    analytic, (2, 4)-point sampling, and (2\textsuperscript{nd},
+    3\textsuperscript{rd})-order derivative methods.
+    (b) Gate error as a function of the detuning from the nominal
+    qubit frequency at a fixed gate duration, see (a), and at the best
+    gate duration for each method chosen from a sweep, see (c).
+    (c) Gate error at a one-percent detuning from the nominal qubit frequency as
+    a function of the gate duration set in optimization.
   }
 \end{figure}
 
@@ -481,7 +472,7 @@ of time as shown in Fig. 1.
   %%   \includegraphics[width=\linewidth]{assets/f3c.png}
   %% \end{subfigure}
   
-  \caption{\centering
+  \caption{
     (a) $X/2$ gates robust to flux offsets constructed using the analytic,
     (2, 4)-point sampling, and (2, 3)-derivative methods at a gate duration
     of $56.8 (ns)$. (b) Mean gate error for 10 samples of 1/$f$ flux noise over 5000
@@ -500,7 +491,7 @@ may cause the flux amplitude to deviate from its
 desired value by an amount $\delta a$. Additionally,
 residual calibration errors and fluctuations may cause
 the qubit frequency to deviate from its measured value
-by an amount $\delta \omega_{q}$.
+by an amount $\delta f_{q}$.
 
 System parameter
 deviations are typically addressed with dynamic decoupling
@@ -541,8 +532,8 @@ are altered by a small deviation, typically chosen
 to represent the distribution of the parameter.
 For example, in the 2-point sampling method we
 propagate $\ket{\psi^{\pm, I}(t)}$ where
-$\omega_{q}^{\pm} = \omega_{q} \pm \sigma_{\omega_{q}}$,
-$\omega_{q}^{I} = \omega_{q}$.
+$f_{q}^{\pm} = f_{q} \pm \sigma_{f_{q}}$,
+$f_{q}^{I} = f_{q}$.
 The difference between the final states and the target
 state is penalized, resulting in quadratic costs at
 each knot point
@@ -552,7 +543,7 @@ ${\lvert \ket{\psi^{\pm, I}_{k}} - \ket{\psi_{f}} \rvert}^{2}$
 schemes to a dynamic decoupling pulse
 for a single $R_{x}(\pi/2)$ gate
 subject to qubit frequency detuning
-($\omega_{q} \gets \omega_{q} + \delta \omega_{q}$)
+($f_{q} \gets f_{q} + \delta f_{q}$)
 to demonstrate the applicability of our techniques to mitigate
 system parameter deviations.
 We use a compensating for off-resonance error
@@ -588,7 +579,7 @@ to qubit frequency detuning errors and
 amplitude scaling errors (see Appendix).
 The derivative and sampling methods are employed to
 mitigate error due to qubit frequency detuning
-($\omega_{q} \gets \omega_{q} + \delta \omega_{q}$)
+($f_{q} \gets f_{q} + \delta f_{q}$)
 as well as flux amplitude scaling error
 ($a \gets a (1 + \delta a)$).
 
@@ -611,7 +602,7 @@ a more naive method.
 We measure $T_{1}$ using the standard experiment
 and $T_{2}$ using te Ramsey experiment. We fit with splines
 and the data looks like fig. 3 in Helin's paper \cite{zhang2020universal}.
-We measure $\omega_{q}$ and $\sigma_{\omega_{q}}$ using X method.
+We measure $f_{q}$ and $\sigma_{f_{q}}$ using X method.
 
 
 %% AC
@@ -636,28 +627,28 @@ $L_{2} = (I - \sigma_{z})/2$.
 To obtain the dynamics for the derivative of the state $\partial_{x}^{l} \ket{\psi(t)}$
 we differentiate the TDSE dynamics \ref{eq:tdse} with respect to the parameter of interest
 ($x$). Using the fluxonium hamiltonian \ref{eq:hamiltonian} we obtain the derivative of the
-state with respect to the qubit frequency ($\omega_{q}$) and the flux amplitude ($a$).
+state with respect to the qubit frequency ($f_{q}$) and the flux amplitude ($a$).
 Here we present the dynamics for the second derivative of the state with respect to the
 qubit frequency. The case is analogous for the flux amplitude. Both $H$ and $\ket{\psi}$ are functions
-of $\omega_{q}$, $a$, and $t$, but we omit the explicit dependence in notation for
+of $f_{q}$, $a$, and $t$, but we omit the explicit dependence in notation for
 brevity.
 \begin{equation}
   \begin{aligned}
-      \partial_{\omega_{q}} \partial_{t} \ket{\psi} &= \partial_{\omega_{q}} H \ket{\psi}\\
-      &= (\partial_{\omega_{q}} H) \ket{\psi} + H (\partial_{\omega_{q}} \ket{\psi})\\
-      &= \frac{\sigma_{z}}{2} \ket{\psi} + H (\partial_{\omega_{q}} \ket{\psi})
+      \partial_{f_{q}} \partial_{t} \ket{\psi} &= \partial_{f_{q}} H \ket{\psi}\\
+      &= (\partial_{f_{q}} H) \ket{\psi} + H (\partial_{f_{q}} \ket{\psi})\\
+      &= \frac{\sigma_{z}}{2} \ket{\psi} + H (\partial_{f_{q}} \ket{\psi})
   \end{aligned}
 \end{equation}
 \begin{equation}
   \begin{aligned}
-    \partial_{\omega_{q}}^{2} \partial_{t} \ket{\psi} &= \partial_{\omega_{q}} (\partial_{\omega_{q}} H \ket{\psi})\\
-    &= (\partial_{\omega_{q}}^{2} H) \ket{\psi} + 2 (\partial_{\omega_{q}} H)(\partial_{\omega_{q}} \ket{\psi})\\
-    &\quad + H (\partial_{\omega_{q}}^{2} \ket{\psi})\\
-    &= \sigma_{z} (\partial_{\omega_{q}} \ket{\psi}) + H (\partial_{\omega_{q}}^{2} \ket{\psi})
+    \partial_{f_{q}}^{2} \partial_{t} \ket{\psi} &= \partial_{f_{q}} (\partial_{f_{q}} H \ket{\psi})\\
+    &= (\partial_{f_{q}}^{2} H) \ket{\psi} + 2 (\partial_{f_{q}} H)(\partial_{f_{q}} \ket{\psi})\\
+    &\quad + H (\partial_{f_{q}}^{2} \ket{\psi})\\
+    &= \sigma_{z} (\partial_{f_{q}} \ket{\psi}) + H (\partial_{f_{q}}^{2} \ket{\psi})
   \end{aligned}
 \end{equation}
-The augmented state vector carries $\partial_{\omega_{q}}^{l} \ket{\psi}$
-which appears explicitly in its own dynamics. Due to the dependence of $H$ on $\omega_{q}$ and $a$,
+The augmented state vector carries $\partial_{f_{q}}^{l} \ket{\psi}$
+which appears explicitly in its own dynamics. Due to the dependence of $H$ on $f_{q}$ and $a$,
 the $l$\textsuperscript{th} state derivative is coupled to the
 $l - 1$\textsuperscript{th} state derivative.
 
