@@ -31,17 +31,29 @@
   %% - 1 what I have done
   %% - few sentences about primary results
   The ability to engineer high fidelity operations on quantum processors in the presence of
-  decoherence and systematic errors remains the primary challenge requisite to achieving quantum advantage.
-  Quantum optimal control (QOC) techniques have been developed to mitigate deleterious effects
-  by manipulating the time-dependent parameters controlling the system. These techniques often
-  target a single error channel and may be incompatible with experimental constraints. 
-  In this work, we develop techniques to simultaneously mitigate
-  longitudinal relaxation and pure dephasing in a framework that can handle arbitrary
-  experimental constraints.
-  Optimizing a gate set for a fluxonium qubit as an example, we achieve a factor of 4 increase in
-  longitudinal relaxation times and outperform
-  existing dynamic decoupling methods in mitigating pure dephasing due to flux noise, achieving
-  high fidelity gates in the presence of parameter spreads up to $5\%$.
+  systematic errors and decoherence remains the primary challenge requisite to achieving quantum advantage.
+  Quantum optimal control (QOC) techniques have proven effective in realizing high fidelity operations,
+  but they require exquisite calibration to be performant. In this work we employ robust control techniques
+  to achieve high fidelity gates in the presence of parameter spreads up to 5$\%$.
+  Additionally, current QOC techniques mitigate decoherence effects due to longitudinal relaxation by integrating
+  Lindblad master equation dynamics, which drastically increase the computational complexity
+  of the optimization algorithm.
+  In this work we achieve a factor of $4$ increase in longitudinal relaxation times
+  for the gate set of a fluxonium qubit
+  using a computationally efficient metric in optimizaiton.
+  
+  %% The ability to engineer high fidelity operations on quantum processors in the presence of
+  %% systematic errors and decoherence remains the primary challenge requisite to achieving quantum advantage.
+  %% Quantum optimal control (QOC) techniques have been developed to mitigate deleterious effects
+  %% by manipulating the time-dependent parameters controlling the system. These techniques often
+  %% target a single error channel and may be incompatible with experimental constraints. 
+  %% In this work, we develop techniques to simultaneously mitigate
+  %% longitudinal relaxation and pure dephasing in a framework that can handle arbitrary
+  %% experimental constraints.
+  %% Optimizing a gate set for a fluxonium qubit as an example, we achieve a factor of 4 increase in
+  %% longitudinal relaxation times and outperform
+  %% existing dynamic decoupling methods in mitigating pure dephasing due to flux noise, achieving
+  %% high fidelity gates in the presence of parameter spreads up to $5\%$.
 \end{abstract}
 
 \maketitle
@@ -49,6 +61,8 @@
 
 %% S1
 \section{Introduction}
+textwidth: \printinunitsof{in}\prntlen{\textwidth}
+linewidth: \printinunitsof{in}\prntlen{\linewidth}
 %% P1 - general field, lots of citation. cite reviews, original qoc.
 %% P2 - exhaustively find all papers, what people have done to address the issues
 %% P3 - what we do is. maybe add a rant about how
@@ -61,8 +75,8 @@ Early QOC techniques were proposed for nuclear magnetic resonance experiments
 \cite{khaneja2005optimal}, and applications now include superconducting
 qubits \cite{heeres2017implementing,
   leng2019robust, leung2017speedup, xu2020nonadiabatic},
-neutral atoms and ion traps \cite{van2016optimal}, nitrogen-vacancy centers in
-diamonds \cite{rembold2020introduction}, and Bose-Einstien condensates
+neutral and ionized atoms \cite{van2016optimal}, nitrogen-vacancy centers in
+diamond \cite{rembold2020introduction}, and Bose-Einstien condensates
 \cite{sorensen2018quantum}.
 In quantum control theory, as in classical control theory,
 optimization is performed
@@ -70,7 +84,7 @@ to minimize an objective function. Relevant for the field
 of quantum computation is the task of achieving high fidelity quantum gates.
 In this application, the objective function includes contributions from the
 gate error associated with the state transfer of the system as well as contributions
-due to the decoherence of the system, such as the evolution time of the gate.
+due to experimental constraints, such as the control amplitude.
 The decision variables of the optimization problem are the time-dependent control
 parameters, particular to the quantum system, that govern its evolution.
 
@@ -97,7 +111,7 @@ Numerical quantum control techniques have developed in parallel
 with analytic frameworks.
 Most numerical techniques proposed for QOC are indirect shooting
 methods where an initial guess for the control trajectory is forward-simulated,
-e.g. under the time-dependent-Schroedinger-equation,
+e.g. under the time-dependent Schroedinger equation,
 and first-order gradients are computed for a functional evaluated
 on the state of the evolved system \cite{leung2017speedup,  goerz2019krotov, doria2011optimal,
   abdelhafez2019gradient, machnes2015gradient, leng2019robust}.
@@ -116,9 +130,9 @@ and proposals have been made to simulate multiple trajectories
 (This work) In this work, we employ state of the art
 trajectory optimization methods
 to formulate the quantum
-optimal control problem as a constrained optimization problem.
-The trajectory optimization framework allows us to handle arbitrary
-constraints on the evolution of the quantum state. Additionally,
+optimal control problem as a constrained optimization problem, allowing
+us to enforce experimental constraints.
+Additionally,
 we introduce methods for constructing gates that mitigate longitudinal
 relaxation and are robust to experimental errors, and therefore
 pure dephasing, the dominant barriers to experimentally
@@ -240,18 +254,23 @@ updates, see \cite{howell2019altro}.
 
 %% F1
 \begin{figure}[ht]
-  \begin{subfigure}{.49\linewidth}
+  \begin{subfigure}{.6\linewidth}
     \includegraphics[width=\linewidth]{assets/f1a.png}
-  \end{subfigure}\hfill%
-  \begin{subfigure}{.49\linewidth}
+  \end{subfigure}%
+    \begin{subfigure}{.4\linewidth}
     \includegraphics[width=\linewidth]{assets/f1b.png}
   \end{subfigure}
+  
   \begin{subfigure}{\linewidth}
     \includegraphics[width=\linewidth]{assets/f1c.png}
   \end{subfigure}
-  \caption{(a) $T_{1}$ optimized gates (orange) and analytic gates (blue). (b) Master equation simulation with $T_{1}$ dissipation
-    for all gates, over the course of concatenated gate applications. (c) $T_{1}$ interpolation function used in optimization
-    and the corresponding $T_{1}$ times for the average absolute amplitude of each gate.}
+  \caption{
+    (a) $T_{1}$ optimized gates (red) and analytic gates (blue).
+    (b) $T_{1}$ interpolation function used in optimization
+    and the corresponding $T_{1}$ times for the average absolute amplitude of each gate.
+    (c) Master equation simulation with $T_{1}$ dissipation
+    for all gates, over the course of concatenated gate applications.
+  }
 \end{figure}
 
 
@@ -403,28 +422,22 @@ broken for intermediate iterations of the optimization,
 so we use the absolute value of the time step
 $\lvert \Delta t_{k} \rvert$ to ensure that it is non-negative.
 
-(Results) We achieve a factor of 2.5 decrease in the probability
+(Results) We achieve a factor of 5 decrease in the probability
 of longitudinal relaxation from the analytic gates we benchmark
 against. We simulate the performance of the gates using the
 Lindblad master equation (see Appendix). We repeatedly apply the basis gates
 and measure the fidelity of the resulting state as a function
 of time as shown in Fig. 1.
 
-%% T4.1
-%% TODO: Maybe best for appendix.
-%% TOOD: Maybe add some commentary about why we see more speedup
-%% for Z/2 and X/2 than Y/2. In particular I think this is because of the
-%% long idle times at the flux frustration point for Z/2 and X/2. It
-%% might be a more fair comparison to show gates that have better T1s
-%% and as good flux noise mitigation.
-
+%% T1
+%% TODO: maybe for appendix.
 \begin{table}[ht]
   \begin{tabular}{c | c | c | c}
     & Analytic  & QOC &\\
-    Gate & $P_{1}\ (10^{-5})$ & $P_{1}\ (10^{-5})$ & Speedup\\
+    Gate & $P_{1}\ (10^{-5})$ & $P_{1}\ (10^{-5})$ & Ratio\\
     \hline
-    Z/2 & 5.745 & 1.469 & 3.911\\
-    Y/2 & 5.253 & 1.400 & 3.752\\
+    Z/2 & 5.745 & 1.149 & 5.000\\
+    Y/2 & 5.253 & 1.157 & 4.540\\
     X/2 & 16.251 & 6.946 & 2.340\\
   \end{tabular}
   \caption{Probability of longitudinal relaxation for each gate
@@ -434,18 +447,15 @@ of time as shown in Fig. 1.
 
 %% F2
 \begin{figure}[ht]
-  \begin{subfigure}{.49\linewidth}
-    \label{fig:5.1:a}
+  \begin{subfigure}{.6\linewidth}
     \includegraphics[width=\linewidth]{assets/f2a.png}
   \end{subfigure}%
-  \begin{subfigure}{.49\linewidth}
-    \label{fig:5.1:b}
+  \begin{subfigure}{.4\linewidth}
     \includegraphics[width=\linewidth]{assets/f2b.png}
   \end{subfigure}
   
   \begin{subfigure}{\linewidth}
     \includegraphics[width=\linewidth]{assets/f2c.png}
-    \label{fig:5.1:c}
   \end{subfigure}
   
   \caption{\centering (a) $X/2$ gates robust to qubit frequency offsets
@@ -459,21 +469,25 @@ of time as shown in Fig. 1.
 
 %% F3
 \begin{figure}[ht]
-  \begin{subfigure}{.5\linewidth}
+  \begin{subfigure}{\linewidth}
     \includegraphics[width=\linewidth]{assets/f3a.png}
-  \end{subfigure}%
-  \begin{subfigure}{.5\linewidth}
-    \includegraphics[width=\linewidth]{assets/f3c.png}
   \end{subfigure}
   
   \begin{subfigure}{\linewidth}
     \includegraphics[width=\linewidth]{assets/f3b.png}
   \end{subfigure}
+
+  %% \begin{subfigure}{.5\linewidth}
+  %%   \includegraphics[width=\linewidth]{assets/f3c.png}
+  %% \end{subfigure}
   
-  \caption{\centering (a) $X/2$ gates robust to flux offsets constructed using the analytic,
+  \caption{\centering
+    (a) $X/2$ gates robust to flux offsets constructed using the analytic,
     (2, 4)-point sampling, and (2, 3)-derivative methods at a gate duration
     of $56.8 (ns)$. (b) Mean gate error for 10 samples of 1/$f$ flux noise over 5000
-    gate applications. (c) Stochastic 1/$f$ flux noise.}
+    gate applications.
+    %% (c) Stochastic 1/$f$ flux noise.
+  }
 \end{figure}
 
 %% S5
