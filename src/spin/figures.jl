@@ -14,7 +14,9 @@ include(joinpath(WDIR, "src", "spin", "spin.jl"))
 const EXPERIMENT_NAME = "figures"
 const SAVE_PATH = joinpath(SPIN_OUT_PATH, EXPERIMENT_NAME)
 const F1B_DATA_FILE_PATH = joinpath(SAVE_PATH, "f1b.h5")
+const F2C_DATA_FILE_PATH = joinpath(SAVE_PATH, "f2c.h5")
 const F3C_DATA_FILE_PATH = joinpath(SAVE_PATH, "f3c.h5")
+const F3D_DATA_FILE_PATH = joinpath(SAVE_PATH, "f3d.h5")
 
 # Configure plotting.
 ENV["GKSwstype"] = "nul"
@@ -22,46 +24,46 @@ Plots.gr()
 
 # types
 @enum PulseType begin
-    qoc = 1
-    analytic = 2
-    derivative = 3
-    sample = 4
-    derivative2 = 5
-    sample2 = 6
+    analytic = 1
+    qoc = 2
+    s2 = 3
+    s4 = 4
+    d2 = 5
+    d3 = 6
 end
 
 const PT_STR = Dict(
     qoc => "QOC",
     analytic => "Anl.",
-    sample => "S-2",
-    derivative => "D-2",
-    derivative2 => "D-3",
-    sample2 => "S-4"
+    s2 => "S-2",
+    d2 => "D-2",
+    d3 => "D-3",
+    s4 => "S-4"
 )
 
 const PT_MARKER = Dict(
-    sample => :circle,
-    sample2 => :square,
-    derivative2 => :utriangle,
-    derivative => :diamond,
+    s2 => :circle,
+    s4 => :square,
+    d3 => :utriangle,
+    d2 => :diamond,
 )
 
 const PT_COLOR = Dict(
     analytic => :lightskyblue,
     qoc => :coral,
-    sample => :limegreen,
-    sample2 => :darkgreen,
-    derivative => :crimson,
-    derivative2 => :firebrick,
+    s2 => :limegreen,
+    s4 => :darkgreen,
+    d2 => :crimson,
+    d3 => :firebrick,
 )
 
 const PT_LINESTYLE = Dict(
     analytic => :solid,
     qoc => :solid,
-    sample => :solid,
-    sample2 => :dash,
-    derivative => :solid,
-    derivative2 => :dash,
+    s2 => :solid,
+    s4 => :dash,
+    d2 => :solid,
+    d3 => :dash,
 )
 
 const GT_LIST = [zpiby2, ypiby2, xpiby2]
@@ -78,14 +80,14 @@ const FG_COLOR_LEGEND = nothing
 const DPI_FINAL = Integer(1e3)
 
 # common dict keys
-const SAVE_FILE_PATH_KEY = 1
-const SAVE_TYPE_KEY = 2
-const DATA_FILE_PATH_KEY = 3
+const SAVEFP_KEY = 1
+const SAVET_KEY = 2
+const DATAFP_KEY = 3
 const COLOR_KEY = 4
 const ACORDS_KEY = 5
 const MARKER_KEY = 6
 const LCORDS_KEY = 7
-const DATA2_FILE_PATH_KEY = 8
+const DATA2FP_KEY = 8
 
 
 ### ALL ###
@@ -123,41 +125,41 @@ const F1_GATE_COUNT = Integer(1.5e4)
 F1_PULSE_DATA = Dict(
     zpiby2 => Dict(
         qoc => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin15/00201_spin15.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin15/00194_spin15.h5"),
-            SAVE_TYPE_KEY => jl,
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin15/00201_spin15.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin15/00194_spin15.h5"),
+            SAVET_KEY => jl,
         ),
         analytic => Dict(
             ACORDS_KEY => (0, 0.25),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin14/00043_spin14.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
-            SAVE_TYPE_KEY => py,
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00043_spin14.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
+            SAVET_KEY => py,
         ),
     ),
     ypiby2 => Dict(
         qoc => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin15/00200_spin15.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin15/00185_spin15.h5"),
-            SAVE_TYPE_KEY => jl,
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin15/00200_spin15.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin15/00185_spin15.h5"),
+            SAVET_KEY => jl,
         ),
         analytic => Dict(
             ACORDS_KEY => (0, 0.4),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin14/00041_spin14.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin14/00003_spin14.h5"),
-            SAVE_TYPE_KEY => py,
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00041_spin14.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00003_spin14.h5"),
+            SAVET_KEY => py,
         )
     ),
     xpiby2 => Dict(
         qoc => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin15/00202_spin15.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin15/00174_spin15.h5"),
-            SAVE_TYPE_KEY => jl,
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin15/00202_spin15.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin15/00174_spin15.h5"),
+            SAVET_KEY => jl,
         ),
         analytic => Dict(
             ACORDS_KEY => (0, 0.5),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin14/00042_spin14.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
-            SAVE_TYPE_KEY => py,
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00042_spin14.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
+            SAVET_KEY => py,
         )
     ),
 )
@@ -186,8 +188,8 @@ function make_figure1a()
             data = F1_PULSE_DATA[gate_type][pulse_type]
             color = PT_COLOR[pulse_type]
             label = "$(GT_STR[gate_type]) $(PT_STR[pulse_type])"
-            save_file_path = data[SAVE_FILE_PATH_KEY]
-            save_type = data[SAVE_TYPE_KEY]
+            save_file_path = data[SAVEFP_KEY]
+            save_type = data[SAVET_KEY]
             (controls, evolution_time) = grab_controls(save_file_path; save_type=save_type)
             (control_eval_count, control_count) = size(controls)
             control_eval_times = Array(1:1:control_eval_count) * DT_PREF
@@ -216,7 +218,7 @@ function make_figure1b()
     for gate_type in keys(F1_PULSE_DATA)
         for pulse_type in keys(F1_PULSE_DATA[gate_type])
             pulse_data = F1_PULSE_DATA[gate_type][pulse_type]
-            if !(DATA_FILE_PATH_KEY in keys(pulse_data))
+            if !(DATAFP_KEY in keys(pulse_data))
                 # get data_file_path and write it to pulse data here
                 data_file_path = nothing
             end
@@ -228,7 +230,7 @@ function make_figure1b()
     for gate_type in GT_LIST
         for pulse_type in keys(F1_PULSE_DATA[gate_type])
             pulse_data = F1_PULSE_DATA[gate_type][pulse_type]
-            (fidelities,) = h5open(pulse_data[DATA_FILE_PATH_KEY], "r") do data_file
+            (fidelities,) = h5open(pulse_data[DATAFP_KEY], "r") do data_file
                 fidelities = read(data_file, "fidelities")
                 return (fidelities,)
             end
@@ -250,7 +252,7 @@ function make_figure1b()
 end
 
 
-const F1C_SAMPLE_LEN = Integer(1e4)
+const F1C_S2_LEN = Integer(1e4)
 const GT_MK_1C = Dict(
     zpiby2 => :diamond,
     ypiby2 => :square,
@@ -262,7 +264,7 @@ const ALPHA_F1C = 1.
 function make_figure1c(;save=false)
     # Collect data and plot.
     max_amp = MAX_CONTROL_NORM_0
-    amps_fit = Array(range(0, stop=max_amp, length=F1C_SAMPLE_LEN))
+    amps_fit = Array(range(0, stop=max_amp, length=F1C_S2_LEN))
     t1s_fit =  map(amp_t1_spline_cubic, amps_fit)
     amps_data = -1 .* map(fbfq_amp, FBFQ_ARRAY)
     t1s_data = T1_ARRAY
@@ -286,8 +288,8 @@ function make_figure1c(;save=false)
         for pulse_type in keys(F1_PULSE_DATA[gate_type])
             pulse_data = F1_PULSE_DATA[gate_type][pulse_type]
             (controls, _) = grab_controls(
-                pulse_data[SAVE_FILE_PATH_KEY];
-                save_type=pulse_data[SAVE_TYPE_KEY]
+                pulse_data[SAVEFP_KEY];
+                save_type=pulse_data[SAVET_KEY]
             )
             avg_amp = mean(map(abs, controls[:,1]))
             avg_t1 = amp_t1_spline_cubic(avg_amp)
@@ -309,40 +311,40 @@ end
 
 
 ### FIGURE 2 ###
-F2_PULSE_DATA = Dict(
-    derivative => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00091_spin11.h5"),
-        SAVE_TYPE_KEY => jl,
-        DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00092_spin11.h5"),
-        LCORDS_KEY => (45, 0.2),
-    ),
-    derivative2 => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00110_spin11.h5"),
-        SAVE_TYPE_KEY => jl,
-        DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00111_spin11.h5"),
-        LCORDS_KEY => (45, 0.2),
-    ),
-    sample => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00132_spin12.h5"),
-        SAVE_TYPE_KEY => jl,
-        DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00200_spin12.h5"),
-        LCORDS_KEY => (30, 0.2),
-    ),
+F2_DATA = Dict(
     analytic => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
-        SAVE_TYPE_KEY => py,
-        DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin14/00074_spin14.h5"),
+        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
+        SAVET_KEY => py,
+        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00074_spin14.h5"),
         LCORDS_KEY => (20, 0.05),
     ),
-    sample2 => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00229_spin12.h5"),
-        SAVE_TYPE_KEY => jl,
-        DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00231_spin12.h5"),
+    s2 => Dict(
+        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00132_spin12.h5"),
+        SAVET_KEY => jl,
+        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00200_spin12.h5"),
         LCORDS_KEY => (30, 0.2),
+    ),
+    s4 => Dict(
+        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00229_spin12.h5"),
+        SAVET_KEY => jl,
+        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00231_spin12.h5"),
+        LCORDS_KEY => (30, 0.2),
+    ),
+    d2 => Dict(
+        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00091_spin11.h5"),
+        SAVET_KEY => jl,
+        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00092_spin11.h5"),
+        LCORDS_KEY => (45, 0.2),
+    ),
+    d3 => Dict(
+        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00110_spin11.h5"),
+        SAVET_KEY => jl,
+        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00111_spin11.h5"),
+        LCORDS_KEY => (45, 0.2),
     ),
 )
 
-F2A_PT_LIST = [[analytic], [sample, sample2,], [derivative, derivative2]]
+F2A_PT_LIST = [[analytic], [s2, s4,], [d2, d3]]
 """
 Show the pulses.
 """
@@ -362,8 +364,8 @@ function make_figure2a()
             color = PT_COLOR[pulse_type]
             label = "$(PT_STR[pulse_type])"
             linestyle = PT_LINESTYLE[pulse_type]
-            save_file_path = data[SAVE_FILE_PATH_KEY]
-            save_type = data[SAVE_TYPE_KEY]
+            save_file_path = data[SAVEFP_KEY]
+            save_type = data[SAVET_KEY]
             (controls, evolution_time) = grab_controls(save_file_path; save_type=save_type)
             (control_eval_count, control_count) = size(controls)
             control_eval_times = Array(1:1:control_eval_count) * DT_PREF
@@ -384,14 +386,14 @@ function make_figure2a()
 end
 
 
-const F2B_TRIAL_COUNT = Integer(1e3)
-const F2B_FQ_DEV = 1e-1
-const F2B_PT_LIST = [analytic, sample, sample2, derivative, derivative2]
+const F2B_TRIAL_COUNT = Integer(3e2)
+const F2B_FQ_DEV = 3e-2
+const F2B_PT_LIST = [analytic, s2, s4, d2, d3]
 """
 Show gate error vs. detuning
 """
 function make_figure2b()
-    # sample detunings
+    # s2 detunings
     fq_devs = Array(range(-F2B_FQ_DEV, stop=F2B_FQ_DEV, length=F2B_TRIAL_COUNT))
     fqs = (fq_devs .* FQ) .+ FQ
     negi_h0s = [NEGI_H0_ISO * fq for fq in fqs]
@@ -399,15 +401,15 @@ function make_figure2b()
     # sweep
     gate_type = xpiby2
     for pulse_type in F2B_PT_LIST
-        # if !(DATA_FILE_PATH_KEY in keys(F2_PULSE_DATA[pulse_type]))
+        # if !(DATAFP_KEY in keys(F2_PULSE_DATA[pulse_type]))
         if true
             if pulse_type == analytic
                 data_file_path = run_sim_h0sweep_deqjl(
                     gate_type, negi_h0s; dynamics_type=xpiby2nodis, dt=1e-3
                 )
             else
-                save_file_path = F2_PULSE_DATA[pulse_type][SAVE_FILE_PATH_KEY]
-                save_type = F2_PULSE_DATA[pulse_type][SAVE_TYPE_KEY]
+                save_file_path = F2_PULSE_DATA[pulse_type][SAVEFP_KEY]
+                save_type = F2_PULSE_DATA[pulse_type][SAVET_KEY]
                 data_file_path = run_sim_h0sweep_deqjl(
                     gate_type, negi_h0s; save_file_path=save_file_path,
                     dynamics_type=schroed, save_type=save_type, dt=1e-3
@@ -417,7 +419,7 @@ function make_figure2b()
                 write(data_file, "fqs", fqs)
                 write(data_file, "pulse_type", Integer(pulse_type))
             end
-            F2_PULSE_DATA[pulse_type][DATA_FILE_PATH_KEY] = data_file_path
+            F2_PULSE_DATA[pulse_type][DATAFP_KEY] = data_file_path
             println("datafp: $(data_file_path), gt: $(GT_STR[gate_type]), pt: $(PT_STR[pulse_type])")
             return
         end
@@ -434,7 +436,7 @@ function make_figure2b()
         label = "$(PT_STR[pulse_type])"
         linestyle = PT_LINESTYLE[pulse_type]
         color = PT_COLOR[pulse_type]
-        data_file_path = pulse_data[DATA_FILE_PATH_KEY]
+        data_file_path = pulse_data[DATAFP_KEY]
         (fidelities,) = h5open(data_file_path, "r") do data_file
             fidelities = read(data_file, "fidelities")
             return (fidelities,)
@@ -462,444 +464,430 @@ function f2b_sweep(;save_file_path=nothing, save_type=jl)
     )
     h5open(data_file_path, "r+") do data_file
         write(data_file, "fqs", fqs)
+        write(data_file, "fq_devs", fq_devs)
     end
     println("datafp: $(data_file_path)")
 end
 
 
-F2C_GATE_TIMES = [50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160]
-F2C_PULSE_DATA = Dict(
-    sample => Dict(
-        F2C_GATE_TIMES[1] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00246_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00247_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00198_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+F2C_GATE_TIMES = [50., 56.8, 60., 70., 80., 90., 100., 110., 120., 130., 140., 150., 160.]
+F2C_DATA = Dict(
+    analytic => Dict(
+        1 => Dict(),
+        2 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00095_spin14.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00096_spin14.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
+            SAVET_KEY => py,
         ),
-        F2C_GATE_TIMES[2] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00248_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00249_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00138_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        3 => Dict(),
+        4 => Dict(),
+        5 => Dict(),
+        6 => Dict(),
+        7 => Dict(),
+        8 => Dict(),
+        9 => Dict(),
+        10 => Dict(),
+        11 => Dict(),
+        12 => Dict(),
+        13 => Dict(),
+    ),
+    s2 => Dict(
+        1 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00365_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00366_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00336_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[3] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00250_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00251_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00145_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        2 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00367_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00368_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00295_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[4] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00252_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00253_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00147_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        3 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00369_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00370_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00301_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[5] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00254_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00255_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00148_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        4 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00371_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00372_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00302_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[6] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00256_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00257_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00150_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        5 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00373_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00374_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00304_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[7] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00258_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00259_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00151_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        6 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00375_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00376_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00303_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[8] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00260_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00261_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00153_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        7 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00492_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00493_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00305_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[9] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00262_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00263_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00197_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        8 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00379_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00380_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00306_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[10] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00264_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00265_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00201_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        9 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00381_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00382_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00340_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[11] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00266_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00267_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00202_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
-        ),
-        F2C_GATE_TIMES[12] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00268_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00269_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00203_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        10 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00402_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00403_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00399_spin12.h5"),
+            SAVET_KEY => jl,
+                ),
+        11 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00404_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00405_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00400_spin12.h5"),
+            SAVET_KEY => jl,
+                ),
+        12 => Dict(
+            # DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00381_spin12.h5"),
+            # DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00382_spin12.h5"),
+            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00340_spin12.h5"),
+            SAVET_KEY => jl,
+                ),
+        13 => Dict(
+            # DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00381_spin12.h5"),
+            # DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00382_spin12.h5"),
+            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00340_spin12.h5"),
+            SAVET_KEY => jl,
         ),
     ),
-    sample2 => Dict(
-        F2C_GATE_TIMES[1] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00270_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00271_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00236_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+    s4 => Dict(
+        1 => Dict(
+            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/_spin12.h5"), #TODO
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[2] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00272_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00273_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00233_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        2 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00383_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00384_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00298_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[3] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00274_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00275_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00234_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        3 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00385_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00386_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00307_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[4] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00276_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00277_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00235_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        4 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00387_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00388_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00308_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[5] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00278_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00279_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00239_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        5 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00389_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00390_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00310_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[6] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00280_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00281_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00241_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        6 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00391_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00392_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00309_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[7] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00282_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00283_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00240_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        7 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00393_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00394_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00335_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[8] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00284_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00285_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00238_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        8 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00395_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00396_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00337_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[9] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00286_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00287_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00243_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        9 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00397_spin12.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00398_spin12.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00339_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[10] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00288_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00289_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00242_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        10 => Dict(
+            # DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00391_spin12.h5"),
+            # DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00392_spin12.h5"),
+            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00309_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[11] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00290_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00291_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00245_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        11 => Dict(
+            # DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00393_spin12.h5"),
+            # DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00394_spin12.h5"),
+            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00335_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[12] => Dict(
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00292_spin12.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00293_spin12.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin12/00244_spin12.h5"),
-            SAVE_TYPE_KEY => jl,
+        12 => Dict(
+            # DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00395_spin12.h5"),
+            # DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00396_spin12.h5"),
+            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00337_spin12.h5"),
+            SAVET_KEY => jl,
         ),
-    ),
-    derivative => Dict(
-        F2C_GATE_TIMES[1] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00117_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00118_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00176_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00177_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00105_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
-        ),
-        F2C_GATE_TIMES[2] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00119_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00120_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00178_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00179_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00098_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
-        ),
-        F2C_GATE_TIMES[3] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00121_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00122_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00180_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00181_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00100_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
-        ),
-        F2C_GATE_TIMES[4] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00123_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00124_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00182_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00183_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00099_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
-        ),
-        F2C_GATE_TIMES[5] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00125_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00126_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00184_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00185_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00101_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
-        ),
-        F2C_GATE_TIMES[6] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00127_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00128_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00186_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00187_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00102_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
-        ),
-        F2C_GATE_TIMES[7] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00129_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00130_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00188_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00189_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00103_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
-        ),
-        F2C_GATE_TIMES[8] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00131_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00132_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00190_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00191_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00107_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
-        ),
-        F2C_GATE_TIMES[9] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00133_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00134_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00192_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00193_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00104_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
-        ),
-        F2C_GATE_TIMES[10] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00135_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00136_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00194_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00195_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00106_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
-        ),
-        F2C_GATE_TIMES[11] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00137_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00138_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00196_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00197_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00108_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
-        ),
-        F2C_GATE_TIMES[12] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00139_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00140_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00198_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00199_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00109_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
+        13 => Dict(
+            # DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00397_spin12.h5"),
+            # DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00398_spin12.h5"),
+            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00339_spin12.h5"),
+            SAVET_KEY => jl,
         ),
     ),
-    derivative2 => Dict(
-        F2C_GATE_TIMES[1] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00148_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00149_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00200_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00201_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00141_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
+    d2 => Dict(
+        1 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00176_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00177_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00105_spin11.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[2] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00150_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00151_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00202_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00203_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00114_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
+        2 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00239_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00240_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00091_spin11.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[3] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00152_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00153_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00204_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00205_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00115_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
+        3 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00178_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00179_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00098_spin11.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[4] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00154_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00155_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00206_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00207_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00113_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
+        4 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00180_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00181_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00100_spin11.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[5] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00156_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00157_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00208_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00209_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00143_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
+        5 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00182_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00183_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00099_spin11.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[6] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00158_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00159_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00210_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00211_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00145_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
+        6 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00273_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00274_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00229_spin11.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[7] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00160_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00161_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00212_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00213_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00112_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
+        7 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00275_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00276_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00231_spin11.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[8] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00162_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00163_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00214_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00215_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00116_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
+        8 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00277_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00278_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00230_spin11.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[9] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00164_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00165_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00216_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00217_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00147_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
+        9 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00279_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00280_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00232_spin11.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[10] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00166_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00167_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00218_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00219_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00142_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
+        10 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00296_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00297_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00291_spin11.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[11] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00168_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00169_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00220_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00221_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00144_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
+        11 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00298_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00299_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00289_spin11.h5"),
+            SAVET_KEY => jl,
         ),
-        F2C_GATE_TIMES[12] => Dict(
-            # DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00170_spin11.h5"),
-            # DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00171_spin11.h5"),
-            DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00222_spin11.h5"),
-            DATA2_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00223_spin11.h5"),
-            SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "spin11/00146_spin11.h5"),
-            SAVE_TYPE_KEY => jl,
+        12 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00300_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00301_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00290_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+        13 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00302_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00303_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00292_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+    ),
+    d3 => Dict(
+        1 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00200_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00201_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00141_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+        2 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00257_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00258_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00110_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+        3 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00202_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00203_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00114_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+        4 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00204_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00205_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00115_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+        5 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00206_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00207_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00113_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+        6 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00281_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00282_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00235_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+        7 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00283_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00284_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00236_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+        8 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00285_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00286_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00234_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+        9 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00287_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00288_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00233_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+        10 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00304_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00305_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00295_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+        11 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00306_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00307_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00293_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+        12 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00308_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00309_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00294_spin11.h5"),
+            SAVET_KEY => jl,
+        ),
+        13 => Dict(
+            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00423_spin11.h5"),
+            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00424_spin11.h5"),
+            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00362_spin11.h5"),
+            SAVET_KEY => jl,
         ),
     ),
 )
-const F2C_PT_LIST = [sample, sample2, derivative, derivative2]
-function make_figure2c()
-    gate_type = xpiby2
-    # get data and plot
-    fig = Plots.plot(
-        dpi=DPI_FINAL, legend=:bottomleft,
-        ticksfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS,
-        legendfontsize=FS_LEGEND, foreground_color_legend=FG_COLOR_LEGEND,
-        ylims=[0, 1e-4], yticks=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] * 1e-5,
-        xticks=F2C_GATE_TIMES
-    )
-    Plots.xlabel!(fig, latexstring("\$t_{N} \\textrm{(ns)}\$"))
-    Plots.ylabel!(fig, latexstring("\$ \\textrm{Mean Gate Error at} \\"
-                                   * "|\\delta \\omega_{q} / \\omega_{q}| = 0.01\$"))
-    for pulse_type in F2C_PT_LIST
-        if pulse_type == sample || pulse_type == sample2
-            continue
-        end
+const F2C_PT_LIST = [s2, s4, d2, d3]
+function gen_2c()
+    gate_type=xpiby2
+    gtcount = size(F2C_GATE_TIMES)[1]
+    ptcount = size(F2C_PT_LIST)[1]
+    gate_errors = ones(ptcount, gtcount)
+    for (i, pulse_type) in enumerate(F2C_PT_LIST)
         println("pt: $(pulse_type)")
-        label = "$(PT_STR[pulse_type])"
-        color = PT_COLOR[pulse_type]
-        marker = PT_MARKER[pulse_type]
-        for (i, gate_time) in enumerate(F2C_GATE_TIMES)
-            # compute
-            data = F2C_PULSE_DATA[pulse_type][gate_time]
-            save_file_path = data[SAVE_FILE_PATH_KEY]
-            save_type = data[SAVE_TYPE_KEY]
-            if !(DATA_FILE_PATH_KEY in keys(data))
-                println("gt: $(gate_time)")
+        for (j, gate_time) in enumerate(F2C_GATE_TIMES)
+            data = F2C_DATA[pulse_type][j]
+            keys_ = keys(data)
+            if !(SAVEFP_KEY in keys_)
+                continue
+            elseif DATAFP_KEY in keys_ && DATA2FP_KEY in keys_
+                data_file_path1 = data[DATAFP_KEY]
+                data_file_path2 = data[DATAFP_KEY]
+            else
+                save_file_path = data[SAVEFP_KEY]
+                save_type = data[SAVET_KEY]
+                println("gt[$(j)]: $(gate_time)")
                 data_file_path1 = run_sim_deqjl(
                     1, gate_type; save_file_path=save_file_path,
                     save_type=save_type, dynamics_type=schroed, dt=1e-3,
                     negi_h0=SP1FQ_NEGI_H0_ISO,
                 )
-            else
-                data_file_path1 = data[DATA_FILE_PATH_KEY]
-            end
-            if !(DATA2_FILE_PATH_KEY in keys(data))
                 data_file_path2 = run_sim_deqjl(
                     1, gate_type; save_file_path=save_file_path,
                     save_type=save_type, dynamics_type=schroed, dt=1e-3,
                     negi_h0=SN1FQ_NEGI_H0_ISO,
                 )
-            else
-                data_file_path2 = data[DATA2_FILE_PATH_KEY]
             end
-            (fidelity1,) = h5open(data_file_path1, "r") do data_file1
-                fidelity1 = read(data_file1, "fidelities")[end]
+            (fidelity1,) = h5open(data_file_path1, "r") do df1
+                fidelity1 = read(df1, "fidelities")[end]
                 return (fidelity1,)
             end
-            (fidelity2,) = h5open(data_file_path2, "r") do data_file2
-                fidelity2 = read(data_file2, "fidelities")[end]
+            (fidelity2,) = h5open(data_file_path2, "r") do df2
+                fidelity2 = read(df2, "fidelities")[end]
                 return (fidelity2,)
             end
-            gate_error = 1 - mean([fidelity1, fidelity2])
-
-            # plot
-            label = i == 1 ? label : nothing
-            Plots.scatter!(fig, [gate_time], [gate_error], label=label, color=color,
-                           marker=(marker, MS_DATA))
+            fidelity = mean([fidelity1, fidelity2])
+            gate_errors[i, j] = 1 - fidelity
         end
     end
-    plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
-    Plots.savefig(fig, plot_file_path)
-    println("Plotted Figure2c to $(plot_file_path)")
+    h5open(F2C_DATA_FILE_PATH, "w") do data_file
+        write(data_file, "gate_errors", gate_errors)
+        write(data_file, "gate_times", F2C_GATE_TIMES)
+        write(data_file, "pulse_types", [Integer(pulse_type) for pulse_type in F2C_PT_LIST])
+    end
 end
 
 
 ### FIGURE 3 ###
-F3_PULSE_DATA = Dict(
-    derivative => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, ""),
-        SAVE_TYPE_KEY => jl,
-        COLOR_KEY => :red,
-        DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, "")
+F3_DATA = Dict(
+    s2 => Dict(
+        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin18/00003_spin18.h5"),
+        SAVET_KEY => jl,
+        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin18/00053_spin18.h5")
     ),
-    sample => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, ""),
-        SAVE_TYPE_KEY => jl,
-        COLOR_KEY => :green
+    s4 => Dict(
+        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin18/00005_spin18.h5"),
+        SAVET_KEY => jl,
+        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin18/00054_spin18.h5")
+    ),
+    d2 => Dict(
+        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin17/00003_spin17.h5"),
+        SAVET_KEY => jl,
+        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin17/00051_spin17.h5"),
+    ),
+    d3 => Dict(
+        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin17/00005_spin17.h5"),
+        SAVET_KEY => jl,
+        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin17/00052_spin17.h5"),
     ),
     analytic => Dict(
-        SAVE_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, ""),
-        SAVE_TYPE_KEY => py,
-        COLOR_KEY => :lightskyblue,
-        DATA_FILE_PATH_KEY => joinpath(SPIN_OUT_PATH, ""),
+        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
+        SAVET_KEY => py,
+        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00101_spin14.h5"),
     ),
 )
 
@@ -909,27 +897,27 @@ function make_figure3a()
     # compute
     gate_type = ypiby2
     dynamics_type = lindbladcfn
-    for pulse_type in keys(F3_PULSE_DATA)
-        pulse_data = F3_PULSE_DATA[pulse_type]
-        if isnothing(pulse_data[DATA_FILE_PATH_KEY])
-            save_file_path = pulse_data[SAVE_FILE_PATH_KEY]
-            save_type = pulse_data[SAVE_TYPE_KEY]
+    for pulse_type in keys(F3_DATA)
+        pulse_data = F3_DATA[pulse_type]
+        if isnothing(pulse_data[DATAFP_KEY])
+            save_file_path = pulse_data[SAVEFP_KEY]
+            save_type = pulse_data[SAVET_KEY]
             data_file_path = run_sim_deqjl(
                 F3A_GATE_COUNT, gate_type; save_file_path=save_file_path,
                 save_type=save_type, dynamics_type=dynamics_type, dt=F3A_DT
             )
-            pulse_data[DATA_FILE_PATH_KEY] = data_file_path
+            pulse_data[DATAFP_KEY] = data_file_path
         end
     end
     
     # plot
     colors = []; fidelitiess = []; labels = []
-    for pulse_type in keys(F3_PULSE_DATA)
-        (fidelities,) = h5open(F3_PULSE_DATA[pulse_type][SAVE_FILE_PATH_KEY], "r") do save_file
+    for pulse_type in keys(F3_DATA)
+        (fidelities,) = h5open(F3_DATA[pulse_type][SAVEFP_KEY], "r") do save_file
             fidelities = read(save_file, "fidelities")
             return (fidelities,)
         end
-        color = F3_PULSE_DATA[pulse_type][COLOR_KEY]
+        color = F3_DATA[pulse_type][COLOR_KEY]
         label = "$(PT_STR[pulse_type])"
         push!(colors, color)
         push!(fideltiess, fidelities)
@@ -980,6 +968,55 @@ function gen_3cdata()
         write(data_file, "times", times)
         write(data_file, "noise_fft", noise_fft)
         write(data_file, "freqs", freqs)
+    end
+end
+
+
+const SIGMAX = [0 1;
+                1 0]
+const SIGMAY = [0   -1im;
+                1im 0]
+const SIGMAZ = [1 0;
+                0 -1]
+const F3D_SAVE_STEP = 1e-1
+const F3D_PTS = [analytic, s2, s4, d2, d3]
+function gen_3d()
+    pulse_types_int = [Integer(pulse_type) for pulse_type in F3D_PTS]
+    point_count = Integer(ceil(56.80 * F3D_SAVE_STEP^(-1)))
+    pointss = zeros(size(F3D_PTS)[1], point_count, 3)
+    for (i, pulse_type) in enumerate(F3D_PTS)
+        data = F3_DATA[pulse_type]
+        if !(DATAFP_KEY in keys(data))
+            if pulse_type == analytic
+                data_file_path = run_sim_fine_deqjl(
+                    dynamics_type=xpiby2nodis, dt=1e-3,
+                    save_step=F3D_SAVE_STEP)
+            else
+                data_file_path = run_sim_fine_deqjl(
+                    save_file_path=data[SAVEFP_KEY],
+                    save_type=data[SAVET_KEY],
+                    dt=1e-3, save_step=F3D_SAVE_STEP,
+                )
+            end
+        else
+            data_file_path = data[DATAFP_KEY]
+        end
+
+        (states_) = h5open(data_file_path, "r") do data_file
+            states_ = read(data_file, "states")
+            return (states_)
+        end
+        for j = 1:point_count
+            state = get_vec_uniso(states_[j, :])
+            state_dag = state'
+            pointss[i, j, 1] = Real(state_dag * SIGMAX * state)
+            pointss[i, j, 2] = Real(state_dag * SIGMAY * state)
+            pointss[i, j, 3] = Real(state_dag * SIGMAZ * state)
+        end
+    end
+    h5open(F3D_DATA_FILE_PATH, "w") do data_file
+        write(data_file, "pointss", pointss)
+        write(data_file, "pulse_types", pulse_types_int)
     end
 end
 

@@ -19,6 +19,7 @@ const EXPERIMENT_NAME = "spin11"
 const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
 # Define the optimization.
+const DT_STATIC = 5e-3
 const CONTROL_COUNT = 1
 const CONSTRAINT_TOLERANCE = 1e-8
 const AL_KICKOUT_TOLERANCE = 1e-7
@@ -76,8 +77,20 @@ function RobotDynamics.dynamics(model::Model{DO}, astate::StaticVector,
     delta_intcontrol = astate[CONTROLS_IDX]
     delta_control = astate[DCONTROLS_IDX]
     delta_dcontrol = acontrols[D2CONTROLS_IDX]
-
-    if DO == 2
+    
+    if DO == 1
+        delta_dstate1 = NEGI_H0_ISO * astate[STATE1_IDX] + negi_h * astate[DSTATE1_IDX]
+        delta_dstate2 = NEGI_H0_ISO * astate[STATE2_IDX] + negi_h * astate[DSTATE2_IDX]
+        delta_astate = [
+            delta_state1;
+            delta_state2;
+            delta_intcontrol;
+            delta_control;
+            delta_dcontrol;
+            delta_dstate1;
+            delta_dstate2;
+        ]
+    elseif DO == 2
         delta_dstate1 = NEGI_H0_ISO * astate[STATE1_IDX] + negi_h * astate[DSTATE1_IDX]
         delta_dstate2 = NEGI_H0_ISO * astate[STATE2_IDX] + negi_h * astate[DSTATE2_IDX]
         delta_d2state1 = 2 * NEGI_H0_ISO * astate[DSTATE1_IDX] + negi_h * astate[D2STATE1_IDX]
@@ -127,11 +140,11 @@ function RobotDynamics.dynamics(model::Model{DO}, astate::StaticVector,
 end
 
 
-function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
+function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=alilqr,
                   postsample=false, initial_save_file_path=nothing,
                   initial_save_type=jl, sqrtbp=false, derivative_order=0,
                   integrator_type=rk6, max_penalty=MAX_PENALTY, qs=nothing,
-                  smoke_test=false, dt=5e-3)
+                  smoke_test=false, dt=DT_STATIC)
     model = Model(derivative_order)
     n = state_dim(model)
     m = control_dim(model)

@@ -27,8 +27,8 @@ const DT_MIN = DT_INIT / 2
 const DT_MAX = DT_INIT * 2
 const CONSTRAINT_TOLERANCE = 1e-8
 const AL_KICKOUT_TOLERANCE = 1e-7
-const PN_STEPS = 5
-const MAX_PENALTY = 1e10
+const PN_STEPS = 2
+const MAX_PENALTY = 1e11
 const ILQR_DJ_TOL = 1e-4
 
 # Define the problem.
@@ -63,8 +63,8 @@ const EMPTY_V = []
 struct Model{DA, TO} <: AbstractModel
     Model(DA::Bool=true, TO::Bool=true) = new{DA, TO}()
 end
-RobotDynamics.state_dim(::Model{false, TO}) where TO = ASTATE_SIZE_NODA
-RobotDynamics.state_dim(::Model{true, TO}) where TO = ASTATE_SIZE_NODA + 1
+RobotDynamics.state_dim(::Model{false, TO}) where TO = ASTATE_SIZE_BASE
+RobotDynamics.state_dim(::Model{true, TO}) where TO = ASTATE_SIZE_BASE + 1
 RobotDynamics.control_dim(::Model{DA, false}) where DA = CONTROL_COUNT
 RobotDynamics.control_dim(::Model{DA, true}) where DA = CONTROL_COUNT + 1
 
@@ -105,7 +105,8 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
                   decay_aware=false,
                   solver_type=altro, sqrtbp=false,
                   integrator_type=rk6, max_penalty=MAX_PENALTY,
-                  qs=[1e0, 1e0, 1e0, 1e-1, 5e1, 1e-1, 1e2])
+                  qs=[1e0, 1e0, 1e0, 1e-1, 5e1, 1e-1, 1e2],
+                  smoke_test=false)
     # Convert to trajectory optimization language.
     model = Model(decay_aware, time_optimal)
     n = state_dim(model)
@@ -117,7 +118,7 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
         zeros(CONTROL_COUNT); # int_control
         zeros(CONTROL_COUNT); # control
         zeros(CONTROL_COUNT); # dcontrol_dt
-        eval(:($decay_aware ? zeros(1) : EMPTY_V))
+        zeros(eval(:($decay_aware ? 1 : 0)));
     ])
 
     if gate_type == xpiby2
@@ -136,7 +137,7 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
         zeros(CONTROL_COUNT); # int_control
         zeros(CONTROL_COUNT); # control
         zeros(CONTROL_COUNT); # dcontrol_dt
-        eval(:($decay_aware ? zeros(1) : EMPTY_V))
+        zeros(eval(:($decay_aware ? 1 : 0)));
     ])
     
     # Bound the control amplitude.
@@ -146,7 +147,7 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
         fill(Inf, CONTROL_COUNT);
         fill(MAX_CONTROL_NORM_0, CONTROL_COUNT); # control
         fill(Inf, CONTROL_COUNT);
-        eval(:($decay_aware ? fill(Inf, 1) : EMPTY_V))
+        fill(Inf, eval(:($decay_aware ? 1 : 0)));
     ])
     x_min = SVector{n}([
         fill(-Inf, STATE_SIZE_ISO);
@@ -154,7 +155,7 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
         fill(-Inf, CONTROL_COUNT);
         fill(-MAX_CONTROL_NORM_0, CONTROL_COUNT); # control
         fill(-Inf, CONTROL_COUNT);
-        eval(:($decay_aware ? fill(-Inf, 1) : EMPTY_V))
+        fill(-Inf, eval(:($decay_aware ? 1 : 0)));
     ])
 
     # Controls start and end at 0.
@@ -164,7 +165,7 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
         fill(Inf, CONTROL_COUNT);
         fill(0, CONTROL_COUNT); # control
         fill(Inf, CONTROL_COUNT);
-        eval(:($decay_aware ? fill(Inf, 1) : EMPTY_V))
+        fill(Inf, eval(:($decay_aware ? 1 : 0)));
     ])
     x_min_boundary = SVector{n}([
         fill(-Inf, STATE_SIZE_ISO);
@@ -172,17 +173,17 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
         fill(-Inf, CONTROL_COUNT);
         fill(0, CONTROL_COUNT); # control
         fill(-Inf, CONTROL_COUNT);
-        eval(:($decay_aware ? fill(-Inf, 1) : EMPTY_V))
+        fill(-Inf, eval(:($decay_aware ? 1 : 0)));
     ])
 
     # Bound dt.
     u_max = SVector{m}([
         fill(Inf, CONTROL_COUNT);
-        eval(:($time_optimal ? fill(sqrt(DT_MAX), 1) : EMPTY_V)); # dt
+        fill(sqrt(DT_MAX), eval(:($time_optimal ? 1 : 0))); #dt
     ])
     u_min = SVector{m}([
         fill(-Inf, CONTROL_COUNT);
-        eval(:($time_optimal ? fill(sqrt(DT_MIN), 1) : EMPTY_V)); # dt
+        fill(sqrt(DT_MIN), eval(:($time_optimal ? 1 : 0))); #dt
     ])
 
     # Generate initial trajectory.
@@ -267,7 +268,16 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     # Instantiate problem and solve.
     prob = Problem{IT_RDI[integrator_type]}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
     opts = SolverOptions(verbose=VERBOSE)
-    if solver_type == alilqr
+    if smoke_test
+        solver = AugmentedLagrangianSolver(prob, opts)
+        solver.solver_uncon.opts.square_root = sqrtbp
+        solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
+        solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
+        solver.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
+        solver.opts.penalty_max = max_penalty
+        solver.opts.iterations = 1
+        solver.solver_uncon.opts.iterations = 1
+    elseif solver_type == alilqr
         solver = AugmentedLagrangianSolver(prob, opts)
         solver.solver_uncon.opts.square_root = sqrtbp
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
@@ -310,7 +320,7 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     
     # Save.
     if SAVE
-        save_file_path = generate_save_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
+        save_file_path = generate_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
         println("Saving this optimization to $(save_file_path)")
         h5open(save_file_path, "cw") do save_file
             write(save_file, "acontrols", acontrols_arr)
@@ -324,6 +334,7 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
             write(save_file, "R", R_arr)
             write(save_file, "cmax", cmax)
             write(save_file, "cmax_info", cmax_info)
+            write(save_file, "dt", dt)
             write(save_file, "solver_type", Integer(solver_type))
             write(save_file, "sqrtbp", Integer(sqrtbp))
             write(save_file, "max_penalty", max_penalty)

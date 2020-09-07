@@ -115,6 +115,8 @@ const SP1FQ = FQ + FQ * 1e-2
 const SN1FQ = FQ - FQ * 1e-2
 const SP2FQ = FQ + FQ * 2e-2
 const SN2FQ = FQ - FQ * 2e-2
+const SP3FQ = FQ + FQ * 3e-2
+const SN3FQ = FQ - FQ * 3e-2
 const MAX_CONTROL_NORM_0 = 5e-1 #GHz
 const FBFQ_A = 0.202407
 const FBFQ_B = 0.5
@@ -173,18 +175,18 @@ const ZPIBY2_GATE_TIME = 17.86
 # ISO indicates the object is defined in the complex to real isomorphism.
 # NEGI is the negative complex unit.
 const NEGI = SA_F64[0   0  1  0 ;
-              0   0  0  1 ;
-              -1  0  0  0 ;
-              0  -1  0  0 ;]
+                    0   0  0  1 ;
+                    -1  0  0  0 ;
+                    0  -1  0  0 ;]
 # SIGMAX, SIGMAZ are the X and Z pauli matrices
 const SIGMAX_ISO = SA_F64[0   1   0   0;
-                    1   0   0   0;
-                    0   0   0   1;
-                    0   0   1   0]
+                          1   0   0   0;
+                          0   0   0   1;
+                          0   0   1   0]
 const SIGMAZ_ISO = SA_F64[1   0   0   0;
-                    0  -1   0   0;
-                    0   0   1   0;
-                    0   0   0  -1]
+                          0  -1   0   0;
+                          0   0   1   0;
+                          0   0   0  -1]
 const NEGI_H0_ISO = pi * NEGI * SIGMAZ_ISO
 const NEGI_H1_ISO = pi * NEGI * SIGMAX_ISO
 const FQ_NEGI_H0_ISO = FQ * NEGI_H0_ISO
@@ -192,6 +194,8 @@ const SP1FQ_NEGI_H0_ISO = SP1FQ * NEGI_H0_ISO
 const SN1FQ_NEGI_H0_ISO = SN1FQ * NEGI_H0_ISO
 const SP2FQ_NEGI_H0_ISO = SP2FQ * NEGI_H0_ISO
 const SN2FQ_NEGI_H0_ISO = SN2FQ * NEGI_H0_ISO
+const SP3FQ_NEGI_H0_ISO = SP3FQ * NEGI_H0_ISO
+const SN3FQ_NEGI_H0_ISO = SN3FQ * NEGI_H0_ISO
 const AYPIBY2_NEGI_H1_ISO = AYPIBY2 * NEGI_H1_ISO
 # relaxation dissipation ops
 # L_{0} = |g> <e|
@@ -369,12 +373,13 @@ function dynamics_lindbladnodis_deqjl(state::StaticMatrix, params::SimParams, ti
 end
 
 
-function dynamics_lindbladt1_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0, namp_dist), t)
-    knot_point = (Int(floor(t * dt_inv)) % control_knot_count) + 1
-    gamma_1 = (amp_t1_spline(controls[knot_point][1]))^(-1)
+function dynamics_lindbladt1_deqjl(density::StaticMatrix, params::SimParams, time::Float64)
+    controls_knot_point = (Int(floor(time * params.controls_dt_inv)) % params.control_knot_count) + 1
+    control1 = params.controls[controls_knot_point][1]
+    gamma_1 = (amp_t1_spline(control1))^(-1)
     negi_h = (
         FQ_NEGI_H0_ISO
-        + controls[knot_point][1] * NEGI_H1_ISO
+        + control1 * NEGI_H1_ISO
     )
     return (
         negi_h * density - density * negi_h
@@ -737,28 +742,27 @@ after each application. Save the output.
 
 Arguments:
 save_file_path :: String - The file path to grab the controls from
-dt_inv :: Int64 - must be an integer and a power of 10
 """
 function run_sim_deqjl(
     gate_count, gate_type;
     save_file_path=nothing,
-    controls_dt_inv=DT_PREF_INV,
     adaptive=DEQJL_ADAPTIVE, dynamics_type=schroed,
     dt=DT_PREF, save=true, save_type=jl, seed=0,
     solver=DifferentialEquations.Vern9, print_seq=false, print_final=false,
     negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
-    noise_dt_inv=DT_NOISE_INV, seed_state=true)
+    noise_dt_inv=DT_NOISE_INV, seed_state=true,)
     start_time = Dates.now()
     # grab
     if isnothing(save_file_path)
         controls = Array{Float64, 2}([0 0])
+        controls_dt_inv = 0
         control_knot_count = 0
         gate_time = DT_GTM[dynamics_type]
     else
-        (controls, gate_time) = grab_controls(save_file_path; save_type=save_type)
+        (controls, controls_dt_inv, gate_time) = grab_controls(save_file_path; save_type=save_type)
         control_knot_count = Int(floor(gate_time * controls_dt_inv))
     end
-    dt_inv = 1 / dt
+    dt_inv = dt^(-1)
     save_times = Array(0:1:gate_count) * gate_time
     evolution_time = gate_time * gate_count
     knot_count = Int(ceil(evolution_time * dt_inv))
@@ -791,12 +795,12 @@ function run_sim_deqjl(
     g3 = g1^3
     id0 = initial_state
     if state_type == st_state
-        states = zeros(gate_count + 1, STATE_SIZE_ISO)
+        states_ = zeros(gate_count + 1, STATE_SIZE_ISO)
         id1 = g1 * id0
         id2 = g2 * id0
         id3 = g3 * id0
     elseif state_type == st_density
-        states = zeros(gate_count + 1, STATE_SIZE_ISO, STATE_SIZE_ISO)
+        states_ = zeros(gate_count + 1, STATE_SIZE_ISO, STATE_SIZE_ISO)
         id1 = g1 * id0 * g1'
         id2 = g2 * id0 * g2'
         id3 = g3 * id0 * g3'
@@ -815,10 +819,10 @@ function run_sim_deqjl(
             target = id3
         end
         if state_type == st_state
-            states[i, :] = state = result.u[i]
+            states_[i, :] = state = result.u[i]
             fidelities[i] = fidelity_vec_iso2(state, target)
         elseif state_type == st_density
-            states[i, :, :] = state = result.u[i]
+            states_[i, :, :] = state = result.u[i]
             fidelities[i] = abs(fidelity_mat_iso(state, target))
         end
 
@@ -854,7 +858,7 @@ function run_sim_deqjl(
             write(data_file, "gate_type", Integer(gate_type))
             write(data_file, "save_file_path", isnothing(save_file_path) ? "" : save_file_path)
             write(data_file, "seed", seed)
-            write(data_file, "states", states)
+            write(data_file, "states", states_)
             write(data_file, "fidelities", fidelities)
             write(data_file, "run_time", string(run_time))
             write(data_file, "dt", dt)
@@ -875,7 +879,6 @@ end
 function run_sim_h0sweep_deqjl(
     gate_type, negi_h0s;
     save_file_path=nothing,
-    controls_dt_inv=DT_PREF_INV,
     adaptive=DEQJL_ADAPTIVE, dynamics_type=schroed,
     dt=DT_PREF, save=true, save_type=jl, seed=0,
     solver=DifferentialEquations.Vern9, print_seq=false)
@@ -886,7 +889,7 @@ function run_sim_h0sweep_deqjl(
         control_knot_count = 0
         gate_time = DT_GTM[dynamics_type]
     else
-        (controls, gate_time) = grab_controls(save_file_path; save_type=save_type)
+        (controls, controls_dt_inv, gate_time) = grab_controls(save_file_path; save_type=save_type)
         control_knot_count = Int(floor(gate_time * controls_dt_inv))
     end
     dt_inv = 1 / dt
@@ -961,6 +964,104 @@ end
 
 
 """
+run_sim_fine_deqjl - Run a simulation, save points.
+
+Arguments:
+save_file_path :: String - The file path to grab the controls from
+"""
+function run_sim_fine_deqjl(
+    ;gate_count = 1,
+    save_file_path=nothing,
+    adaptive=DEQJL_ADAPTIVE, dynamics_type=schroed,
+    dt=DT_PREF, save=true, save_type=jl, seed=0,
+    solver=DifferentialEquations.Vern9, print_seq=false, print_final=false,
+    negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
+    noise_dt_inv=DT_NOISE_INV, seed_state=true, save_step=1e-1)
+    start_time = Dates.now()
+    # grab
+    if isnothing(save_file_path)
+        controls = Array{Float64, 2}([0 0])
+        controls_dt_inv = 0
+        control_knot_count = 0
+        gate_time = DT_GTM[dynamics_type]
+    else
+        (controls, controls_dt_inv, gate_time) = grab_controls(save_file_path; save_type=save_type)
+        control_knot_count = Int(floor(gate_time * controls_dt_inv))
+    end
+    dt_inv = dt^(-1)
+    evolution_time = gate_time * gate_count
+    save_step_inv = save_step^(-1)
+    save_count = Int(ceil(evolution_time * save_step_inv))
+    save_times = Array(0:save_count) * save_step
+
+    # get noise offsets
+    noise_knot_count = Int(ceil(evolution_time * noise_dt_inv)) + 1
+    noise_offsets = (namp) * pink_noise_from_white(noise_knot_count, noise_dt_inv, ndist; seed=seed)
+    
+    # integrate
+    dynamics = DT_DYN[dynamics_type]
+    state_type = DT_ST[dynamics_type]
+    state_seed = seed_state ? seed : 0
+    if state_type == st_state
+        initial_state = gen_rand_state_iso(;seed=state_seed)
+    elseif state_type == st_density
+        initial_state =  gen_rand_density_iso(;seed=state_seed)
+    end
+    tspan = (0., evolution_time)
+    params = SimParams(controls, control_knot_count, controls_dt_inv, negi_h0,
+                       noise_offsets, noise_dt_inv, dt_inv)
+    prob = ODEProblem(dynamics, initial_state, tspan, params)
+    result = solve(prob, solver(), dt=dt, saveat=save_times,
+                   maxiters=DEQJL_MAXITERS, adaptive=adaptive)
+
+    if state_type == st_state
+        states_ = zeros(save_count + 1, STATE_SIZE_ISO)
+        for i = 1:save_count
+            states_[i, :] = Array(result.u[i])
+        end
+    elseif state_type == st_density
+        states_ = zeros(save_count + 1, STATE_SIZE_ISO, STATE_SIZE_ISO)
+        for i = 1:save_count
+            states_[i, :, :] = Array(result.u[i])
+        end
+    end
+
+    end_time = Dates.now()
+    run_time = end_time - start_time
+
+    # Save the data.
+    experiment_name = save_path = nothing
+    if isnothing(save_file_path)
+        experiment_name = DT_EN[dynamics_type]
+        save_path = joinpath(SPIN_OUT_PATH, experiment_name)
+    else
+        experiment_name = split(save_file_path, "/")[end - 1]
+        save_path = dirname(save_file_path)
+    end
+    data_file_path = nothing
+    if save
+        data_file_path = generate_file_path("h5", experiment_name, save_path)
+        h5open(data_file_path, "w") do data_file
+            write(data_file, "dynamics_type", Integer(dynamics_type))
+            write(data_file, "gate_count", gate_count)
+            write(data_file, "gate_time", gate_time)
+            write(data_file, "save_file_path", isnothing(save_file_path) ? "" : save_file_path)
+            write(data_file, "seed", seed)
+            write(data_file, "states", states_)
+            write(data_file, "run_time", string(run_time))
+            write(data_file, "dt", dt)
+            write(data_file, "negi_h0", Array(negi_h0))
+            write(data_file, "namp", namp)
+            write(data_file, "ndist", string(ndist))
+            write(data_file, "noise_dt_inv", noise_dt_inv)
+        end
+        println("Saved simulation to $(data_file_path)")
+    end
+    return data_file_path
+end
+
+
+"""
 sample_controls - Sample controls and d2controls_dt2
 on the preferred time axis using a spline.
 """
@@ -1016,7 +1117,7 @@ t1_average - Compute the average t1 time for a control pulse.
 """
 function t1_average(save_file_path; save_type=jl)
     # Grab and prep data.
-    (controls, evolution_time) = grab_controls(save_file_path; save_type=save_type)
+    (controls, controls_dt_inv, evolution_time) = grab_controls(save_file_path; save_type=save_type)
     (control_knot_count, control_count) = size(controls)
     t1_avgs = zeros(control_count)
     for i = 1:control_count

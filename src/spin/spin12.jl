@@ -19,11 +19,9 @@ const EXPERIMENT_NAME = "spin12"
 const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
 # Define the optimization.
-const DT_STATIC = DT_PREF
-const DT_STATIC_INV = DT_PREF_INV
 const CONSTRAINT_TOLERANCE = 1e-8
 const AL_KICKOUT_TOLERANCE = 1e-7
-const PN_STEPS = 5
+const PN_STEPS = 2
 const MAX_PENALTY = 1e11
 const ILQR_DJ_TOL = 1e-4
 
@@ -140,11 +138,12 @@ function RobotDynamics.dynamics(model::Model{SO}, astate::StaticVector,
 end
 
 
-function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
+function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=alilqr,
                   postsample=false, sqrtbp=false, sample_order=0,
-                  integrator_type=rk6, qs=nothing, max_penalty=MAX_PENALTY)
-    dt = DT_STATIC
-    N = Int(floor(evolution_time * DT_STATIC_INV)) + 1
+                  integrator_type=rk6, qs=nothing, max_penalty=MAX_PENALTY,
+                  dt=5e-3, smoke_test=false)
+    dt_inv = dt^(-1)
+    N = Int(floor(evolution_time * dt_inv)) + 1
     model = Model(sample_order)
     n = state_dim(model)
     m = control_dim(model)
@@ -253,10 +252,14 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     if solver_type == alilqr
         solver = AugmentedLagrangianSolver(prob, opts)
         solver.solver_uncon.opts.square_root = sqrtbp
-        solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
-        solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
+        solver.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
+        solver.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
         solver.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
         solver.opts.penalty_max = max_penalty
+        if smoke_test
+            solver.opts.iterations = 1
+            solver.solver_uncon.opts.iterations = 1
+        end
     elseif solver_type == altro
         solver = ALTROSolver(prob, opts)
         solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
@@ -267,6 +270,11 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         solver.solver_al.opts.penalty_max = max_penalty
         solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
         solver.solver_pn.opts.n_steps = PN_STEPS
+        if smoke_test
+            solver.solver_al.opts.iterations = 1
+            solver.solver_al.solver_uncon.opts.iterations = 1
+            solver.solver_pn.opts.n_steps = 1
+        end
     end
     Altro.solve!(solver)
 
@@ -288,7 +296,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     
     # Save.
     if SAVE
-        save_file_path = generate_save_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
+        save_file_path = generate_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
         println("Saving this optimization to $(save_file_path)")
         h5open(save_file_path, "cw") do save_file
             write(save_file, "acontrols", acontrols_arr)

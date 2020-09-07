@@ -87,14 +87,17 @@ function grab_controls(save_file_path; save_type=jl)
             cidx = read(save_file, "controls_idx")
             controls = read(save_file, "astates")[:, cidx]
             evolution_time = read(save_file, "evolution_time")
+            controls_dt_inv = "dt" in names(save_file) ? read(save_file, "dt")^(-1) : DT_PREF_INV
         elseif save_type == samplejl
             controls = read(save_file, "controls_sample")
             evolution_time = read(save_file, "evolution_time_sample")
+            controls_dt_inv = DT_PREF_INV
         elseif save_type == py
             controls = permutedims(read(save_file, "controls"), (2, 1))
             evolution_time = read(save_file, "evolution_time")
+            controls_dt_inv = DT_PREF_INV
         end
-        return (controls, evolution_time)
+        return (controls, controls_dt_inv, evolution_time)
     end
 
     return data
@@ -168,6 +171,15 @@ end
 
 
 @inline get_vec_iso(vec) = vcat(real(vec), imag(vec))
+
+
+function get_vec_uniso(vec)
+    n = size(vec)[1]
+    nby2 = Integer(n/2)
+    i1 = 1:nby2
+    i2 = (nby2 + 1):n
+    return vec[i1] + 1im * vec[i2]
+end
 
 
 function get_mat_iso(mat)
