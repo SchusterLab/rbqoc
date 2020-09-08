@@ -22,7 +22,6 @@ META_NAME = "spin"
 EXPERIMENT_NAME = "figures"
 SPIN_OUT_PATH = os.path.join(WDIR, "out", META_NAME)
 SAVE_PATH = os.path.join(WDIR, "out", META_NAME, EXPERIMENT_NAME)
-F2C_DATA_FILE_PATH = os.path.join(SAVE_PATH, "f2c.h5")
 F3C_DATA_FILE_PATH = os.path.join(SAVE_PATH, "f3c.h5")
 F3D_DATA_FILE_PATH = os.path.join(SAVE_PATH, "f3d.h5")
 
@@ -36,6 +35,16 @@ DPI_FINAL = int(1e3)
 TICK_FS = LABEL_FS = LEGEND_FS = TEXT_FS = 10
 PAPER_LW = 3.40457
 
+# keys
+DATAFP_KEY = 1
+SAVEFP_KEY = 2
+SAVET_KEY = 3
+ACORDS_KEY = 4
+AVGAMP_KEY = 5
+AVGT1_KEY = 6
+DATA2FP_KEY = 7
+
+
 # TYPES #
 
 class SaveType(Enum):
@@ -43,49 +52,6 @@ class SaveType(Enum):
     samplejl = 2
     py = 3
 #ENDDEF
-
-# METHODS #
-
-def grab_controls(save_file_path, save_type=SaveType.jl):
-    with h5py.File(save_file_path, "r") as save_file:
-        if save_type == SaveType.jl:
-            cidx = save_file["controls_idx"][()]
-            controls = save_file["astates"][cidx - 1, :][()]
-            controls = np.reshape(controls, (controls.shape[1], 1))
-            evolution_time = save_file["evolution_time"][()]
-        elif save_type == SaveType.samplejl:
-            controls = np.swapaxes(save_file["controls_sample"][()], -1, -2)
-            evolution_time = save_file["evolution_time_sample"][()]
-        elif save_type == SaveType.py:
-            controls = save_file["controls"][()]
-            evolution_time = save_file["evolution_time"][()]
-        #ENDIF
-    #ENDWITH
-    return (controls, evolution_time)
-#ENDDEF
-
-
-def generate_file_path(extension, save_file_name, save_path):
-    # Ensure the path exists.
-    os.makedirs(save_path, exist_ok=True)
-    
-    # Create a save file name based on the one given; ensure it will
-    # not conflict with others in the directory. 
-    max_numeric_prefix = -1
-    for file_name in os.listdir(save_path):
-        if ("_{}.{}".format(save_file_name, extension)) in file_name:
-            max_numeric_prefix = max(int(file_name.split("_")[0]),
-                                     max_numeric_prefix)
-    #ENDFOR
-    save_file_name_augmented = ("{:05d}_{}.{}"
-                                "".format(max_numeric_prefix + 1,
-                                          save_file_name, extension))
-    
-    return os.path.join(save_path, save_file_name_augmented)
-#ENDDEF
-
-
-## PLOTTING ##
 
 class GateType(Enum):
     zpiby2 = 1
@@ -160,15 +126,70 @@ PT_MARKER = {
     PulseType.d3: "d",
 }
 
-DATAFP_KEY = 1
-SAVEFP_KEY = 2
-SAVET_KEY = 3
-ACORDS_KEY = 4
-AVGAMP_KEY = 5
-AVGT1_KEY = 6
-DATA2FP_KEY = 7
+# METHODS #
+
+def grab_controls(save_file_path):
+    with h5py.File(save_file_path, "r") as save_file:
+        save_type = SaveType(save_file["save_type"][()])
+        if save_type == SaveType.jl:
+            cidx = save_file["controls_idx"][()]
+            controls = save_file["astates"][cidx - 1, :][()]
+            controls = np.reshape(controls, (controls.shape[1], 1))
+            evolution_time = save_file["evolution_time"][()]
+        elif save_type == SaveType.samplejl:
+            controls = np.swapaxes(save_file["controls_sample"][()], -1, -2)
+            evolution_time = save_file["evolution_time_sample"][()]
+        elif save_type == SaveType.py:
+            controls = save_file["controls"][()]
+            evolution_time = save_file["evolution_time"][()]
+        #ENDIF
+    #ENDWITH
+    return (controls, evolution_time)
+#ENDDEF
+
+
+def generate_file_path(extension, save_file_name, save_path):
+    # Ensure the path exists.
+    os.makedirs(save_path, exist_ok=True)
+    
+    # Create a save file name based on the one given; ensure it will
+    # not conflict with others in the directory. 
+    max_numeric_prefix = -1
+    for file_name in os.listdir(save_path):
+        if ("_{}.{}".format(save_file_name, extension)) in file_name:
+            max_numeric_prefix = max(int(file_name.split("_")[0]),
+                                     max_numeric_prefix)
+    #ENDFOR
+    save_file_name_augmented = ("{:05d}_{}.{}"
+                                "".format(max_numeric_prefix + 1,
+                                          save_file_name, extension))
+    
+    return os.path.join(save_path, save_file_name_augmented)
+#ENDDEF
+
+
+def latest_file_path(extension, save_file_name, save_path):
+    max_numeric_prefix = -1
+    for file_name in os.listdir(save_path):
+        if ("_{}.{}".format(save_file_name, extension)) in file_name:
+            max_numeric_prefix = max(int(file_name.split("_")[0]),
+                                     max_numeric_prefix)
+        #ENDIF
+    #ENDFOR
+    if max_numeric_prefix > -1:
+        save_file_name = ("{:05d}_{}.{}"
+                          "".format(max_numeric_prefix, save_file_name, extension))
+        save_file_path = os.path.join(save_path, save_file_name)
+    else:
+        save_file_path = None
+    #ENDIF
+    
+    return save_file_path
+#ENDDEF
+
 
 # GENERAL #
+
 def plot_fidelity_by_gate_count(
         fidelitiess, inds=None, title="", ylim=None,
         yticks=None, labels=None, colors=None, linestyles=None,
@@ -215,82 +236,27 @@ def plot_fidelity_by_gate_count(
 
 # FIGURE 1 #
 
-F1_PT_LIST = [PulseType.analytic, PulseType.qoc]
-
-F1_DATA = {
-    GateType.zpiby2: {
-        PulseType.qoc: {
-            DATAFP_KEY: os.path.join(SPIN_OUT_PATH, "spin15/00216_spin15.h5"),
-            SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin15/00209_spin15.h5"),
-            SAVET_KEY: SaveType.jl,
-            AVGAMP_KEY: 0.20628855236611363,
-            AVGT1_KEY: 2.94161031851321e6,
-        },
-        PulseType.analytic: {
-            DATAFP_KEY: os.path.join(SPIN_OUT_PATH, "spin14/00043_spin14.h5"),
-            SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
-            SAVET_KEY: SaveType.py,
-            AVGAMP_KEY: 0.,
-            AVGT1_KEY: 310880.0,
-        },
-    },
-    GateType.ypiby2: {
-        PulseType.qoc: {
-            DATAFP_KEY: os.path.join(SPIN_OUT_PATH, "spin15/00215_spin15.h5"),
-            SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin15/00205_spin15.h5"),
-            SAVET_KEY: SaveType.jl,
-            AVGAMP_KEY: 0.20386686839468854,
-            AVGT1_KEY: 2.846659754345148e6,
-        },
-        PulseType.analytic: {
-            DATAFP_KEY: os.path.join(SPIN_OUT_PATH, "spin14/00041_spin14.h5"),
-            SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin14/00003_spin14.h5"),
-            SAVET_KEY: SaveType.py,
-            AVGAMP_KEY: 0.027799178222907037,
-            AVGT1_KEY: 513020.2302254785,
-        },
-    },
-    GateType.xpiby2: {
-        PulseType.qoc: {
-            DATAFP_KEY: os.path.join(SPIN_OUT_PATH, "spin15/00202_spin15.h5"),
-            SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin15/00174_spin15.h5"),
-            SAVET_KEY: SaveType.jl,
-            AVGAMP_KEY: 0.10855232522260652,
-            AVGT1_KEY: 1.4927200778820992e6,
-        },
-        PulseType.analytic: {
-            DATAFP_KEY: os.path.join(SPIN_OUT_PATH, "spin14/00042_spin14.h5"),
-            SAVEFP_KEY: os.path.join(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
-            SAVET_KEY: SaveType.py,
-            AVGAMP_KEY: 0.019058098591549295,
-            AVGT1_KEY: 497914.87979617505,
-        },  
-    },
-}
-
+F1A_DATA_FILE_PATH = os.path.join(SPIN_OUT_PATH, "figures/f1a.h5")
 def make_figure1a():
-    plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
-    save_file_paths = list()
-    save_types = list()
-    labels = list()
-    colors = list()
-    subfigs = list()
+    with h5py.File(F1A_DATA_FILE_PATH, "r") as data_file:
+        save_file_paths = data_file["save_file_paths"][()]
+        gate_types = [GateType(gt) for gt in data_file["gate_types"][()]]
+        pulse_types = [PulseType(pt) for pt in data_file["pulse_types"][()]]
+    #ENDWITH
+    gate_type_count = len(gate_types)
+    pulse_type_count = len(pulse_types)
     (fig, axs) = plt.subplots(3, figsize=(PAPER_LW * 0.55, PAPER_LW * 0.8))
-    for (i, gate_type) in enumerate(GT_LIST):
-        # annotate gate type
-        text_ = GT_STR[gate_type]
+    for (i, gate_type) in enumerate(gate_types):
         xmax = 0
-        # plot controls
-        for (j, pulse_type) in enumerate(F1_PT_LIST):
-            data = F1_DATA[gate_type][pulse_type]
+        for (j, pulse_type) in enumerate(pulse_types):
+            idx = i * pulse_type_count + j
             color = PT_COLOR[pulse_type]
-            save_file_path = data[SAVEFP_KEY]
-            save_type = data[SAVET_KEY]
-            (controls, evolution_time) = grab_controls(save_file_path, save_type=save_type)
+            save_file_path = save_file_paths[idx]
+            (controls, evolution_time) = grab_controls(save_file_path)
             (control_eval_count, control_count) = controls.shape
             control_eval_times = np.linspace(0, control_eval_count - 1, control_eval_count) * DT_PREF
             xmax = max(xmax, control_eval_times[-1])
-            axs[i].plot(control_eval_times, controls[:,0], color=color)
+            axs[i].plot(control_eval_times, controls[:, 0], color=color)
         #ENDFOR
         axs[i].axhline(0, color="grey", alpha=0.2, zorder=1, linewidth=0.8)
         axs[i].set_xlim(0, xmax)
@@ -318,6 +284,7 @@ def make_figure1a():
     axs[2].set_xlabel("$t$ (ns)", fontsize=LABEL_FS)
     fig.text(0, 0.96, "(a)", fontsize=TEXT_FS)
     plt.subplots_adjust(left=0.32, right=0.997, bottom=0.14, top=.95, wspace=None, hspace=0.55)
+    plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     plt.savefig(plot_file_path, dpi=DPI_FINAL)
     print("Plotted Figure1a to {}"
           "".format(plot_file_path))
@@ -537,38 +504,24 @@ def make_figure2a():
 #ENDDEF
 
 
-F2B_TRIAL_COUNT = int(1e3)
-F2B_FQ_DEV = 1e-1
-F2B_PT_LIST = [PulseType.analytic, PulseType.s2, PulseType.s4, PulseType.d2,
-               PulseType.d3, PulseType.s2b, PulseType.s4b, PulseType.d2b, PulseType.d3b]
-F2B_LB = 1 + 1e-8
+F2B_LB = 1.1
 def make_figure2b():
-    fq = 1.4e-2
-    fq_devs_ = np.linspace(-F2B_FQ_DEV, F2B_FQ_DEV, F2B_TRIAL_COUNT)
-    fqs = (fq_devs_ * fq) + fq
     log_transform = lambda x: np.log10(x) / np.log10(F2B_LB)
+    
+    data_file_path = latest_file_path("h5", "f2b", SAVE_PATH)
+    with h5py.File(data_file_path, "r") as data_file:
+        fq_devs = data_file["fq_devs"][()]
+        gate_errorss = np.swapaxes(data_file["gate_errorss"][()], -1, -2)
+        pulse_types = [PulseType(pt) for pt in data_file["pulse_types"][()]]
+    #ENDWITH
     
     fig = plt.figure(figsize=(PAPER_LW * 0.4, PAPER_LW * 0.8))
     ax = plt.gca()
-    for (i, pulse_type) in enumerate(F2B_PT_LIST):
-        data = F2_DATA[pulse_type]
-        if not DATAFP_KEY in data.keys():
-            continue
-        #ENDIF
-        label = "{}".format(PT_STR[pulse_type])
+    for (i, pulse_type) in enumerate(pulse_types):
         linestyle = PT_LS[pulse_type]
         color = PT_COLOR[pulse_type]
-        data_file_path = data[DATAFP_KEY]
-        with h5py.File(data_file_path, "r") as data_file:
-            fidelities = data_file["fidelities"][()]
-            fq_devs = fq_devs_ if not "fq_devs" in data_file.keys() else data_file["fq_devs"][()]
-        #ENDWITH
-        gate_errors = 1 - fidelities
-        mid_idx = int(len(gate_errors) / 2)
-        mean_gate_errors = (np.flip(gate_errors[0:mid_idx]) + gate_errors[mid_idx:]) / 2
-        log_mge = log_transform(mean_gate_errors)
-        fq_devs_top = fq_devs[mid_idx:]
-        plt.plot(fq_devs_top, log_mge, color=color,
+        log_mge = log_transform(gate_errorss[i, :])
+        plt.plot(fq_devs, log_mge, color=color,
                  linestyle=linestyle)
     #ENDFOR
     plt.xlim(0, 3e-2)
@@ -576,7 +529,7 @@ def make_figure2b():
         np.array([0, 1, 2, 3]) * 1e-2,
         ["0", "1", "2", "3"],
     )
-    plt.ylim(log_transform(1e-7), log_transform(1e-3))
+    plt.ylim(log_transform(1e-7), log_transform(1e-1))
     plt.yticks(
         log_transform(np.array([1e-7, 1e-6, 1e-5, 1e-4, 1e-3])),
         ["$10^{-7}$", "$10^{-6}$", "$10^{-5}$",
@@ -601,11 +554,9 @@ def make_figure2b():
 F2C_MS = 30
 F2C_MEW = 0.5
 def make_figure2c():
-    gate_type = GateType.xpiby2
-    # get data and plot
     fig = plt.figure(figsize=(PAPER_LW, PAPER_LW * 0.8))
     ax = plt.gca()
-    data_file_path = F2C_DATA_FILE_PATH
+    data_file_path = latest_file_path("h5", "f2c", SAVE_PATH)
     with h5py.File(data_file_path, "r") as data_file:
         gate_errors = np.swapaxes(data_file["gate_errors"][()], -1, -2)
         gate_times = data_file["gate_times"][()]
@@ -624,20 +575,20 @@ def make_figure2c():
         plt.scatter([], [], label=label, color=color, linewidths=F2C_MEW,
                     s=F2C_MS, marker=marker, edgecolors="black")
     #ENDFOR
-    plt.ylim(0, 1e-4)
+    plt.ylim(0, 1.6e-4)
     plt.yticks(
-        np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) * 1e-5,
-        ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
+        np.array([0, 0.5, 1.0, 1.5]) * 1e-4,
+        ["0.0", "0.5", "1.0", "1.5"],
     )
     plt.xticks([50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160],
                ["", "60", "", "80", "", "100", "", "120", "", "140", "", "160"])
     ax.tick_params(direction="in", labelsize=TICK_FS)
     plt.xlabel("$t_{N}$ (ns)")
-    plt.ylabel("Gate Error $\\times10^{5}$")
-    plt.legend(frameon=False, loc="upper right", bbox_to_anchor=(1, 1),
+    plt.ylabel("Gate Error $\\times10^{4}$")
+    plt.legend(frameon=False, loc="lower left", bbox_to_anchor=(-0.03, 0),
                handletextpad=0.2, fontsize=8)
     fig.text(0, 0.96, "(c)")
-    plt.subplots_adjust(left=0.14, right=0.997, top=0.95, bottom=0.14, hspace=None, wspace=None)
+    plt.subplots_adjust(left=0.15, right=0.997, top=0.95, bottom=0.14, hspace=None, wspace=None)
     plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     plt.savefig(plot_file_path, dpi=DPI_FINAL)
     print("Plotted Figure2c to {}".format(plot_file_path))

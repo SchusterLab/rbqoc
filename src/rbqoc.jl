@@ -83,6 +83,7 @@ data for common h5 save formats
 """
 function grab_controls(save_file_path; save_type=jl)
     data = h5open(save_file_path, "r") do save_file
+        save_type = SaveType(read(save_file, "save_type"))
         if save_type == jl
             cidx = read(save_file, "controls_idx")
             controls = read(save_file, "astates")[:, cidx]

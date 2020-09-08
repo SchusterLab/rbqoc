@@ -19,7 +19,6 @@ const EXPERIMENT_NAME = "spin11"
 const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
 # Define the optimization.
-const DT_STATIC = 5e-3
 const CONTROL_COUNT = 1
 const CONSTRAINT_TOLERANCE = 1e-8
 const AL_KICKOUT_TOLERANCE = 1e-7
@@ -144,7 +143,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=alilqr,
                   postsample=false, initial_save_file_path=nothing,
                   initial_save_type=jl, sqrtbp=false, derivative_order=0,
                   integrator_type=rk6, max_penalty=MAX_PENALTY, qs=nothing,
-                  smoke_test=false, dt=DT_STATIC)
+                  smoke_test=false, dt=5e-3)
     model = Model(derivative_order)
     n = state_dim(model)
     m = control_dim(model)
@@ -340,6 +339,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=alilqr,
             write(save_file, "ilqr_dj_tol", ILQR_DJ_TOL)
             write(save_file, "integrator_type", Integer(integrator_type))
             write(save_file, "gate_type", Integer(gate_type))
+            write(save_file, "save_type", Integer(jl))
         end
 
         if postsample
@@ -348,6 +348,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=alilqr,
                 write(save_file, "controls_sample", csample)
                 write(save_file, "d2controls_dt2_sample", d2csample)
                 write(save_file, "evolution_time_sample", etsample)
+                o_delete(save_file, "save_type")
+                write(save_file, "save_type", Integer(samplejl))
             end
         end
     end

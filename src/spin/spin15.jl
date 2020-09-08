@@ -343,6 +343,7 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
             write(save_file, "ilqr_dj_tol", ILQR_DJ_TOL)
             write(save_file, "integrator_type", Integer(integrator_type))
             write(save_file, "gate_type", Integer(gate_type))
+            write(save_file, "save_type", Integer(jl))
         end
         if time_optimal
             # Sample the important metrics.
@@ -351,6 +352,8 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
                 write(save_file, "controls_sample", controls_sample)
                 write(save_file, "d2controls_dt2_sample", d2controls_dt2_sample)
                 write(save_file, "evolution_time_sample", evolution_time_sample)
+                o_delete(save_file, "save_type")
+                write(save_file, "save_type", Integer(samplejl))
             end
         end
     end

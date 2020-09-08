@@ -243,6 +243,9 @@ const XPIBY2 = [1 -1im;
 const XPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(XPIBY2))
 const XPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPIBY2[:,1]))
 const XPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPIBY2[:,2]))
+const XPI = [0 -1im;
+             -1im 0]
+XPI_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(XPI))
 
 const GT_GATE = Dict(
     xpiby2 => XPIBY2_ISO,
@@ -742,24 +745,30 @@ after each application. Save the output.
 
 Arguments:
 save_file_path :: String - The file path to grab the controls from
+
+Returns:
+result :: Union{String, Dict} - string to save file path if save is true,
+otherwise returns a dictionary of the result
 """
 function run_sim_deqjl(
     gate_count, gate_type;
     save_file_path=nothing,
     adaptive=DEQJL_ADAPTIVE, dynamics_type=schroed,
-    dt=DT_PREF, save=true, save_type=jl, seed=0,
+    dt=DT_PREF, save=true, seed=0,
     solver=DifferentialEquations.Vern9, print_seq=false, print_final=false,
     negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
     noise_dt_inv=DT_NOISE_INV, seed_state=true,)
     start_time = Dates.now()
     # grab
+    analytic = false
     if isnothing(save_file_path)
         controls = Array{Float64, 2}([0 0])
         controls_dt_inv = 0
         control_knot_count = 0
         gate_time = DT_GTM[dynamics_type]
+        analytic = true
     else
-        (controls, controls_dt_inv, gate_time) = grab_controls(save_file_path; save_type=save_type)
+        (controls, controls_dt_inv, gate_time) = grab_controls(save_file_path)
         control_knot_count = Int(floor(gate_time * controls_dt_inv))
     end
     dt_inv = dt^(-1)
@@ -784,7 +793,7 @@ function run_sim_deqjl(
     params = SimParams(controls, control_knot_count, controls_dt_inv, negi_h0,
                        noise_offsets, noise_dt_inv, dt_inv)
     prob = ODEProblem(dynamics, initial_state, tspan, params)
-    result = solve(prob, solver(), dt=dt, saveat=save_times,
+    result_deqjl = solve(prob, solver(), dt=dt, saveat=save_times,
                    maxiters=DEQJL_MAXITERS, adaptive=adaptive)
 
     # Compute the fidelities.
@@ -813,16 +822,22 @@ function run_sim_deqjl(
             target = id0
         elseif i_eff % 4 == 1
             target = id1
+            if analytic
+                target = XPI_ISO * target
+            end
         elseif i_eff % 4 == 2
             target = id2
         elseif i_eff % 4 == 3
             target = id3
+            if analytic
+                target = XPI_ISO * target
+            end
         end
         if state_type == st_state
-            states_[i, :] = state = result.u[i]
+            states_[i, :] = state = result_deqjl.u[i]
             fidelities[i] = fidelity_vec_iso2(state, target)
         elseif state_type == st_density
-            states_[i, :, :] = state = result.u[i]
+            states_[i, :, :] = state = result_deqjl.u[i]
             fidelities[i] = abs(fidelity_mat_iso(state, target))
         end
 
@@ -839,37 +854,46 @@ function run_sim_deqjl(
     end_time = Dates.now()
     run_time = end_time - start_time
 
+    # Generate the result.
+    result = Dict(
+        "dynamics_type" => Integer(dynamics_type),
+        "gate_count" => gate_count,
+        "gate_time" => gate_time,
+        "gate_type" => Integer(gate_type),
+        "save_file_path" => isnothing(save_file_path) ? "" : save_file_path,
+        "seed" => seed,
+        "states" => states_,
+        "fidelities" => fidelities,
+        "run_time" => string(run_time),
+        "dt" => dt,
+        "negi_h0" => Array(negi_h0),
+        "namp" => namp,
+        "ndist" => string(ndist),
+        "noise_dt_inv" => noise_dt_inv,
+
+    )
+    
     # Save the data.
-    experiment_name = save_path = nothing
-    if isnothing(save_file_path)
-        experiment_name = DT_EN[dynamics_type]
-        save_path = joinpath(SPIN_OUT_PATH, experiment_name)
-    else
-        experiment_name = split(save_file_path, "/")[end - 1]
-        save_path = dirname(save_file_path)
-    end
-    data_file_path = nothing
     if save
+        experiment_name = save_path = nothing
+        if isnothing(save_file_path)
+            experiment_name = DT_EN[dynamics_type]
+            save_path = joinpath(SPIN_OUT_PATH, experiment_name)
+        else
+            experiment_name = split(save_file_path, "/")[end - 1]
+            save_path = dirname(save_file_path)
+        end
         data_file_path = generate_file_path("h5", experiment_name, save_path)
         h5open(data_file_path, "w") do data_file
-            write(data_file, "dynamics_type", Integer(dynamics_type))
-            write(data_file, "gate_count", gate_count)
-            write(data_file, "gate_time", gate_time)
-            write(data_file, "gate_type", Integer(gate_type))
-            write(data_file, "save_file_path", isnothing(save_file_path) ? "" : save_file_path)
-            write(data_file, "seed", seed)
-            write(data_file, "states", states_)
-            write(data_file, "fidelities", fidelities)
-            write(data_file, "run_time", string(run_time))
-            write(data_file, "dt", dt)
-            write(data_file, "negi_h0", Array(negi_h0))
-            write(data_file, "namp", namp)
-            write(data_file, "ndist", string(ndist))
-            write(data_file, "noise_dt_inv", noise_dt_inv)
+            for key in keys(result)
+                write(data_file, key, result[key])
+            end
         end
+        result = data_file_path
         println("Saved simulation to $(data_file_path)")
     end
-    return data_file_path
+    
+    return result
 end
 
 
@@ -880,16 +904,20 @@ function run_sim_h0sweep_deqjl(
     gate_type, negi_h0s;
     save_file_path=nothing,
     adaptive=DEQJL_ADAPTIVE, dynamics_type=schroed,
-    dt=DT_PREF, save=true, save_type=jl, seed=0,
-    solver=DifferentialEquations.Vern9, print_seq=false)
+    dt=DT_PREF, save=true, seed=0,
+    solver=DifferentialEquations.Vern9, print_seq=false,
+    seed_state=true)
     start_time = Dates.now()
     # grab
+    analytic = false
     if isnothing(save_file_path)
         controls = Array{Float64, 2}([0 0])
+        controls_dt_inv = 0
         control_knot_count = 0
         gate_time = DT_GTM[dynamics_type]
+        analytic = true
     else
-        (controls, controls_dt_inv, gate_time) = grab_controls(save_file_path; save_type=save_type)
+        (controls, controls_dt_inv, gate_time) = grab_controls(save_file_path)
         control_knot_count = Int(floor(gate_time * controls_dt_inv))
     end
     dt_inv = 1 / dt
@@ -899,10 +927,11 @@ function run_sim_h0sweep_deqjl(
     # set up integration
     dynamics = DT_DYN[dynamics_type]
     state_type = DT_ST[dynamics_type]
+    state_seed = seed_state ? seed : 0
     if state_type == st_state
-        initial_state = gen_rand_state_iso(;seed=seed)
+        initial_state = gen_rand_state_iso(;seed=state_seed)
     elseif state_type == st_density
-        initial_state =  gen_rand_density_iso(;seed=seed)
+        initial_state =  gen_rand_density_iso(;seed=state_seed)
     end
     tspan = (0., gate_time)
 
@@ -912,8 +941,14 @@ function run_sim_h0sweep_deqjl(
     gate = GT_GATE[gate_type]
     if state_type == st_state
         target_state = gate * initial_state
+        if analytic
+            target_state = XPI_ISO * target_state
+        end
     elseif state_type == st_density
         target_state = gate * initial_state * gate'
+        if analytic
+            target_state = XPI_ISO * target_state * XPI_ISO'
+        end
     end
     for i = 1:sample_count
         params = SimParams(controls, control_knot_count, controls_dt_inv, negi_h0s[i],
@@ -933,33 +968,40 @@ function run_sim_h0sweep_deqjl(
     end
     end_time = Dates.now()
     run_time = end_time - start_time
-    
-    # save
-    experiment_name = save_path = nothing
-    if isnothing(save_file_path)
-        experiment_name = DT_EN[dynamics_type]
-        save_path = joinpath(SPIN_OUT_PATH, experiment_name)
-    else
-        experiment_name = split(save_file_path, "/")[end - 1]
-        save_path = dirname(save_file_path)
-    end
-    data_file_path = nothing
-    if save
-        data_file_path = generate_file_path("h5", experiment_name, save_path)
-        h5open(data_file_path, "cw") do data_file
-            write(data_file, "dynamics_type", Integer(dynamics_type))
-            write(data_file, "gate_time", gate_time)
-            write(data_file, "gate_type", Integer(gate_type))
-            write(data_file, "save_file_path", isnothing(save_file_path) ? "" : save_file_path)
-            write(data_file, "seed", seed)
-            write(data_file, "fidelities", fidelities)
-            write(data_file, "run_time", string(run_time))
-            write(data_file, "dt", dt)
-        end
-        println("Saved run_sim_h0sweep_deqjl to $(data_file_path)")
-    end
 
-    return data_file_path
+    # Generate the result.
+    result = Dict(
+        "dynamics_type" => Integer(dynamics_type),
+        "gate_time" => gate_time,
+        "gate_type" => Integer(gate_type),
+        "save_file_path" => isnothing(save_file_path) ? "" : save_file_path,
+        "seed" => seed,
+        "fidelities" => fidelities,
+        "run_time" => string(run_time),
+        "dt" => dt,
+    )
+    
+    # Save the data.
+    if save
+        experiment_name = save_path = nothing
+        if isnothing(save_file_path)
+            experiment_name = DT_EN[dynamics_type]
+            save_path = joinpath(SPIN_OUT_PATH, experiment_name)
+        else
+            experiment_name = split(save_file_path, "/")[end - 1]
+            save_path = dirname(save_file_path)
+        end
+        data_file_path = generate_file_path("h5", experiment_name, save_path)
+        h5open(data_file_path, "w") do data_file
+            for key in keys(result)
+                write(data_file, key, result[keys])
+            end
+        end
+        result = data_file_path
+        println("Saved simulation to $(data_file_path)")
+    end
+            
+    return result
 end
 
 
