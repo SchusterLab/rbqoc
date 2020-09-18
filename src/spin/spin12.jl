@@ -335,3 +335,60 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=alilqr,
     end
 end
 
+function forward_pass(save_file_path; sample_order=0, integrator_type=rk6, gate_type=xpiby2)
+    (evolution_time, d2controls, dt
+     ) = h5open(save_file_path, "r+") do save_file
+         save_type = SaveType(read(save_file, "save_type"))
+         if save_type == jl
+             d2controls_idx = read(save_file, "d2controls_dt2_idx")
+             acontrols = read(save_file, "acontrols")
+             d2controls = acontrols[:, d2controls_idx]
+             dt = read(save_file, "dt")
+             evolution_time = read(save_file, "evolution_time")
+         elseif save_type == samplejl
+             d2controls = read(save_file, "d2controls_dt2_sample")
+             dt = DT_PREF
+             ets = read(save_file, "evolution_time_sample")
+             evolution_time = Integer(floor(ets / dt)) * dt
+         end
+         return (evolution_time, d2controls, dt)
+     end
+    rdi = IT_RDI[integrator_type]
+    knot_count = Integer(floor(evolution_time / dt))
+
+    if gate_type == xpiby2
+        target_state1 = Array(XPIBY2_ISO_1)
+        target_state2 = Array(XPIBY2_ISO_2)
+    elseif gate_type == ypiby2
+        target_state1 = Array(YPIBY2_ISO_1)
+        target_state2 = Array(YPIBY2_ISO_2)
+    elseif gate_type == zpiby2
+        target_state1 = Array(ZPIBY2_ISO_1)
+        target_state2 = Array(ZPIBY2_ISO_2)
+    end
+    
+    model = Model(sample_order)
+    n = state_dim(model)
+    m = control_dim(model)
+    time = 0.
+    astate = SVector{n}([
+        INITIAL_STATE1;
+        INITIAL_STATE2;
+        zeros(3 * CONTROL_COUNT);
+        repeat([INITIAL_STATE1; INITIAL_STATE2], sample_order);
+    ])
+    acontrols = [SVector{m}([d2controls[i, 1],]) for i = 1:knot_count - 1]
+
+    for i = 1:knot_count - 1
+        astate = RobotDynamics.discrete_dynamics(rdi, model, astate, acontrols[i], time, dt)
+        time = time + dt
+    end
+
+    res = Dict(
+        "astate" => astate,
+        "target_state1" => target_state1,
+        "target_state2" => target_state2,
+    )
+
+    return res
+end

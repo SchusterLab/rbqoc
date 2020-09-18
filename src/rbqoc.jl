@@ -55,25 +55,43 @@ const IT_RDI = Dict(
 
 
 # methods
-function generate_file_path(extension, save_file_name, save_path)
+function generate_file_path(extension, file_name, path)
     # Ensure the path exists.
-    mkpath(save_path)
+    mkpath(path)
 
     # Create a save file name based on the one given; ensure it will
     # not conflict with others in the directory.
     max_numeric_prefix = -1
-    for (_, _, files) in walkdir(save_path)
-        for file_name in files
-            if occursin("_$(save_file_name).$(extension)", file_name)
-                max_numeric_prefix = max(parse(Int, split(file_name, "_")[1]))
+    for (_, _, files) in walkdir(path)
+        for file_name_ in files
+            if occursin("_$(file_name).$(extension)", file_name_)
+                numeric_prefix = parse(Int, split(file_name_, "_")[1])
+                max_numeric_prefix = max(numeric_prefix, max_numeric_prefix)
             end
         end
     end
+    
+    file_path = joinpath(path, "$(lpad(max_numeric_prefix + 1, 5, '0'))_$(file_name).$(extension)")
+    return file_path
+end
 
-    save_file_name = "_$(save_file_name).$(extension)"
-    save_file_name = @sprintf("%05d%s", max_numeric_prefix + 1, save_file_name)
 
-    return joinpath(save_path, save_file_name)
+function latest_file_path(extension, file_name, path)
+    max_numeric_prefix = -1
+    for (_, _, files) in walkdir(path)
+        for file_name_ in files
+            if occursin("_$(file_name).$(extension)", file_name_)
+                numeric_prefix = parse(Int, split(file_name_, "_")[1])
+                max_numeric_prefix = max(numeric_prefix, max_numeric_prefix)
+            end
+        end
+    end
+    if max_numeric_prefix == -1
+        file_path = nothing
+    else
+        file_path = joinpath(path, "$(lpad(max_numeric_prefix, 5, '0'))_$(file_name).$(extension)")
+    end
+    return file_path
 end
 
 
@@ -81,7 +99,7 @@ end
 grab_controls - do some extraction of relevant controls
 data for common h5 save formats
 """
-function grab_controls(save_file_path; save_type=jl)
+function grab_controls(save_file_path)
     data = h5open(save_file_path, "r") do save_file
         save_type = SaveType(read(save_file, "save_type"))
         if save_type == jl
@@ -140,15 +158,15 @@ end
 
 
 function plot_controls(save_file_paths, plot_file_path;
-                       save_types=[jl,], labels=nothing,
+                       labels=nothing,
                        title="", colors=nothing, print_out=true,
                        legend=nothing)
     fig = Plots.plot(dpi=DPI, title=title, legend=legend)
     for (i, save_file_path) in enumerate(save_file_paths)
         # Grab and prep data.
-        (controls, evolution_time) = grab_controls(save_file_path; save_type=save_types[i])
+        (controls, controls_dt_inv, evolution_time) = grab_controls(save_file_path)
         (control_eval_count, control_count) = size(controls)
-        control_eval_times = Array(1:1:control_eval_count) * DT_PREF
+        control_eval_times = Array(0:control_eval_count - 1) / controls_dt_inv
         
         # Plot.
         for j = 1:control_count

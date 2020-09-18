@@ -25,10 +25,7 @@ const DT_INIT = 5e-3
 const DT_INIT_INV = 2e2
 const DT_MIN = DT_INIT / 2
 const DT_MAX = DT_INIT * 2
-const CONSTRAINT_TOLERANCE = 1e-8
-const AL_KICKOUT_TOLERANCE = 1e-7
 const PN_STEPS = 2
-const MAX_PENALTY = 1e11
 const ILQR_DJ_TOL = 1e-4
 
 # Define the problem.
@@ -93,20 +90,21 @@ function RobotDynamics.dynamics(model::Model{DA, TO}, astate::StaticVector,
     end
     if TO
         dastate = dastate * acontrols[DT_IDX][1]^2
+        # dastate = dastate * abs(acontrols[DT_IDX][1])
     end
     
     return dastate
 end
 
 
-function run_traj(;evolution_time=20., gate_type=zpiby2,
-                  initial_save_file_path=nothing,
-                  initial_save_type=jl, time_optimal=false,
-                  decay_aware=false,
-                  solver_type=altro, sqrtbp=false,
-                  integrator_type=rk6, max_penalty=MAX_PENALTY,
-                  qs=[1e0, 1e0, 1e0, 1e-1, 5e1, 1e-1, 1e2],
-                  smoke_test=false)
+function run_traj(
+    ;evolution_time=20., gate_type=zpiby2, initial_save_file_path=nothing,
+    time_optimal=false, decay_aware=false,
+    solver_type=alilqr, sqrtbp=false, integrator_type=rk6,
+    qs=[1e0, 1e0, 1e0, 1e-1, 5e1, 1e-1, 1e2], smoke_test=false,
+    al_kickout_tolerance=1e-7, constraint_tolerance=1e-8, max_penalty=1e11,
+    penalty_initial=1e0,
+)
     # Convert to trajectory optimization language.
     model = Model(decay_aware, time_optimal)
     n = state_dim(model)
@@ -180,10 +178,12 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     u_max = SVector{m}([
         fill(Inf, CONTROL_COUNT);
         fill(sqrt(DT_MAX), eval(:($time_optimal ? 1 : 0))); #dt
+        # fill(DT_MAX, eval(:($time_optimal ? 1 : 0))); #dt
     ])
     u_min = SVector{m}([
         fill(-Inf, CONTROL_COUNT);
         fill(sqrt(DT_MIN), eval(:($time_optimal ? 1 : 0))); #dt
+        # fill(DT_MIN, eval(:($time_optimal ? 1 : 0))); #dt
     ])
 
     # Generate initial trajectory.
@@ -206,15 +206,16 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
         else
             # Initial guess pulled from initial_save_file_path.
             (d2controls_dt2, evolution_time) = h5open(initial_save_file_path, "r") do save_file
-                 if initial_save_type == jl
-                     d2controls_dt2_idx = read(save_file, "d2controls_dt2_idx")
-                     d2controls_dt2 = read(save_file, "acontrols")[:, d2controls_dt2_idx]
-                     evolution_time = read(save_file, "evolution_time")
-                 elseif initial_save_type == samplejl
-                     d2controls_dt2 = read(save_file, "d2controls_dt2_sample")
-                     evolution_time = read(save_file, "evolution_time_sample")
-                 end
-                 return (d2controls_dt2, evolution_time)
+                initial_save_type = SaveType(read(save_file, "save_type"))
+                if initial_save_type == jl
+                    d2controls_dt2_idx = read(save_file, "d2controls_dt2_idx")
+                    d2controls_dt2 = read(save_file, "acontrols")[:, d2controls_dt2_idx]
+                    evolution_time = read(save_file, "evolution_time")
+                elseif initial_save_type == samplejl
+                    d2controls_dt2 = read(save_file, "d2controls_dt2_sample")
+                    evolution_time = read(save_file, "evolution_time_sample")
+                end
+                return (d2controls_dt2, evolution_time)
             end
             # Without variable dts, evolution time will be a multiple of DT_STATIC.
             evolution_time = Int(floor(evolution_time * DT_STATIC_INV)) * DT_STATIC
@@ -268,32 +269,34 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     # Instantiate problem and solve.
     prob = Problem{IT_RDI[integrator_type]}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
     opts = SolverOptions(verbose=VERBOSE)
-    if smoke_test
+    if solver_type == alilqr
         solver = AugmentedLagrangianSolver(prob, opts)
         solver.solver_uncon.opts.square_root = sqrtbp
-        solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
-        solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
+        solver.opts.constraint_tolerance = al_kickout_tolerance
+        solver.opts.constraint_tolerance_intermediate = al_kickout_tolerance
         solver.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
         solver.opts.penalty_max = max_penalty
-        solver.opts.iterations = 1
-        solver.solver_uncon.opts.iterations = 1
-    elseif solver_type == alilqr
-        solver = AugmentedLagrangianSolver(prob, opts)
-        solver.solver_uncon.opts.square_root = sqrtbp
-        solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
-        solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
-        solver.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
-        solver.opts.penalty_max = max_penalty
+        solver.opts.penalty_initial = penalty_initial
+        if smoke_test
+            solver.opts.iterations = 1
+            solver.solver_uncon.opts.iterations = 1
+        end
     elseif solver_type == altro
         solver = ALTROSolver(prob, opts)
-        solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
+        solver.opts.constraint_tolerance = constraint_tolerance
         solver.solver_al.solver_uncon.opts.square_root = sqrtbp
-        solver.solver_al.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
-        solver.solver_al.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
+        solver.solver_al.opts.constraint_tolerance = al_kickout_tolerance
+        solver.solver_al.opts.constraint_tolerance_intermediate = al_kickout_tolerance
         solver.solver_al.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
         solver.solver_al.opts.penalty_max = max_penalty
-        solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
+        solver.solver_al.opts.penalty_initial = penalty_initial
+        solver.solver_pn.opts.constraint_tolerance = constraint_tolerance
         solver.solver_pn.opts.n_steps = PN_STEPS
+        if smoke_test
+            solver.solver_al.opts.iterations = 1
+            solver.solver_al.solver_uncon.opts.iterations = 1
+            solver.solver_pn.opts.n_steps = 1
+        end
     end
     Altro.solve!(solver)
 
@@ -314,6 +317,7 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     # Square the dts.
     if time_optimal
         acontrols_arr[:, DT_IDX] = acontrols_arr[:, DT_IDX] .^2
+        # acontrols_arr[:, DT_IDX] = map(abs, acontrols_arr[:, DT_IDX])
     end
     cmax = TrajectoryOptimization.max_violation(solver)
     cmax_info = TrajectoryOptimization.findmax_violation(get_constraints(solver))
@@ -338,12 +342,13 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
             write(save_file, "solver_type", Integer(solver_type))
             write(save_file, "sqrtbp", Integer(sqrtbp))
             write(save_file, "max_penalty", max_penalty)
-            write(save_file, "ctol", CONSTRAINT_TOLERANCE)
-            write(save_file, "alko", AL_KICKOUT_TOLERANCE)
+            write(save_file, "constraint_tolerance", constraint_tolerance)
+            write(save_file, "al_kickout_tolerance", al_kickout_tolerance)
             write(save_file, "ilqr_dj_tol", ILQR_DJ_TOL)
             write(save_file, "integrator_type", Integer(integrator_type))
             write(save_file, "gate_type", Integer(gate_type))
             write(save_file, "save_type", Integer(jl))
+            write(save_file, "penalty_initial", penalty_initial)
         end
         if time_optimal
             # Sample the important metrics.

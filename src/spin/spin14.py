@@ -12,18 +12,17 @@ import os
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
-from qoc.standard import (
-    conjugate_transpose,
-    generate_save_file_path,
-)
-from qutip import (
-    mesolve, Qobj,
-)
-
 
 class Shape(Enum):
     SQUARE = 0
     TRIANGLE = 1
+#ENDDEF
+
+class SaveType(Enum):
+    jl = 1
+    samplejl = 2
+    py = 3
+#ENDDEF
 
 # paths
 EXPERIMENT_META = "spin"
@@ -31,115 +30,50 @@ EXPERIMENT_NAME = "spin14"
 WDIR = os.environ.get("ROBUST_QOC_PATH", ".")
 SAVE_PATH = os.path.join(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
-# misc constants
+# plotting
 DPI = 300
 
-# computational constants
-SIGMA_X = np.array([[0, 1],
-                    [1, 0]])
-SIGMA_Z = np.array([[1, 0],
-                    [0, -1]])
-
-MAX_CONTROL_0 = 2 * np.pi * 3e-1
-OMEGA = 2 * np.pi * 1.4e-2
-H_S = SIGMA_Z / 2
-H_C1 = SIGMA_X / 2
-
-AMP_0 = 2 * np.pi * 1.25e-1
+# constants
+AMP_0 = 1.25e-1
 DT = 1e-2
 DT_INV = 1e2
-T_ZPI = 35.714285714285715
-T_TOT_ZPIBY2 = 17.85714285714286
 
-# XPI pulse parameters
-T_XZ_XPI = 4.800613
-T_Z_XPI = 11.928691
-T_YPIBY2_XPI = 2 * T_XZ_XPI + T_Z_XPI
-T_TOT_XPI = 2 * T_YPIBY2_XPI + T_ZPI
-N_TOT_XPI = int(T_TOT_XPI / DT)
-T0_XPI = 0
-T1_XPI = T_XZ_XPI / 2
-T2_XPI = T_XZ_XPI
-T3_XPI = T2_XPI + T_Z_XPI
-T4_XPI = T3_XPI + T_XZ_XPI / 2
-T5_XPI = T3_XPI + T_XZ_XPI
-T6_XPI = T5_XPI + T_ZPI
-T7_XPI = T6_XPI + T_XZ_XPI / 2
-T8_XPI = T6_XPI + T_XZ_XPI
-T9_XPI = T8_XPI + T_Z_XPI
-T10_XPI = T9_XPI + T_XZ_XPI / 2
-T11_XPI = T9_XPI + T_XZ_XPI
-
-
-def gen_controls_xpi(t, shape=Shape.SQUARE):
-    # Y/2
-    if t <= T5_XPI:
-        if shape == Shape.SQUARE:
-            if t <= T2_XPI:
-                c1 = AMP_0 / 2
-            elif t <= T3_XPI:
-                c1 = 0
-            elif t <= T5_XPI:
-                c1 = -AMP_0 / 2
-        elif shape == Shape.TRIANGLE:
-            if t <= T1_XPI:
-                c1 = 2 * AMP_0 * t / T_XZ_XPI
-            elif t <= T2_XPI:
-                c1 = 2 * AMP_0 * (1 - t / T_XZ_XPI)
-            elif t <= T3_XPI:
-                c1 = 0
-            elif t <= T4_XPI:
-                c1 = 2 * AMP_0 / T_XZ_XPI * (T3_XPI - t)
-            elif t <= T5_XPI:
-                c1 = 2 * AMP_0 / T_XZ_XPI * (t - T4_XPI) - AMP_0
-        #ENDIF
-    # Z
-    elif t <= T6_XPI:
-        c1 = 0
-    # -Y/2
-    else:
-        if shape == Shape.SQUARE:
-            if t <= T8_XPI:
-                c1 = -AMP_0 / 2
-            elif t <= T9_XPI:
-                c1 = 0
-            elif t <= T11_XPI:
-                c1 = AMP_0 / 2
-        elif shape == Shape.TRIANGLE:
-            if t <= T7_XPI:
-                c1 = 2 * AMP_0 / T_XZ_XPI * (T6_XPI - t)
-            elif t <= T8_XPI:
-                c1 = 2 * AMP_0 / T_XZ_XPI * (t - T7_XPI) - AMP_0
-            elif t <= T9_XPI:
-                c1 = 0
-            elif t <= T10_XPI:
-                c1 = 2 * AMP_0 / T_XZ_XPI * (t - T9_XPI)
-            elif t <= T11_XPI:
-                c1 = 2 * AMP_0 / T_XZ_XPI * (T10_XPI - t) + AMP_0
-            else:
-                c1 = 0
-        #ENDIF
-    #ENDIF
+# methods
+def generate_file_path(extension, save_file_name, save_path):
+    # Ensure the path exists.
+    os.makedirs(save_path, exist_ok=True)
     
-    return np.array([c1,])
-
-
-def save_controls_xpi():
-    shape = Shape.TRIANGLE
-    control_eval_times = np.linspace(0, T_TOT_XPI, N_TOT_XPI)
-    controls = np.vstack([gen_controls_xpi(t, shape=shape) for t in control_eval_times])
-    evolution_time = controls.shape[0] * DT
-    save_file_path = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
-    with h5py.File(save_file_path, "a") as save_file:
-        save_file["complex_controls"] = False
-        save_file["evolution_time"] = evolution_time
-        save_file["controls"] = controls
-    # ENDWITH
-    print("saved xpi controls to {}"
-          "".format(save_file_path))
+    # Create a save file name based on the one given; ensure it will
+    # not conflict with others in the directory. 
+    max_numeric_prefix = -1
+    for file_name in os.listdir(save_path):
+        if ("_{}.{}".format(save_file_name, extension)) in file_name:
+            max_numeric_prefix = max(int(file_name.split("_")[0]),
+                                     max_numeric_prefix)
+    #ENDFOR
+    save_file_name_augmented = ("{:05d}_{}.{}"
+                                "".format(max_numeric_prefix + 1,
+                                          save_file_name, extension))
+    
+    return os.path.join(save_path, save_file_name_augmented)
 #ENDDEF
 
-    
+### Z/2 ###
+
+T_TOT_ZPIBY2 = 17.85714285714286
+def gen_controls_zpiby2(t, shape=Shape.SQUARE):
+    c1 = 0
+    return np.array([c1,])
+#ENDDEF
+
+
+def save_controls_zpiby2(shape=Shape.SQUARE):
+    pass
+#ENDDEF
+
+
+### Y/2 ###
+
 T_XZ_YPIBY2 = 2.1656249366575766
 T_Z_YPIBY2 = 15.142330599557274
 T_TOT_YPIBY2 = 2 * T_XZ_YPIBY2 + T_Z_YPIBY2
@@ -149,8 +83,7 @@ T2_YPIBY2 = T_XZ_YPIBY2
 T3_YPIBY2 = T2_YPIBY2 + T_Z_YPIBY2
 T4_YPIBY2 = T3_YPIBY2 + T_XZ_YPIBY2 / 2
 T5_YPIBY2 = T3_YPIBY2 + T_XZ_YPIBY2
-
-def gen_controls_ypiby2(t, shape=Shape.TRIANGLE):
+def gen_controls_ypiby2(t, shape=Shape.SQUARE):
     if shape == Shape.TRIANGLE:
         amp = 2 * AMP_0
         if t <= T1_YPIBY2:
@@ -178,91 +111,142 @@ def gen_controls_ypiby2(t, shape=Shape.TRIANGLE):
 #ENDDEF
 
 
-def save_controls_ypiby2():
+def save_controls_ypiby2(plot=False):
     # generate
     shape = Shape.SQUARE
     evolution_time = T_TOT_YPIBY2
     control_eval_count = int(np.floor(evolution_time * DT_INV))
     control_eval_times = np.arange(0, control_eval_count, 1) * DT
     controls = np.vstack([gen_controls_ypiby2(t, shape=shape) for t in control_eval_times])
+    controls[0, 0] = 0
+    controls[-1, 0] = 0
 
     # save
-    save_file_path = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
+    save_file_path = generate_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
     with h5py.File(save_file_path, "a") as save_file:
         save_file["complex_controls"] = False
         save_file["evolution_time"] = evolution_time
         save_file["controls"] = controls
+        save_file["save_type"] = int(SaveType.py.value)
     # ENDWITH
-    print("saved controls to {}"
+    print("saved ypiby2 controls to {}"
           "".format(save_file_path))
 
     # plot
-    file_prefix = save_file_path.split(".")[0]
-    plot_file_path = "{}_controls.png".format(file_prefix)
-    fig = plt.figure()
-    plt.scatter(control_eval_times, controls,
-                label="controls", color="blue")
-    plt.title(file_prefix)
-    plt.legend()
-    plt.savefig(plot_file_path, dpi=DPI)
+    if plot:
+        file_prefix = save_file_path.split(".")[0]
+        plot_file_path = "{}_controls.png".format(file_prefix)
+        fig = plt.figure()
+        plt.scatter(control_eval_times, controls,
+                    label="controls", color="blue")
+        plt.title(file_prefix)
+        plt.legend()
+        plt.savefig(plot_file_path, dpi=DPI)
+        print("plotted controls to {}"
+              "".format(plot_file_path))
+    #ENDIF
 #ENDDEF
 
+
+### X/2 ###
 
 T_TOT_XPIBY2 = 2 * T_TOT_YPIBY2 + T_TOT_ZPIBY2
 T1_XPIBY2 = T_TOT_YPIBY2
 T2_XPIBY2 = T1_XPIBY2 + T_TOT_ZPIBY2
-
-
-def gen_controls_xpiby2(t, shape=Shape.TRIANGLE):
+def gen_controls_xpiby2(t, shape=Shape.SQUARE):
     if t <= T1_XPIBY2:
-        ret = gen_controls_ypiby2(t, shape=shape)
+        ret = -gen_controls_ypiby2(t, shape=shape)
     elif t <= T2_XPIBY2:
         ret = np.array([0])
     else:
-        ret = -gen_controls_ypiby2(t - T2_XPIBY2, shape=shape)
+        ret = gen_controls_ypiby2(t - T2_XPIBY2, shape=shape)
     #ENDIF
 
     return ret
 #ENDDEF
 
 
-def save_controls_xpiby2():
+def save_controls_xpiby2(plot=False):
     # generate
     shape = Shape.SQUARE
     evolution_time = T_TOT_XPIBY2
     control_eval_count = int(np.floor(evolution_time * DT_INV))
     control_eval_times = np.arange(0, control_eval_count, 1) * DT
     controls = np.vstack([gen_controls_xpiby2(t, shape=shape) for t in control_eval_times])
+    controls[0, 0] = 0
+    controls[-1, 0] = 0
 
     # save
-    save_file_path = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
+    save_file_path = generate_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
     with h5py.File(save_file_path, "a") as save_file:
         save_file["complex_controls"] = False
         save_file["evolution_time"] = evolution_time
         save_file["controls"] = controls
+        save_file["save_type"] = int(SaveType.py.value)
     # ENDWITH
-    print("saved controls to {}"
+    print("saved xpiby2 controls to {}"
           "".format(save_file_path))
 
     # plot
-    file_prefix = save_file_path.split(".")[0]
-    plot_file_path = "{}_controls.png".format(file_prefix)
-    fig = plt.figure()
-    plt.scatter(control_eval_times, controls,
-                label="controls", color="blue")
-    plt.title(file_prefix)
-    plt.legend()
-    plt.savefig(plot_file_path, dpi=DPI)
+    if plot:
+        file_prefix = save_file_path.split(".")[0]
+        plot_file_path = "{}_controls.png".format(file_prefix)
+        fig = plt.figure()
+        plt.scatter(control_eval_times, controls,
+                    label="controls", color="blue")
+        plt.title(file_prefix)
+        plt.legend()
+        plt.savefig(plot_file_path, dpi=DPI)
+        print("plotted controls to {}"
+              "".format(plot_file_path))
+    #ENDIF
 #ENDDEF
+
+
+A_XPIC = 0.2166666666666667
+T1_XPIC = 5.384615384615385
+T2_XPIC = T1_XPIC + 3.846153846153847
+TTOT_XPIC = 10.
+def gen_xpicorpse(time):
+    if time <= T1_XPIC:
+        c1 = A_XPIC
+    elif time <= T2_XPIC:
+        c1 = -A_XPIC
+    else:
+        c1 = A_XPIC
+    #ENDIF
+    return np.array([c1,])
+#ENDDEF
+
+
+def save_xpicorpse():
+    evolution_time = TTOT_XPIC
+    control_eval_count = int(np.floor(evolution_time * DT_INV))
+    control_eval_times = np.arange(0, control_eval_count, 1) * DT
+    controls = np.vstack([gen_xpicorpse(t) for t in control_eval_times])
+    controls[0, 0] = controls[-1, 0] = 0
+
+    # save
+    save_file_path = generate_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
+    with h5py.File(save_file_path, "a") as save_file:
+        save_file["controls"] = controls
+        save_file["save_type"]= int(SaveType.py.value)
+        save_file["dt"] = DT
+        save_file["evolution_time"] = evolution_time
+    #ENDWITH
+    print("saved xpicorpse controls to {}"
+          "".format(save_file_path))
+#ENDDEF
+    
 
     
 def main():
-    # save_controls_xpi()
     # save_controls_ypiby2()
     # save_controls_xpiby2()
-    pass
+    save_xpicorpse()
+#ENDDEF
 
 
 if __name__ == "__main__":
     main()
-
+#ENDIF

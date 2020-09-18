@@ -320,6 +320,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
             write(save_file, "ilqr_dj_tol", ILQR_DJ_TOL)
             write(save_file, "integrator_type", Integer(integrator_type))
             write(save_file, "gate_type", Integer(gate_type))
+            write(save_file, "save_type", Integer(jl))
         end
 
         if postsample
@@ -328,6 +329,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
                 write(save_file, "controls_sample", csample)
                 write(save_file, "d2controls_sample", d2csample)
                 write(save_file, "evolution_time_sample", etsample)
+                o_delete(save_file, "save_type")
+                write(save_file, "save_type", Integer(samplejl))
             end
         end
     end
