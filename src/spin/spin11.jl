@@ -135,12 +135,6 @@ function RobotDynamics.discrete_dynamics(::Type{EM}, model::Model{DO}, astate::S
 end
 
 
-function RobotDynamics.dynamics(model::Model{DO}, astate::StaticVector,
-                                acontrols::StaticVector, time::Real) where DO
-
-end
-
-
 function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=alilqr,
                   initial_save_file_path=nothing,
                   sqrtbp=false, derivative_order=0,
@@ -148,7 +142,6 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=alilqr,
                   smoke_test=false, dt_inv=Int64(2e2), constraint_tol=1e-8, al_tol=1e-7,
                   pn_steps=2, max_penalty=1e11, ilqr_dj_tol=1e-4, verbose=true,
                   save=true)
-    dt = dt_inv^(-1)
     model = Model(derivative_order)
     n = state_dim(model)
     m = control_dim(model)
@@ -205,38 +198,19 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=alilqr,
         fill(-Inf, CONTROL_COUNT);
         fill(-Inf, derivative_order * STATE_COUNT * HDIM_ISO)
     ]
-
-    if isnothing(initial_save_file_path)
-        N = Int(floor(evolution_time * dt_inv)) + 1
-        U0 = [SVector{m}(
-            fill(1e-4, CONTROL_COUNT)
-        ) for k = 1:N-1]
-    else
-        (d2controls, evolution_time) = h5open(initial_save_file_path, "r") do save_file
-            save_type = SaveType(read(save_file, "save_type"))
-            if save_type == jl
-                d2controls_idx = read(save_file, "d2controls_dt2_idx")
-                d2controls = read(save_file, "acontrols")[:, d2controls_idx]
-                evolution_time = read(save_file, "evolution_time")
-            elseif save_type == samplejl
-                d2controls = read(save_file, "d2controls_dt2_sample")
-                evolution_time = read(save_file, "evolution_time_sample")
-            end
-            return (d2controls, evolution_time)
-        end
-        dt = DT_PREF
-        dt_inv = DT_PREF_INV
-        evolution_time = Int(floor(evolution_time * dt_inv)) * dt
-        N = Int(floor(evolution_time * dt_inv)) + 1
-        U0 = [SVector{m}(d2controls[k, 1]) for k = 1:N-1]
-    end
+    
+    dt = dt_inv^(-1)
+    N = Int(floor(evolution_time * dt_inv)) + 1
+    U0 = [SVector{m}(
+        fill(1e-4, CONTROL_COUNT)
+    ) for k = 1:N-1]
     X0 = [SVector{n}([
         fill(NaN, n);
     ]) for k = 1:N]
     Z = Traj(X0, U0, dt * ones(N))
 
     if isnothing(qs)
-        qs = zeros(8)
+        qs = fill(1, 7)
     end
     Q = Diagonal(SVector{n}([
         fill(qs[1], STATE_COUNT * HDIM_ISO); # state1, state2
