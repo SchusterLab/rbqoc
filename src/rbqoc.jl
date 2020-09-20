@@ -2,18 +2,18 @@
 rbqoc.jl - common definitions for the rbqoc repo
 """
 
+# paths / venv
+WDIR = joinpath(@__DIR__, "../")
+import Pkg
+Pkg.activate(WDIR)
+
 # imports
 using HDF5
 using Interpolations
 using LinearAlgebra
-import Pkg
 using Plots
 using Printf
 using RobotDynamics
-
-# paths / venv
-WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
-Pkg.activate(joinpath(WDIR))
 
 # plotting configuration and constants
 ENV["GKSwstype"] = "nul"
@@ -42,7 +42,7 @@ end
     rk2 = 1
     rk3 = 2
     rk4 = 3
-    rk6 = 4
+    # rk6 = 4
 end
 
 
@@ -50,7 +50,7 @@ const IT_RDI = Dict(
     rk2 => RobotDynamics.RK2,
     rk3 => RobotDynamics.RK3,
     rk4 => RobotDynamics.RK4,
-    rk6 => RobotDynamics.RK6,
+    # rk6 => RobotDynamics.RK6,
 )
 
 

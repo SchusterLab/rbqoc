@@ -2,6 +2,9 @@
 spin12.jl - sampling robustness
 """
 
+WDIR = joinpath(@__DIR__, "../../")
+include(joinpath(WDIR, "src", "spin", "spin.jl"))
+
 using Altro
 using HDF5
 using LinearAlgebra
@@ -10,9 +13,6 @@ using StaticArrays
 using TrajectoryOptimization
 const RD = RobotDynamics
 const TO = TrajectoryOptimization
-
-WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
-include(joinpath(WDIR, "src", "spin", "spin.jl"))
 
 # paths
 const EXPERIMENT_META = "spin"
@@ -47,7 +47,7 @@ const S4STATE2_IDX = S4STATE1_IDX[end] + 1:S4STATE1_IDX[end] + HDIM_ISO
 # control indices
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
 
-# dynamics
+# model
 struct Model{SC} <: AbstractModel
     Model(SC::Int64=0) = new{SC}()
 end
@@ -56,11 +56,9 @@ RD.state_dim(::Model{SC}) where SC = (
 )
 RD.control_dim(::Model{SC}) where SC = CONTROL_COUNT
 
-# dynamics
-abstract type EM <: RobotDynamics.Explicit end
 
-# TO.rollout! uses RK3. To avoid redefining TO.rollout! we redfine discrete_dynamics
-# for RK3. We also tell ALTRO that we are using RK3. This is not actually RK3.
+# dynamics
+# Note that TO.rollout! uses RK3.
 function RD.discrete_dynamics(::Type{RD.RK3}, model::Model{SC}, astate::StaticVector,
                                          acontrols::StaticVector, time::Real, dt::Real) where {SC}
     negi_hc = astate[CONTROLS_IDX][1] * NEGI_H1_ISO
@@ -107,9 +105,9 @@ function RD.discrete_dynamics(::Type{RD.RK3}, model::Model{SC}, astate::StaticVe
 end
 
 
-function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
+function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
                   sqrtbp=false, sample_count=0,
-                  integrator_type=rk3, qs=nothing,
+                  integrator_type=rk3, qs=[1e0, 1e0, 1e0, 1e-1, 5e0, 1e-1, 1e-1],
                   dt_inv=Int64(1e1), smoke_test=false, constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true)
     model = Model(sample_count)
@@ -196,7 +194,6 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     R = SVector{m}([
         fill(qs[7], CONTROL_COUNT);
     ])
-    println("Q: $(size(Q)), R: $(size(R)), Qf: $(size(Qf)), xf: $(size(xf)), N: $(size(N))")
     obj = LQRObjective(Q, R, Qf, xf, N)
 
     # Must satisfy control amplitude bound.
@@ -218,36 +215,23 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
 
     # Instantiate problem and solve.
     prob = Problem{IT_RDI[integrator_type]}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
-    opts = SolverOptions(verbose=verbose)
-    if solver_type == alilqr
-        solver = AugmentedLagrangianSolver(prob, opts)
-        solver.solver_uncon.opts.square_root = sqrtbp
-        solver.opts.constraint_tolerance = al_tol
-        solver.opts.constraint_tolerance_intermediate = al_tol
-        solver.opts.penalty_max = max_penalty
-        if smoke_test
-            solver.opts.iterations = 1
-            solver.solver_uncon.opts.iterations = 1
-        end
-    elseif solver_type == altro
-        solver = ALTROSolver(prob, opts)
-        solver.opts.constraint_tolerance = constraint_tol
-        solver.solver_al.solver_uncon.opts.square_root = sqrtbp
-        solver.solver_al.opts.constraint_tolerance = al_tol
-        solver.solver_al.opts.constraint_tolerance_intermediate = al_tol
-        solver.solver_al.opts.penalty_max = max_penalty
-        solver.solver_pn.opts.constraint_tolerance = constraint_tol
-        solver.solver_pn.opts.n_steps = pn_steps
-        if smoke_test
-            solver.solver_al.opts.iterations = 1
-            solver.solver_al.solver_uncon.opts.iterations = 1
-            solver.solver_pn.opts.n_steps = 1
-        end
-    end
+    solver = ALTROSolver(prob)
+    verbose_pn = verbose ? true : false
+    verbose_ = verbose ? 2 : 0
+    projected_newton = solver_type == altro ? true : false
+    constraint_tolerance = solver_type == altro ? constraint_tol : al_tol
+    iterations_inner = smoke_test ? 1 : 300
+    iterations_outer = smoke_test ? 1 : 30
+    n_steps = smoke_test ? 1 : pn_steps
+    set_options!(solver, square_root=sqrtbp, constraint_tolerance=constraint_tolerance,
+                 projected_newton_tolerance=al_tol, n_steps=n_steps,
+                 penalty_max=max_penalty, verbose_pn=verbose_pn, verbose=verbose_,
+                 projected_newton=projected_newton, iterations_inner=iterations_inner,
+                 iterations_outer=iterations_outer)
     Altro.solve!(solver)
 
     # Post-process.
-    acontrols_raw = controls(solver)
+    acontrols_raw = TO.controls(solver)
     acontrols_arr = permutedims(reduce(hcat, map(Array, acontrols_raw)), [2, 1])
     astates_raw = TO.states(solver)
     astates_arr = permutedims(reduce(hcat, map(Array, astates_raw)), [2, 1])
@@ -260,7 +244,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     cidx_arr = Array(CONTROLS_IDX)
     d2cidx_arr = Array(D2CONTROLS_IDX)
     cmax = TO.max_violation(solver)
-    cmax_info = TO.findmax_violation(get_constraints(solver))
+    cmax_info = TO.findmax_violation(TO.get_constraints(solver))
     iterations_ = iterations(solver)
     
     # save

@@ -2,6 +2,9 @@
 spin.jl - common definitions for the spin directory
 """
 
+WDIR = joinpath(@__DIR__, "../../")
+include(joinpath(WDIR, "src", "rbqoc.jl"))
+
 using Dates
 using Dierckx
 using DifferentialEquations
@@ -11,9 +14,6 @@ using HDF5
 using Random
 using StaticArrays
 using Statistics
-
-WDIR = get(ENV, "RBQOC_PATH", "../../")
-include(joinpath(WDIR, "src", "rbqoc.jl"))
 
 # paths
 const SPIN_OUT_PATH = joinpath(WDIR, "out", "spin")
