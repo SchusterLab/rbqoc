@@ -203,12 +203,6 @@ const NEGI_H0_ISO_BIG = pi * NEGI * SMatrix{HDIM_ISO, HDIM_ISO, BigFloat}(SIGMAZ
 const NEGI_H1_ISO = pi * NEGI * SIGMAX_ISO
 const NEGI_H1_ISO_BIG = pi * NEGI * SMatrix{HDIM_ISO, HDIM_ISO, BigFloat}(SIGMAX_ISO)
 const FQ_NEGI_H0_ISO = FQ * NEGI_H0_ISO
-const SP1FQ_NEGI_H0_ISO = SP1FQ * NEGI_H0_ISO
-const SN1FQ_NEGI_H0_ISO = SN1FQ * NEGI_H0_ISO
-const SP2FQ_NEGI_H0_ISO = SP2FQ * NEGI_H0_ISO
-const SN2FQ_NEGI_H0_ISO = SN2FQ * NEGI_H0_ISO
-const SP3FQ_NEGI_H0_ISO = SP3FQ * NEGI_H0_ISO
-const SN3FQ_NEGI_H0_ISO = SN3FQ * NEGI_H0_ISO
 const AYPIBY2_NEGI_H1_ISO = AYPIBY2 * NEGI_H1_ISO
 # relaxation dissipation ops
 # L_{0} = |g> <e|
@@ -853,11 +847,11 @@ otherwise returns a dictionary of the result
 function run_sim_deqjl(
     gate_count, gate_type;
     save_file_path=nothing,
-    adaptive=false, dynamics_type=schroed,
+    adaptive=true, dynamics_type=schroed,
     dt_inv=DT_PREF_INV, save=true, seed=0,
     solver=DifferentialEquations.Vern9, print_seq=false, print_final=false,
     negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
-    noise_dt_inv=DT_NOISE_INV, state_seed=nothing, reltol=1e-3, abstol=1e-6)
+    noise_dt_inv=DT_NOISE_INV, state_seed=nothing, reltol=1e-12, abstol=1e-12)
     dt = BigFloat(dt_inv^(-1))
     start_time = Dates.now()
     if isnothing(state_seed)
