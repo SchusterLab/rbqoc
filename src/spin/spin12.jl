@@ -8,6 +8,7 @@ using LinearAlgebra
 using RobotDynamics
 using StaticArrays
 using TrajectoryOptimization
+const RD = RobotDynamics
 const TO = TrajectoryOptimization
 
 WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
@@ -24,6 +25,11 @@ const STATE_COUNT = 2
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
 const INITIAL_STATE1 = [1., 0, 0, 0]
 const INITIAL_STATE2 = [0., 1, 0, 0]
+const SIGMA = 1e-2
+const S1FQ_NEGI_H0_ISO = (FQ + FQ * SIGMA) * NEGI_H0_ISO
+const S2FQ_NEGI_H0_ISO = (FQ - FQ * SIGMA) * NEGI_H0_ISO
+const S3FQ_NEGI_H0_ISO = (FQ + FQ * 2 * SIGMA) * NEGI_H0_ISO
+const S4FQ_NEGI_H0_ISO = (FQ - FQ * 2 * SIGMA) * NEGI_H0_ISO
 # state indices
 const STATE1_IDX = 1:HDIM_ISO
 const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
@@ -41,96 +47,72 @@ const S4STATE2_IDX = S4STATE1_IDX[end] + 1:S4STATE1_IDX[end] + HDIM_ISO
 # control indices
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
 
-# model
-struct Model{SO} <: AbstractModel
-    Model(SO::Int64=0) = new{SO}()
+# dynamics
+struct Model{SC} <: AbstractModel
+    Model(SC::Int64=0) = new{SC}()
 end
-RobotDynamics.state_dim(::Model{SO}) where SO = (
-    ASTATE_SIZE_BASE + SO * STATE_COUNT * HDIM_ISO
+RD.state_dim(::Model{SC}) where SC = (
+    ASTATE_SIZE_BASE + SC * STATE_COUNT * HDIM_ISO
 )
-RobotDynamics.control_dim(::Model{SO}) where SO = CONTROL_COUNT
+RD.control_dim(::Model{SC}) where SC = CONTROL_COUNT
 
 # dynamics
 abstract type EM <: RobotDynamics.Explicit end
 
-function discrete_dynamics(::Type{EM}, model::Model{SO}, astate::StaticVector,
-                           acontrols::StaticVector, time::Real, dt::Real) where {SO}
+# TO.rollout! uses RK3. To avoid redefining TO.rollout! we redfine discrete_dynamics
+# for RK3. We also tell ALTRO that we are using RK3. This is not actually RK3.
+function RD.discrete_dynamics(::Type{RD.RK3}, model::Model{SC}, astate::StaticVector,
+                                         acontrols::StaticVector, time::Real, dt::Real) where {SC}
     negi_hc = astate[CONTROLS_IDX][1] * NEGI_H1_ISO
     negi_s0h = FQ_NEGI_H0_ISO + negi_hc
-    negi_s0h_prop = expm(negi_s0h * dt)
-    
-    state1 = astate[STATE1_IDX] + negi_s0h * astate[STATE1_IDX]
-    state2 = astate[STATE2_IDX] + negi_s0h * astate[STATE2_IDX]
+    negi_s0h_prop = exp(negi_s0h * dt)
+    state1 = negi_s0h_prop * astate[STATE1_IDX]
+    state2 = negi_s0h_prop * astate[STATE2_IDX]
     intcontrols = astate[INTCONTROLS_IDX] + dt * astate[CONTROLS_IDX]
     controls = astate[CONTROLS_IDX] + dt * astate[DCONTROLS_IDX]
     dcontrols = astate[DCONTROLS_IDX] + dt * acontrols[D2CONTROLS_IDX]
+
     astate_ = [
-        state1;
-        state2;
-        intcontrols;
-        controls;
-        dcontrols;
+        state1; state2; intcontrols; controls; dcontrols;
     ]
 
-    if SO == 2
-        negi_s1h = SP1FQ_NEGI_H0_ISO + negi_hc
-        negi_s2h = SN1FQ_NEGI_H0_ISO + negi_hc
-        delta_s1state1 = negi_s1h * astate[S1STATE1_IDX]
-        delta_s1state2 = negi_s1h * astate[S1STATE2_IDX]
-        delta_s2state1 = negi_s2h * astate[S2STATE1_IDX]
-        delta_s2state2 = negi_s2h * astate[S2STATE2_IDX]
-        delta_astate = [
-            delta_state1;
-            delta_state2;
-            delta_intcontrol;
-            delta_control;
-            delta_dcontrol;
-            delta_s1state1;
-            delta_s1state2;
-            delta_s2state1;
-            delta_s2state2;
-        ]
-    elseif SO == 4
-        negi_s1h = SP1FQ_NEGI_H0_ISO + negi_hc
-        negi_s2h = SN1FQ_NEGI_H0_ISO + negi_hc
-        negi_s3h = SP2FQ_NEGI_H0_ISO + negi_hc
-        negi_s4h = SN2FQ_NEGI_H0_ISO + negi_hc
-        delta_s1state1 = negi_s1h * astate[S1STATE1_IDX]
-        delta_s1state2 = negi_s1h * astate[S1STATE2_IDX]
-        delta_s2state1 = negi_s2h * astate[S2STATE1_IDX]
-        delta_s2state2 = negi_s2h * astate[S2STATE2_IDX]
-        delta_s3state1 = negi_s3h * astate[S3STATE1_IDX]
-        delta_s3state2 = negi_s3h * astate[S3STATE2_IDX]
-        delta_s4state1 = negi_s4h * astate[S4STATE1_IDX]
-        delta_s4state2 = negi_s4h * astate[S4STATE2_IDX]
-        delta_astate = [
-            delta_state1;
-            delta_state2;
-            delta_intcontrol;
-            delta_control;
-            delta_dcontrol;
-            delta_s1state1;
-            delta_s1state2;
-            delta_s2state1;
-            delta_s2state2;
-            delta_s3state1;
-            delta_s3state2;
-            delta_s4state1;
-            delta_s4state2;
-        ]
+    if SC >= 2
+        negi_s1h = S1FQ_NEGI_H0_ISO + negi_hc
+        negi_s1h_prop = exp(negi_s1h * dt)
+        negi_s2h = S2FQ_NEGI_H0_ISO + negi_hc
+        negi_s2h_prop = exp(negi_s2h * dt)
+        s1state1 = negi_s1h_prop * astate[S1STATE1_IDX]
+        s1state2 = negi_s1h_prop * astate[S1STATE2_IDX]
+        s2state1 = negi_s2h_prop * astate[S2STATE1_IDX]
+        s2state2 = negi_s2h_prop * astate[S2STATE2_IDX]
+        append!(astate_, [
+            s1state1; s1state2; s2state1; s2state2;
+        ])
     end
-    
+    if SC >= 4
+        negi_s3h = S3FQ_NEGI_H0_ISO + negi_hc
+        negi_s3h_prop = exp(negi_s3h * dt)
+        negi_s4h = S4FQ_NEGI_H0_ISO + negi_hc
+        negi_s4h_prop = exp(negi_s4h * dt)
+        s3state1 = negi_s3h_prop * astate[S3STATE1_IDX]
+        s3state2 = negi_s3h_prop * astate[S3STATE2_IDX]
+        s4state1 = negi_s4h_prop * astate[S4STATE1_IDX]
+        s4state2 = negi_s4h_prop * astate[S4STATE2_IDX]
+        append!(astate_, [
+            s1state1; s1state2; s2state1; s2state2;
+        ])
+    end
+
     return astate_
 end
 
 
-function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=alilqr,
-                  sqrtbp=false, sample_order=0,
-                  integrator_type=rk6, qs=nothing,
-                  dt_inv=Int64(2e2), smoke_test=false, verbose=true, save=true,
-                  constraint_tol=1e-8, al_tol=1e-7, pn_steps=2, ilqr_dj_tol=1e-4,
-                  max_penalty=1e11)
-    model = Model(sample_order)
+function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
+                  sqrtbp=false, sample_count=0,
+                  integrator_type=rk3, qs=nothing,
+                  dt_inv=Int64(1e1), smoke_test=false, constraint_tol=1e-8, al_tol=1e-4,
+                  pn_steps=2, max_penalty=1e11, verbose=true, save=true)
+    model = Model(sample_count)
     n = state_dim(model)
     m = control_dim(model)
     t0 = 0.
@@ -139,7 +121,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=alilqr,
         INITIAL_STATE1;
         INITIAL_STATE2;
         zeros(3 * CONTROL_COUNT);
-        repeat([INITIAL_STATE1; INITIAL_STATE2], sample_order);
+        repeat([INITIAL_STATE1; INITIAL_STATE2], sample_count);
     ])
     
     if gate_type == xpiby2
@@ -156,7 +138,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=alilqr,
         target_state1;
         target_state2;
         zeros(3 * CONTROL_COUNT);
-        repeat([target_state1; target_state2], sample_order);
+        repeat([target_state1; target_state2], sample_count);
     ])
     # control amplitude constraint
     x_max = SVector{n}([
@@ -164,14 +146,14 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=alilqr,
         fill(Inf, CONTROL_COUNT);
         fill(MAX_CONTROL_NORM_0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        fill(Inf, sample_order * STATE_COUNT * HDIM_ISO);
+        fill(Inf, sample_count * STATE_COUNT * HDIM_ISO);
     ])
     x_min = SVector{n}([
         fill(-Inf, STATE_COUNT * HDIM_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(-MAX_CONTROL_NORM_0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, sample_order * STATE_COUNT * HDIM_ISO);
+        fill(-Inf, sample_count * STATE_COUNT * HDIM_ISO);
     ])
     # controls start and end at 0
     x_max_boundary = SVector{n}([
@@ -179,14 +161,14 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=alilqr,
         fill(Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        fill(Inf, sample_order * STATE_COUNT * HDIM_ISO);
+        fill(Inf, sample_count * STATE_COUNT * HDIM_ISO);
     ])
     x_min_boundary = SVector{n}([
         fill(-Inf, STATE_COUNT * HDIM_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, sample_order * STATE_COUNT * HDIM_ISO);
+        fill(-Inf, sample_count * STATE_COUNT * HDIM_ISO);
     ])
 
     dt = dt_inv^(-1)
@@ -202,14 +184,14 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=alilqr,
     if isnothing(qs)
         qs = fill(1, 7)
     end
-    Q = SVector{n}([
+    Q = Diagonal(SVector{n}([
         fill(qs[1], STATE_COUNT * HDIM_ISO); # state1, state2
         fill(qs[2], 1); # intcontrol
         fill(qs[3], 1); # control
         fill(qs[4], 1); # dcontrol
-        fill(qs[5], eval(:($sample_order >= 2 ? 2 * $STATE_COUNT * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
-        fill(qs[6], eval(:($sample_order >= 4 ? 2 * $STATE_COUNT * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
-    ])
+        fill(qs[5], eval(:($sample_count >= 2 ? 2 * $STATE_COUNT * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
+        fill(qs[6], eval(:($sample_count >= 4 ? 2 * $STATE_COUNT * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
+    ]))
     Qf = Q * N
     R = SVector{m}([
         fill(qs[7], CONTROL_COUNT);
@@ -237,13 +219,11 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=alilqr,
     # Instantiate problem and solve.
     prob = Problem{IT_RDI[integrator_type]}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
     opts = SolverOptions(verbose=verbose)
-    solver = AugmentedLagrangianSolver(prob, opts)
     if solver_type == alilqr
         solver = AugmentedLagrangianSolver(prob, opts)
         solver.solver_uncon.opts.square_root = sqrtbp
         solver.opts.constraint_tolerance = al_tol
         solver.opts.constraint_tolerance_intermediate = al_tol
-        solver.opts.cost_tolerance_intermediate = ilqr_dj_tol
         solver.opts.penalty_max = max_penalty
         if smoke_test
             solver.opts.iterations = 1
@@ -255,7 +235,6 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=alilqr,
         solver.solver_al.solver_uncon.opts.square_root = sqrtbp
         solver.solver_al.opts.constraint_tolerance = al_tol
         solver.solver_al.opts.constraint_tolerance_intermediate = al_tol
-        solver.solver_al.opts.cost_tolerance_intermediate = ilqr_dj_tol
         solver.solver_al.opts.penalty_max = max_penalty
         solver.solver_pn.opts.constraint_tolerance = constraint_tol
         solver.solver_pn.opts.n_steps = pn_steps
@@ -280,8 +259,9 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=alilqr,
     R_arr = [R_raw[i, i] for i in 1:size(R_raw)[1]]
     cidx_arr = Array(CONTROLS_IDX)
     d2cidx_arr = Array(D2CONTROLS_IDX)
-    cmax = TrajectoryOptimization.max_violation(solver)
-    cmax_info = TrajectoryOptimization.findmax_violation(get_constraints(solver))
+    cmax = TO.max_violation(solver)
+    cmax_info = TO.findmax_violation(get_constraints(solver))
+    iterations_ = iterations(solver)
     
     # save
     if save
@@ -299,23 +279,22 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=alilqr,
             write(save_file, "cmax", cmax)
             write(save_file, "cmax_info", cmax_info)
             write(save_file, "dt", dt)
-            write(save_file, "sample_order", sample_order)
+            write(save_file, "sample_count", sample_count)
             write(save_file, "solver_type", Integer(solver_type))
             write(save_file, "sqrtbp", Integer(sqrtbp))
             write(save_file, "max_penalty", max_penalty)
-            write(save_file, "ctol", constraint_tol)
-            write(save_file, "alko", al_tol)
-            write(save_file, "ilqr_dj_tol", ilqr_dj_tol)
-            write(save_file, "pn_steps", 2)
+            write(save_file, "constraint_tol", constraint_tol)
+            write(save_file, "al_tol", al_tol)
             write(save_file, "integrator_type", Integer(integrator_type))
             write(save_file, "gate_type", Integer(gate_type))
             write(save_file, "save_type", Integer(jl))
+            write(save_file, "iterations", iterations_)
         end
     end
 end
 
 
-function forward_pass(save_file_path; sample_order=0, integrator_type=rk6, gate_type=xpiby2)
+function forward_pass(save_file_path; sample_count=0, integrator_type=rk6, gate_type=xpiby2)
     (evolution_time, d2controls, dt
      ) = h5open(save_file_path, "r+") do save_file
          save_type = SaveType(read(save_file, "save_type"))
@@ -347,7 +326,7 @@ function forward_pass(save_file_path; sample_order=0, integrator_type=rk6, gate_
         target_state2 = Array(ZPIBY2_ISO_2)
     end
     
-    model = Model(sample_order)
+    model = Model(sample_count)
     n = state_dim(model)
     m = control_dim(model)
     time = 0.
@@ -355,12 +334,12 @@ function forward_pass(save_file_path; sample_order=0, integrator_type=rk6, gate_
         INITIAL_STATE1;
         INITIAL_STATE2;
         zeros(3 * CONTROL_COUNT);
-        repeat([INITIAL_STATE1; INITIAL_STATE2], sample_order);
+        repeat([INITIAL_STATE1; INITIAL_STATE2], sample_count);
     ])
     acontrols = [SVector{m}([d2controls[i, 1],]) for i = 1:knot_count - 1]
 
     for i = 1:knot_count - 1
-        astate = RobotDynamics.discrete_dynamics(rdi, model, astate, acontrols[i], time, dt)
+        astate = RD.discrete_dynamics(rdi, model, astate, acontrols[i], time, dt)
         time = time + dt
     end
 

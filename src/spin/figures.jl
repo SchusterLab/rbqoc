@@ -334,10 +334,10 @@ const F2C_DATA = Dict(
         INVAL, 4, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
     ]],
     s2 => [joinpath(SPIN_OUT_PATH, "spin12/$(lpad(index, 5, '0'))_spin12.h5") for index in [
-        336, 496, 301, 302, 304, 303, 305, 306, 508, 399, 400, 506, 501
+        522, 518, 523, 524, 525, 526, 527, 528, 546, 529, 532, 530, 531,
     ]],
     s4 => [joinpath(SPIN_OUT_PATH, "spin12/$(lpad(index, 5, '0'))_spin12.h5") for index in [
-        INVAL, 498, 307, 308, 310, 309, 335, 337, 339, 500, 499, 507, INVAL
+        534, 533, 535, 536, 539, 540, 541, 538, 537, 500, 499, 507, INVAL
     ]],
     d2 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
         105, 432, 98, 100, 99, 229, 231, 230, 232, 291, 289, 290, 292
@@ -348,6 +348,9 @@ const F2C_DATA = Dict(
 )
 const F2C_PT_LIST = [analytic, s2, s4, d2, d3]
 const F2C_AVG_COUNT = 10
+const F2C_SIGMA = 1e-2
+const F2C_S1_NEGI_H0 = (FQ + FQ * F2C_SIGMA) * NEGI_H0_ISO
+const F2C_S2_NEGI_H0 = (FQ - FQ * F2C_SIGMA) * NEGI_H0_ISO
 function gen_2c(;use_previous=true)
     gate_type = xpiby2
     pulse_type_count = size(F2C_PT_LIST)[1]
@@ -378,26 +381,14 @@ function gen_2c(;use_previous=true)
 
     for (i, pulse_type) in enumerate(F2C_PT_LIST)
         println("pt[$(i)]: $(pulse_type)")
-        if pulse_type == analytic
-            dynamics_type = xpiby2nodis
-            negi_h0p = SP1FQ_NEGI_H0_ISO
-            negi_h0n = SN1FQ_NEGI_H0_ISO
-        elseif pulse_type == corpse
-            dynamics_type = xpiby2corpse
-            negi_h0p = (SP1FQ - FQ) * NEGI_H0_ISO
-            negi_h0n = (SN1FQ - FQ) * NEGI_H0_ISO
-        else
-            dynamics_type = schroed
-            negi_h0p = SP1FQ_NEGI_H0_ISO
-            negi_h0n = SN1FQ_NEGI_H0_ISO
-        end
+        dynamics_type = pulse_type == analytic ? xpiby2nodis : schroed
         for (j, gate_time) in enumerate(F2C_GATE_TIMES)
             print("gt[$(j)]: $(gate_time) ")
             save_file_path = F2C_DATA[pulse_type][j]
             save_file_paths[i, j] = save_file_path
-            save_file_path_sim = ((pulse_type == analytic || pulse_type == corpse)
-                                  ? nothing : save_file_path)
-            save_file_path_old = ((isnothing(save_file_paths_old) || i > pulse_type_count_old || j > gate_time_count_old)
+            save_file_path_sim = pulse_type == analytic ? nothing : save_file_path
+            save_file_path_old = ((isnothing(save_file_paths_old) ||
+                                   i > pulse_type_count_old || j > gate_time_count_old)
                                   ? nothing : save_file_paths_old[i, j])
             if !isnothing(findfirst("$(INVAL)", save_file_path))
                 println("INVAL")
@@ -410,23 +401,23 @@ function gen_2c(;use_previous=true)
                     gate_errors[i, j, (k - 1) * 2 + 1] = gate_errors_old[i, j, (k - 1) * 2 + 1]
                     gate_errors[i, j, (k - 1) * 2 + 2] = gate_errors_old[i, j, (k - 1) * 2 + 2]
                     print("s")
-                    continue
+                else
+                    res1 = run_sim_deqjl(
+                        1, gate_type; save_file_path=save_file_path_sim,
+                        dynamics_type=dynamics_type, negi_h0=F2C_S1_NEGI_H0,
+                        save=false, seed=k,
+                    )
+                    ge1 = 1 - res1["fidelities"][end]
+                    res2 = run_sim_deqjl(
+                        1, gate_type; save_file_path=save_file_path_sim,
+                        dynamics_type=dynamics_type, negi_h0=F2C_S2_NEGI_H0,
+                        save=false, seed=k,
+                    )
+                    ge2 = 1 - res2["fidelities"][end]
+                    gate_errors[i, j, (k - 1) * 2 + 1] = ge1
+                    gate_errors[i, j, (k - 1) * 2 + 2] = ge2
+                    print(".")
                 end
-                res1 = run_sim_deqjl(
-                    1, gate_type; save_file_path=save_file_path_sim,
-                    dynamics_type=dynamics_type, dt=1e-3, negi_h0=negi_h0p,
-                    save=false, seed=k,
-                )
-                ge1 = 1 - res1["fidelities"][end]
-                res2 = run_sim_deqjl(
-                    1, gate_type; save_file_path=save_file_path_sim,
-                    dynamics_type=dynamics_type, dt=1e-3, negi_h0=negi_h0n,
-                    save=false, seed=k,
-                )
-                ge2 = 1 - res2["fidelities"][end]
-                gate_errors[i, j, (k - 1) * 2 + 1] = ge1
-                gate_errors[i, j, (k - 1) * 2 + 2] = ge2
-                print(".")
             end
             println("")
         end
