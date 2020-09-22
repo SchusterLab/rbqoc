@@ -83,6 +83,7 @@ class PulseType(Enum):
     d3b = 10
     corpse = 11
     d1 = 12
+    s1 = 13
 #ENDDEF
 
 PT_STR = {
@@ -98,6 +99,7 @@ PT_STR = {
     PulseType.d2b: "D-2",
     PulseType.d3b: "D-2",
     PulseType.corpse: "C-2",
+    PulseType.s1: "S-*",
 }
 
 PT_COLOR = {
@@ -112,7 +114,8 @@ PT_COLOR = {
     PulseType.d2b: "red",
     PulseType.d3b: "darkred",
     PulseType.corpse: "pink",
-    PulseType.d1: "lightcoral"
+    PulseType.d1: "lightcoral",
+    PulseType.s1: "hotpink",
 }
 
 PT_LS = {
@@ -127,7 +130,7 @@ PT_LS = {
     PulseType.d2b: DASH_LS,
     PulseType.d3b: DASH_LS,
     PulseType.corpse: "solid",
-    PulseType.d1: "solid"
+    PulseType.d1: "solid",
 }
 
 PT_MARKER = {
@@ -137,6 +140,7 @@ PT_MARKER = {
     PulseType.d2: "^",
     PulseType.d3: "d",
     PulseType.corpse: "x",
+    PulseType.s1: "*",
 }
 
 # METHODS #
@@ -588,7 +592,7 @@ def make_figure2c():
     plt.xlabel("$t_{N}$ (ns)", fontsize=LABEL_FS)
     plt.ylabel("Gate Error ($10^{-4}$)", fontsize=LABEL_FS)
     plt.legend(frameon=False, loc="lower left", bbox_to_anchor=(-0.03, 0),
-               handletextpad=0.2, fontsize=8)
+               handletextpad=0.2, fontsize=8, ncol=2, columnspacing=0.)
     fig.text(0, 0.955, "(b)", fontsize=TEXT_FS)
     plt.subplots_adjust(left=0.15, right=0.997, top=0.96, bottom=0.15, hspace=None, wspace=None)
     plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)

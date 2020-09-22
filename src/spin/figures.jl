@@ -2,13 +2,13 @@
 figures.jl
 """
 
+WDIR = joinpath(@__DIR__, "../../")
+include(joinpath(WDIR, "src", "spin", "spin.jl"))
+
 using LaTeXStrings
 using Printf
 import Plots
 using Statistics
-
-WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
-include(joinpath(WDIR, "src", "spin", "spin.jl"))
 
 # paths
 const EXPERIMENT_NAME = "figures"
@@ -30,6 +30,7 @@ const F3D_DATA_FILE_PATH = joinpath(SAVE_PATH, "f3d.h5")
     d3b = 10
     corpse = 11
     d1 = 12
+    s1 = 13
 end
 
 const GT_LIST = [zpiby2, ypiby2, xpiby2]
@@ -334,10 +335,10 @@ const F2C_DATA = Dict(
         INVAL, 4, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
     ]],
     s2 => [joinpath(SPIN_OUT_PATH, "spin12/$(lpad(index, 5, '0'))_spin12.h5") for index in [
-        522, 518, 523, 524, 525, 526, 527, 528, 546, 529, 532, 530, 531,
+        336, 496, 301, 302, 304, 303, 564, 306, 508, 399, 400, 506, 501
     ]],
     s4 => [joinpath(SPIN_OUT_PATH, "spin12/$(lpad(index, 5, '0'))_spin12.h5") for index in [
-        534, 533, 535, 536, 539, 540, 541, 538, 537, 500, 499, 507, INVAL
+        INVAL, 498, 307, 308, 310, 309, 335, 337, 339, 500, 499, 507, INVAL
     ]],
     d2 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
         105, 432, 98, 100, 99, 229, 231, 230, 232, 291, 289, 290, 292
@@ -345,8 +346,11 @@ const F2C_DATA = Dict(
     d3 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
         141, 429, 114, 115, 113, 235, 236, 234, 438, 295, 293, 294, 362
     ]],
+    s1 => [joinpath(SPIN_OUT_PATH, "spin22/$(lpad(index, 5, '0'))_spin22.h5") for index in [
+        125, 89, 52, 53, 99, 103, 131, 116, 115, 118, 119, 120, 123
+    ]]
 )
-const F2C_PT_LIST = [analytic, s2, s4, d2, d3]
+const F2C_PT_LIST = [analytic, s2, s4, d2, d3, s1]
 const F2C_AVG_COUNT = 10
 const F2C_SIGMA = 1e-2
 const F2C_S1_NEGI_H0 = (FQ + FQ * F2C_SIGMA) * NEGI_H0_ISO
@@ -381,12 +385,10 @@ function gen_2c(;use_previous=true)
 
     for (i, pulse_type) in enumerate(F2C_PT_LIST)
         println("pt[$(i)]: $(pulse_type)")
-        dynamics_type = pulse_type == analytic ? xpiby2nodis : schroed
         for (j, gate_time) in enumerate(F2C_GATE_TIMES)
             print("gt[$(j)]: $(gate_time) ")
             save_file_path = F2C_DATA[pulse_type][j]
             save_file_paths[i, j] = save_file_path
-            save_file_path_sim = pulse_type == analytic ? nothing : save_file_path
             save_file_path_old = ((isnothing(save_file_paths_old) ||
                                    i > pulse_type_count_old || j > gate_time_count_old)
                                   ? nothing : save_file_paths_old[i, j])
@@ -402,17 +404,26 @@ function gen_2c(;use_previous=true)
                     gate_errors[i, j, (k - 1) * 2 + 2] = gate_errors_old[i, j, (k - 1) * 2 + 2]
                     print("s")
                 else
-                    res1 = run_sim_deqjl(
-                        1, gate_type; save_file_path=save_file_path_sim,
-                        dynamics_type=dynamics_type, negi_h0=F2C_S1_NEGI_H0,
-                        save=false, seed=k,
-                    )
+                    if pulse_type == analytic
+                        res1 = run_sim_deqjl(
+                            1, gate_type; dynamics_type=xpiby2nodis,
+                            negi_h0=F2C_S1_NEGI_H0, save=false, seed=k
+                        )
+                        res2 = run_sim_deqjl(
+                            1, gate_type; dynamics_type=xpiby2nodis,
+                            negi_h0=F2C_S2_NEGI_H0, save=false, seed=k
+                        )
+                    else
+                        res1 = run_sim_prop(
+                            1, gate_type, save_file_path;
+                            negi_h0=F2C_S1_NEGI_H0, save=false, seed=k,
+                        )
+                        res2 = run_sim_prop(
+                            1, gate_type, save_file_path;
+                            negi_h0=F2C_S2_NEGI_H0, save=false, seed=k,
+                        )
+                    end
                     ge1 = 1 - res1["fidelities"][end]
-                    res2 = run_sim_deqjl(
-                        1, gate_type; save_file_path=save_file_path_sim,
-                        dynamics_type=dynamics_type, negi_h0=F2C_S2_NEGI_H0,
-                        save=false, seed=k,
-                    )
                     ge2 = 1 - res2["fidelities"][end]
                     gate_errors[i, j, (k - 1) * 2 + 1] = ge1
                     gate_errors[i, j, (k - 1) * 2 + 2] = ge2

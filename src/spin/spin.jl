@@ -16,7 +16,7 @@ using StaticArrays
 using Statistics
 
 # paths
-const SPIN_OUT_PATH = joinpath(WDIR, "out", "spin")
+const SPIN_OUT_PATH = abspath(joinpath(WDIR, "out", "spin"))
 const FBFQ_DFQ_DATA_FILE_PATH = joinpath(SPIN_OUT_PATH, "figures", "misc", "dfq.h5")
 
 # simulation constants
@@ -96,11 +96,13 @@ const GT_STR = Dict(
     xpiby2 => "X/2",
 )
 
+const HDIM = 2
+const HDIM_ISO = HDIM * 2
 struct SimParams
     controls :: Array{Float64, 2}
     control_knot_count :: Int64
     controls_dt_inv :: Int64
-    negi_h0 :: StaticMatrix
+    negi_h0 :: StaticMatrix{HDIM_ISO, HDIM_ISO}
     noise_offsets :: Array{Float64, 1}
     noise_dt_inv :: Int64
     sim_dt_inv :: Int64
@@ -176,10 +178,6 @@ const FBFQ_T1_REDUCED_SPLINE_ITP = extrapolate(interpolate(
     return(fbfqs, dfqs)
 end
 const FBFQ_DFQ_SPLINE_DIERCKX = Spline1D(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS)
-const STATE_SIZE_NOISO = 2
-const STATE_SIZE_ISO = 2 * STATE_SIZE_NOISO
-const HDIM = 2
-const HDIM_ISO = HDIM * 2
 
 # Define the system.
 # ISO indicates the object is defined in the complex to real isomorphism.
@@ -237,24 +235,24 @@ const NEG_GAMMAC_DOP_ISO = GAMMAC * NEG_DOP_ISO
 # gates
 const ZPIBY2 = [1-1im 0;
                 0 1+1im] / sqrt(2)
-const ZPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(ZPIBY2))
-const ZPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(ZPIBY2[:,1]))
-const ZPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(ZPIBY2[:,2]))
+const ZPIBY2_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(ZPIBY2))
+const ZPIBY2_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(ZPIBY2[:,1]))
+const ZPIBY2_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(ZPIBY2[:,2]))
 const YPIBY2 = [1 -1;
                 1  1] / sqrt(2)
-const YPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(YPIBY2))
-const YPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(YPIBY2[:,1]))
-const YPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(YPIBY2[:,2]))
+const YPIBY2_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(YPIBY2))
+const YPIBY2_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(YPIBY2[:,1]))
+const YPIBY2_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(YPIBY2[:,2]))
 const XPIBY2 = [1 -1im;
                 -1im 1] / sqrt(2)
-const XPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(XPIBY2))
-const XPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPIBY2[:,1]))
-const XPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPIBY2[:,2]))
+const XPIBY2_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(XPIBY2))
+const XPIBY2_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(XPIBY2[:,1]))
+const XPIBY2_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(XPIBY2[:,2]))
 const XPI = [0 -1im;
              -1im 0]
-const XPI_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(XPI))
-const XPI_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPI[:,1]))
-const XPI_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPI[:,2]))
+const XPI_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(XPI))
+const XPI_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(XPI[:,1]))
+const XPI_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(XPI[:,2]))
 
 const GT_GATE = Dict(
     xpiby2 => XPIBY2_ISO,
@@ -740,10 +738,10 @@ function gen_rand_state_iso(;seed=0)
         state = [1, 1] / sqrt(2)
     else
         Random.seed!(seed)
-        state = rand(STATE_SIZE_NOISO) + 1im * rand(STATE_SIZE_NOISO)
+        state = rand(HDIM) + 1im * rand(HDIM)
         state = state / sqrt(real(state'state))
     end
-    return SVector{STATE_SIZE_ISO, BigFloat}(
+    return SVector{HDIM_ISO, BigFloat}(
         [real(state); imag(state)]
     )
 end
@@ -754,13 +752,13 @@ function gen_rand_density_iso(;seed=0)
         state = [1, 1] / sqrt(2)
     else
         Random.seed!(seed)
-        state = rand(STATE_SIZE_NOISO) + 1im * rand(STATE_SIZE_NOISO)
+        state = rand(HDIM) + 1im * rand(HDIM)
         state = state / sqrt(real(state'state))
     end
     density = state * state'
     density_r = real(density)
     density_i = imag(density)
-    density_iso = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO, BigFloat}([
+    density_iso = SMatrix{HDIM_ISO, HDIM_ISO, BigFloat}([
         density_r -density_i;
         density_i density_r;
     ])
@@ -834,6 +832,52 @@ end
 
 
 """
+compute_fidelities
+"""
+function compute_fidelities(gate_count, gate_type, states)
+    # Compute the fidelities.
+    # All of the gates we consider are 4-cyclic up to phase.
+    state_type = length(size(states)) == 2 ? st_state : st_density
+    initial_state = state_type == st_state ? states[1, :] : states[1, :, :]
+    fidelities = zeros(BigFloat, gate_count + 1)
+    g1 = GT_GATE[gate_type]
+    g2 = g1^2
+    g3 = g1^3
+    id0 = initial_state
+    if state_type == st_state
+        id1 = g1 * id0
+        id2 = g2 * id0
+        id3 = g3 * id0
+    elseif state_type == st_density
+        id1 = g1 * id0 * g1'
+        id2 = g2 * id0 * g2'
+        id3 = g3 * id0 * g3'
+    end
+    # Compute the fidelity after each gate.
+    for i = 1:gate_count + 1
+        # 1-indexing means we are 1 ahead for modulo arithmetic.
+        i_eff = i - 1
+        if i_eff % 4 == 0
+            target = id0
+        elseif i_eff % 4 == 1
+            target = id1
+        elseif i_eff % 4 == 2
+            target = id2
+        elseif i_eff % 4 == 3
+            target = id3
+        end
+        if state_type == st_state
+            fidelities[i] = fidelity_vec_iso2(states[i, :], target)
+        elseif state_type == st_density
+            fidelities[i] = fidelity_mat_iso(states[i, :, :], target)
+        end
+    end
+
+    return fidelities
+end
+
+
+"""
 run_sim_deqjl - Apply a gate multiple times and measure the fidelity
 after each application. Save the output.
 
@@ -892,56 +936,21 @@ function run_sim_deqjl(
     result_deqjl = solve(prob, solver(), dt=dt, saveat=save_times,
                          maxiters=DEQJL_MAXITERS, adaptive=adaptive,
                          reltol=reltol, abstol=abstol)
-
-    # Compute the fidelities.
-    # All of the gates we consider are 4-cyclic up to phase.
-    fidelities = zeros(BigFloat, gate_count + 1)
-    g1 = GT_GATE[gate_type]
-    g2 = g1^2
-    g3 = g1^3
-    id0 = initial_state
+    
     if state_type == st_state
-        states_ = zeros(BigFloat, gate_count + 1, STATE_SIZE_ISO)
-        id1 = g1 * id0
-        id2 = g2 * id0
-        id3 = g3 * id0
-    elseif state_type == st_density
-        states_ = zeros(BigFloat, gate_count + 1, STATE_SIZE_ISO, STATE_SIZE_ISO)
-        id1 = g1 * id0 * g1'
-        id2 = g2 * id0 * g2'
-        id3 = g3 * id0 * g3'
-    end
-    # Compute the fidelity after each gate.
-    for i = 1:gate_count + 1
-        # 1-indexing means we are 1 ahead for modulo arithmetic.
-        i_eff = i - 1
-        if i_eff % 4 == 0
-            target = id0
-        elseif i_eff % 4 == 1
-            target = id1
-        elseif i_eff % 4 == 2
-            target = id2
-        elseif i_eff % 4 == 3
-            target = id3
+        states = zeros(gate_count + 1, HDIM_ISO)
+        states[1, :] = initial_state
+        for i = 2:gate_count + 1
+            states[i, :] = Array(result_deqjl.u[i])
         end
-        if state_type == st_state
-            states_[i, :] = state = result_deqjl.u[i]
-            fidelities[i] = fidelity_vec_iso2(state, target)
-        elseif state_type == st_density
-            states_[i, :, :] = state = result_deqjl.u[i]
-            fidelities[i] = abs(fidelity_mat_iso(state, target))
-        end
-
-        if print_seq || (print_final && i == gate_count + 1)
-            println("fidelities[$(i)]\n$(fidelities[i])")
-            println("state")
-            show_nice(state)
-            println("")
-            println("target")
-            show_nice(target)
-            println("")
+    else
+        states = zeros(gate_count + 1, HDIM_ISO, HDIM_ISO)
+        states[1, :, :] = initial_state
+        for i = 2:gate_count + 1
+            states[i, :, :] = Array(result.u[i])
         end
     end
+    fidelities = compute_fidelities(gate_count, gate_type, states)
     end_time = Dates.now()
     run_time = end_time - start_time
 
@@ -953,7 +962,7 @@ function run_sim_deqjl(
         "gate_type" => Integer(gate_type),
         "save_file_path" => isnothing(save_file_path) ? "" : save_file_path,
         "seed" => seed,
-        "states" => states_,
+        "states" => states,
         "fidelities" => fidelities,
         "run_time" => string(run_time),
         "dt" => dt,
@@ -961,7 +970,6 @@ function run_sim_deqjl(
         "namp" => namp,
         "ndist" => string(ndist),
         "noise_dt_inv" => noise_dt_inv,
-
     )
     
     # Save the data.
@@ -1040,12 +1048,12 @@ function run_sim_fine_deqjl(
                    maxiters=DEQJL_MAXITERS, adaptive=adaptive)
 
     if state_type == st_state
-        states_ = zeros(save_count + 1, STATE_SIZE_ISO)
+        states_ = zeros(save_count + 1, HDIM_ISO)
         for i = 1:save_count
             states_[i, :] = Array(result.u[i])
         end
     elseif state_type == st_density
-        states_ = zeros(save_count + 1, STATE_SIZE_ISO, STATE_SIZE_ISO)
+        states_ = zeros(save_count + 1, HDIM_ISO, HDIM_ISO)
         for i = 1:save_count
             states_[i, :, :] = Array(result.u[i])
         end
@@ -1151,4 +1159,58 @@ function t1_average(save_file_path; save_type=jl)
     end
     
     return t1_avgs
+end
+
+
+"""
+integrate the schroedinger equation using unitary propagators
+"""
+function run_sim_prop(
+    gate_count, gate_type, save_file_path;
+    negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
+    noise_dt_inv=DT_NOISE_INV, seed=0, state_seed=nothing, save=false)
+    (controls, dt_inv, gate_time) = grab_controls(save_file_path)
+    dt = dt_inv^(-1)
+    control_knot_count = Int(floor(gate_time * dt_inv))
+    save_times = Array(0:1:gate_count) * gate_time
+    evolution_time = gate_time * gate_count
+    noise_knot_count = Int(ceil(evolution_time * noise_dt_inv)) + 1
+    noise_offsets = namp * pink_noise_from_white(noise_knot_count, noise_dt_inv, ndist; seed=seed)
+    params = SimParams(controls, control_knot_count, dt_inv, negi_h0,
+                       noise_offsets, noise_dt_inv, dt_inv)
+    
+    if isnothing(state_seed)
+        state_seed = seed
+    end
+    initial_state = state = gen_rand_state_iso(;seed=state_seed)
+    states = zeros(BigFloat, gate_count + 1, HDIM_ISO)
+    states[1, :] = Array(state)
+    time = 0.
+    
+    for i = 1:gate_count
+        for j = 1:control_knot_count
+            hamiltonian = negi_h0 + controls[j, 1] * NEGI_H1_ISO
+            unitary = exp(hamiltonian * dt)
+            state = unitary * state
+        end
+        states[i + 1, :] = state
+    end
+
+    fidelities = compute_fidelities(gate_count, gate_type, states)
+
+    result = Dict(
+        "gate_count" => gate_count,
+        "gate_type" => Integer(gate_type),
+        "seed" => seed,
+        "state_seed" => state_seed,
+        "states" => states,
+        "fidelities" => fidelities,
+        "negi_h0" => Array(negi_h0),
+        "namp" => namp,
+        "ndist" => string(ndist),
+        "noise_dt_inv" => noise_dt_inv,
+        "save_file_path" => save_file_path
+    )
+
+    return result
 end

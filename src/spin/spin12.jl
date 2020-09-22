@@ -37,8 +37,11 @@ const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
 const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
 const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
 const S1STATE1_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO
-const S1STATE2_IDX = S1STATE1_IDX[end] + 1:S1STATE1_IDX[end] + HDIM_ISO
-const S2STATE1_IDX = S1STATE2_IDX[end] + 1:S1STATE2_IDX[end] + HDIM_ISO
+
+# const S1STATE2_IDX = S1STATE1_IDX[end] + 1:S1STATE1_IDX[end] + HDIM_ISO
+# const S2STATE1_IDX = S1STATE2_IDX[end] + 1:S1STATE2_IDX[end] + HDIM_ISO
+const S2STATE1_IDX = S1STATE1_IDX[end] + 1:S1STATE1_IDX[end] + HDIM_ISO
+
 const S2STATE2_IDX = S2STATE1_IDX[end] + 1:S2STATE1_IDX[end] + HDIM_ISO
 const S3STATE1_IDX = S2STATE2_IDX[end] + 1:S2STATE2_IDX[end] + HDIM_ISO
 const S3STATE2_IDX = S3STATE1_IDX[end] + 1:S3STATE1_IDX[end] + HDIM_ISO
@@ -49,10 +52,10 @@ const D2CONTROLS_IDX = 1:CONTROL_COUNT
 
 # model
 struct Model{SC} <: AbstractModel
-    Model(SC::Int64=0) = new{SC}()
 end
 RD.state_dim(::Model{SC}) where SC = (
-    ASTATE_SIZE_BASE + SC * STATE_COUNT * HDIM_ISO
+    # ASTATE_SIZE_BASE + SC * STATE_COUNT * HDIM_ISO
+    ASTATE_SIZE_BASE + SC * HDIM_ISO
 )
 RD.control_dim(::Model{SC}) where SC = CONTROL_COUNT
 
@@ -80,11 +83,12 @@ function RD.discrete_dynamics(::Type{RD.RK3}, model::Model{SC}, astate::StaticVe
         negi_s2h = S2FQ_NEGI_H0_ISO + negi_hc
         negi_s2h_prop = exp(negi_s2h * dt)
         s1state1 = negi_s1h_prop * astate[S1STATE1_IDX]
-        s1state2 = negi_s1h_prop * astate[S1STATE2_IDX]
+        # s1state2 = negi_s1h_prop * astate[S1STATE2_IDX]
         s2state1 = negi_s2h_prop * astate[S2STATE1_IDX]
-        s2state2 = negi_s2h_prop * astate[S2STATE2_IDX]
+        # s2state2 = negi_s2h_prop * astate[S2STATE2_IDX]
         append!(astate_, [
-            s1state1; s1state2; s2state1; s2state2;
+            # s1state1; s1state2; s2state1; s2state2;
+            s1state1; s2state1;
         ])
     end
     if SC >= 4
@@ -109,8 +113,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
                   sqrtbp=false, sample_count=0,
                   integrator_type=rk3, qs=[1e0, 1e0, 1e0, 1e-1, 5e0, 1e-1, 1e-1],
                   dt_inv=Int64(1e1), smoke_test=false, constraint_tol=1e-8, al_tol=1e-4,
-                  pn_steps=2, max_penalty=1e11, verbose=true, save=true)
-    model = Model(sample_count)
+                  pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5))
+    model = Model{sample_count}()
     n = state_dim(model)
     m = control_dim(model)
     t0 = 0.
@@ -119,7 +123,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         INITIAL_STATE1;
         INITIAL_STATE2;
         zeros(3 * CONTROL_COUNT);
-        repeat([INITIAL_STATE1; INITIAL_STATE2], sample_count);
+        # repeat([INITIAL_STATE1; INITIAL_STATE2], sample_count);
+        repeat(INITIAL_STATE1, sample_count);
     ])
     
     if gate_type == xpiby2
@@ -136,7 +141,11 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         target_state1;
         target_state2;
         zeros(3 * CONTROL_COUNT);
-        repeat([target_state1; target_state2], sample_count);
+        # repeat([target_state1; target_state2], sample_count);
+        repeat(target_state1, sample_count);
+    ])
+    uf = SVector{m}([
+        zeros(CONTROL_COUNT);
     ])
     # control amplitude constraint
     x_max = SVector{n}([
@@ -144,14 +153,16 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         fill(Inf, CONTROL_COUNT);
         fill(MAX_CONTROL_NORM_0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        fill(Inf, sample_count * STATE_COUNT * HDIM_ISO);
+        # fill(Inf, sample_count * STATE_COUNT * HDIM_ISO);
+        fill(Inf, sample_count * HDIM_ISO);
     ])
     x_min = SVector{n}([
         fill(-Inf, STATE_COUNT * HDIM_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(-MAX_CONTROL_NORM_0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, sample_count * STATE_COUNT * HDIM_ISO);
+        # fill(-Inf, sample_count * STATE_COUNT * HDIM_ISO);
+        fill(-Inf, sample_count * HDIM_ISO);
     ])
     # controls start and end at 0
     x_max_boundary = SVector{n}([
@@ -159,14 +170,16 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         fill(Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        fill(Inf, sample_count * STATE_COUNT * HDIM_ISO);
+        # fill(Inf, sample_count * STATE_COUNT * HDIM_ISO);
+        fill(Inf, sample_count * HDIM_ISO);
     ])
     x_min_boundary = SVector{n}([
         fill(-Inf, STATE_COUNT * HDIM_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, sample_count * STATE_COUNT * HDIM_ISO);
+        # fill(-Inf, sample_count * STATE_COUNT * HDIM_ISO);
+        fill(-Inf, sample_count * HDIM_ISO);
     ])
 
     dt = dt_inv^(-1)
@@ -179,22 +192,44 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     ]) for k = 1:N]
     Z = Traj(X0, U0, dt * ones(N))
 
-    if isnothing(qs)
-        qs = fill(1, 7)
-    end
-    Q = Diagonal(SVector{n}([
+    Q = [
         fill(qs[1], STATE_COUNT * HDIM_ISO); # state1, state2
         fill(qs[2], 1); # intcontrol
         fill(qs[3], 1); # control
         fill(qs[4], 1); # dcontrol
-        fill(qs[5], eval(:($sample_count >= 2 ? 2 * $STATE_COUNT * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
-        fill(qs[6], eval(:($sample_count >= 4 ? 2 * $STATE_COUNT * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
-    ]))
-    Qf = Q * N
-    R = SVector{m}([
+        # fill(qs[5], eval(:($sample_count >= 2 ? 
+        #                    2 * $STATE_COUNT * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
+        fill(qs[5], eval(:($sample_count >= 2 ? 
+                           2 * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
+        # fill(qs[6], eval(:($sample_count >= 4 ?
+        #                    2 * $STATE_COUNT * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
+    ]
+    qinds_base = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
+    qinds_s2 = qinds_base + 1:qinds_base + 2 * STATE_COUNT * HDIM_ISO
+    R = Diagonal(SVector{m}([
         fill(qs[7], CONTROL_COUNT);
-    ])
-    obj = LQRObjective(Q, R, Qf, xf, N)
+    ]))
+    # costs = Array{DiagonalCost, 1}(undef, N)
+    # for i = 1:N
+    #     if i == N
+    #         terminal = true
+    #         Qk = Diagonal(SVector{n}(Q * N))
+    #     else
+    #         terminal = false
+    #         Qk = copy(Q)
+    #         if sample_count >= 2
+    #             Qk[qinds_s2] = i * Qk[qinds_s2]
+    #         end
+    #         Qk = Diagonal(SVector{n}(Qk))
+    #     end
+    #     qk = -Qk * xf
+    #     rk = -R * uf
+    #     ck = 0.5 * xf'Qk * xf + 0.5 * uf'R * uf
+    #     costs[i] = DiagonalCost(Qk, R, qk, rk, ck, checks=true, terminal=terminal)
+    # end
+    # obj = Objective(costs)
+    Q_ = Diagonal(SVector{n}(Q))
+    obj = LQRObjective(Q_, R, Q * N, xf, N)
 
     # Must satisfy control amplitude bound.
     control_bnd = BoundConstraint(n, m, x_max=x_max, x_min=x_min)
@@ -227,7 +262,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
                  projected_newton_tolerance=al_tol, n_steps=n_steps,
                  penalty_max=max_penalty, verbose_pn=verbose_pn, verbose=verbose_,
                  projected_newton=projected_newton, iterations_inner=iterations_inner,
-                 iterations_outer=iterations_outer)
+                 iterations_outer=iterations_outer, iterations=max_iterations)
     Altro.solve!(solver)
 
     # Post-process.
@@ -235,10 +270,12 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     acontrols_arr = permutedims(reduce(hcat, map(Array, acontrols_raw)), [2, 1])
     astates_raw = TO.states(solver)
     astates_arr = permutedims(reduce(hcat, map(Array, astates_raw)), [2, 1])
-    Q_raw = Array(Q)
-    Q_arr = [Q_raw[i, i] for i in 1:size(Q_raw)[1]]
-    Qf_raw = Array(Qf)
-    Qf_arr = [Qf_raw[i, i] for i in 1:size(Qf_raw)[1]]
+    # Q_raw = Array(Q)
+    # Q_arr = [Q_raw[i, i] for i in 1:size(Q_raw)[1]]
+    # Qf_raw = Array(Qf)
+    # Qf_arr = [Qf_raw[i, i] for i in 1:size(Qf_raw)[1]]
+    Q_arr = Q
+    Qf_arr = Q * N
     R_raw = Array(R)
     R_arr = [R_raw[i, i] for i in 1:size(R_raw)[1]]
     cidx_arr = Array(CONTROLS_IDX)
@@ -273,6 +310,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
             write(save_file, "gate_type", Integer(gate_type))
             write(save_file, "save_type", Integer(jl))
             write(save_file, "iterations", iterations_)
+            write(save_file, "max_iterations", max_iterations)
         end
     end
 end
