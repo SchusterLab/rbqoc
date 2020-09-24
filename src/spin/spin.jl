@@ -14,6 +14,7 @@ using HDF5
 using Random
 using StaticArrays
 using Statistics
+using Zygote
 
 # paths
 const SPIN_OUT_PATH = abspath(joinpath(WDIR, "out", "spin"))
@@ -715,35 +716,36 @@ const DT_EN = Dict(
 )
 
 
-@inline gate_error_iso2a(s1::StaticVector{4}, s2::StaticVector{4}) = (
-    s1[1] * s2[1] + s1[2] * s2[2] + s1[3] * s2[3] + s1[4] * s2[4]
+@inline gate_error_iso2a(s1::SVector, s2::SVector{HDIM_ISO}, s1o::Int64) = (
+    s1[1 + s1o] * s2[1] + s1[2 + s1o] * s2[2] + s1[3 + s1o] * s2[3] + s1[4 + s1o] * s2[4]
 )
 
 
-@inline gate_error_iso2b(s1::StaticVector{4}, s2::StaticVector{4}) = (
-    -s1[3] * s2[1] - s1[4] * s2[2] + s1[1] * s2[3] + s1[2] * s2[4]
+@inline gate_error_iso2b(s1::SVector, s2::SVector{HDIM_ISO}, s1o::Int64) = (
+    -s1[3 + s1o] * s2[1] - s1[4 + s1o] * s2[2] + s1[1 + s1o] * s2[3] + s1[2 + s1o] * s2[4]
 )
 
 
-@inline gate_error_iso2(s1::StaticVector{4}, s2::StaticVector{4}) = (
-    1 - gate_error_iso2a(s1, s2)^2 - gate_error_iso2b(s1, s2)^2
+@inline gate_error_iso2(s1::SVector, s2::SVector{HDIM_ISO}, s1o::Int64=0) = (
+    1 - gate_error_iso2a(s1, s2, s1o)^2 - gate_error_iso2b(s1, s2, s1o)^2
 )
 
 
-function jacobian_gate_error_iso2(s1::StaticVector{4}, s2::StaticVector{4}) :: StaticVector{4}
-    a = gate_error_iso2a(s1, s2)
-    b = gate_error_iso2b(s1, s2)
+function jacobian_gate_error_iso2(s1::SVector, s2::SVector{HDIM_ISO},
+                                  s1o::Int64=0) :: SVector{HDIM_ISO}
+    a = 2 * gate_error_iso2a(s1, s2, s1o)
+    b = 2 * gate_error_iso2b(s1, s2, s1o)
     jac = @SVector [
-        -2 * a * s2[1] - 2 * b * s2[3];
-        -2 * a * s2[2] - 2 * b * s2[4];
-        -2 * a * s2[3] + 2 * b * s2[1];
-        -2 * a * s2[4] + 2 * b * s2[2];
+        -a * s2[1] - b * s2[3],
+        -a * s2[2] - b * s2[4],
+        -a * s2[3] + b * s2[1],
+        -a * s2[4] + b * s2[2],
     ]
     return jac
 end
 
 
-function hessian_gate_error_iso2(s2::StaticVector{4}) :: StaticVector{16}
+function hessian_gate_error_iso2(s2::SVector{HDIM_ISO}) :: SMatrix{4, 4}
     d11 = -2 * s2[1]^2 - 2 * s2[3]^2
     d12 = -2 * s2[1] * s2[2] -2 * s2[3] * s2[4]
     d13 = 0
@@ -1263,4 +1265,57 @@ function run_sim_prop(
     )
 
     return result
+end
+
+
+### TESTS ###
+function gen_rand_state_()
+    s = SVector{2}(rand(2) + 1im * rand(2))
+    return s / sqrt(s's)
+end
+
+
+function test_ge_(;seed=0, do_ge=true, do_gej=true, do_geh=true)
+    Random.seed!(seed)
+    big_ge = Int(1e4)
+    big_gej = Int(1e4)
+    big_geh = Int(1e4)
+    
+    if do_ge
+        for i = 1:big_ge
+            x1 = gen_rand_state()
+            x2 = gen_rand_state()
+            x1_iso = get_vec_iso(x1)
+            x2_iso = get_vec_iso(x2)
+            ge = 1 - abs(x1'x2)^2
+            ge_iso = gate_error_iso2(x1_iso, x2_iso)
+            @assert isapprox(ge, ge_iso)
+        end
+    end
+
+    if do_gej
+        for i = 1:big_gej
+            x1 = gen_rand_state()
+            x2 = gen_rand_state()
+            x1_iso = get_vec_iso(x1)
+            x2_iso = get_vec_iso(x2)
+            ge_aug(x1_iso_) = gate_error_iso2(x1_iso_, x2_iso)
+            (gej_z,) = Zygote.gradient(ge_aug, x1_iso)
+            gej_m = jacobian_gate_error_iso2(x1_iso, x2_iso)
+            @assert isapprox(gej_z, gej_m)
+        end
+    end
+
+    if do_geh
+        for i = 1:big_geh
+            x1 = gen_rand_state()
+            x2 = gen_rand_state()
+            x1_iso = get_vec_iso(x1)
+            x2_iso = get_vec_iso(x2)
+            ge_aug(x1_iso_) = gate_error_iso2(x1_iso_, x2_iso)
+            geh_z = Zygote.hessian(ge_aug, x1_iso)
+            geh_m = hessian_gate_error_iso2(x2_iso)
+            @assert isapprox(geh_z, geh_m)
+        end
+    end
 end
