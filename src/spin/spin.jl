@@ -172,13 +172,14 @@ const FBFQ_T1_SPLINE_ITP = extrapolate(interpolate(
     (FBFQ_ARRAY,), T1_ARRAY, Gridded(Linear())), Flat())
 const FBFQ_T1_REDUCED_SPLINE_ITP = extrapolate(interpolate(
     (FBFQ_ARRAY,), T1_ARRAY_REDUCED, Gridded(Linear())), Flat())
-# TODO: idk if HDF5.jl is inter-process safe
-(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS) = h5open(FBFQ_DFQ_DATA_FILE_PATH, "r") do data_file
-    fbfqs = read(data_file, "fbfqs")
-    dfqs = read(data_file, "dfqs")
-    return(fbfqs, dfqs)
-end
-const FBFQ_DFQ_SPLINE_DIERCKX = Spline1D(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS)
+
+# (FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS) = h5open(FBFQ_DFQ_DATA_FILE_PATH, "r") do data_file
+#     fbfqs = read(data_file, "fbfqs")
+#     dfqs = read(data_file, "dfqs")
+#     return(fbfqs, dfqs)
+# end
+# const FBFQ_DFQ_SPLINE_DIERCKX = Spline1D(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS)
+
 
 # Define the system.
 # ISO indicates the object is defined in the complex to real isomorphism.
@@ -292,14 +293,6 @@ flux quantum. Reflects over the flux frustration point.
 
 
 """
-amp_dfq - Compute the derivative of the qubit frequency
-with respect to the flux by flux quantum from the flux drive
-amplitude.
-"""
-@inline amp_dfq(amplitude) = FBFQ_DFQ_SPLINE_DIERCKX(amp_fbfq(amplitude))
-
-
-"""
 amp_t1_poly - Compute the t1 time for the given amplitude in units
 of nanoseconds.
 
@@ -323,6 +316,14 @@ amplitude :: Array(N) - amplitude in units of GHz (no 2 pi)
 
 
 @inline amp_t1_spline_cubic(amplitude) = FBFQ_T1_SPLINE_DIERCKX(amp_fbfq_lo(amplitude))
+
+
+"""
+amp_dfq - Compute the derivative of the qubit frequency
+with respect to the flux by flux quantum from the flux drive
+amplitude.
+"""
+# amp_dfq(amplitude) = FBFQ_DFQ_SPLINE_DIERCKX(amp_fbfq(amplitude))
 
 
 """
@@ -407,7 +408,8 @@ function dynamics_lindbladt2_deqjl(state, (controls, control_knot_count, dt_inv,
         FQ_NEGI_H0_ISO
         + controls[knot_point][1] * NEGI_H1_ISO
     )
-    gammaf = GAMMAF_PREFACTOR * abs(amp_dfq(controls[knot_point][1]))
+    # gammaf = GAMMAF_PREFACTOR * abs(amp_dfq(controls[knot_point][1]))
+    gammaf = GAMMAF_PREFACTOR
     return (
         negi_h * state - state * negi_h
         + (GAMMAC + 2 * gammaf^2 * t) * NEG_DOP_ISO .* state
@@ -1283,8 +1285,8 @@ function test_ge_(;seed=0, do_ge=true, do_gej=true, do_geh=true)
     
     if do_ge
         for i = 1:big_ge
-            x1 = gen_rand_state()
-            x2 = gen_rand_state()
+            x1 = gen_rand_state_()
+            x2 = gen_rand_state_()
             x1_iso = get_vec_iso(x1)
             x2_iso = get_vec_iso(x2)
             ge = 1 - abs(x1'x2)^2
@@ -1295,8 +1297,8 @@ function test_ge_(;seed=0, do_ge=true, do_gej=true, do_geh=true)
 
     if do_gej
         for i = 1:big_gej
-            x1 = gen_rand_state()
-            x2 = gen_rand_state()
+            x1 = gen_rand_state_()
+            x2 = gen_rand_state_()
             x1_iso = get_vec_iso(x1)
             x2_iso = get_vec_iso(x2)
             ge_aug(x1_iso_) = gate_error_iso2(x1_iso_, x2_iso)
@@ -1308,8 +1310,8 @@ function test_ge_(;seed=0, do_ge=true, do_gej=true, do_geh=true)
 
     if do_geh
         for i = 1:big_geh
-            x1 = gen_rand_state()
-            x2 = gen_rand_state()
+            x1 = gen_rand_state_()
+            x2 = gen_rand_state_()
             x1_iso = get_vec_iso(x1)
             x2_iso = get_vec_iso(x2)
             ge_aug(x1_iso_) = gate_error_iso2(x1_iso_, x2_iso)
