@@ -28,8 +28,6 @@ const INITIAL_STATE2 = [0., 1, 0, 0]
 const SIGMA = 1e-2
 const S1FQ_NEGI_H0_ISO = (FQ + FQ * SIGMA) * NEGI_H0_ISO
 const S2FQ_NEGI_H0_ISO = (FQ - FQ * SIGMA) * NEGI_H0_ISO
-const S3FQ_NEGI_H0_ISO = (FQ + FQ * 2 * SIGMA) * NEGI_H0_ISO
-const S4FQ_NEGI_H0_ISO = (FQ - FQ * 2 * SIGMA) * NEGI_H0_ISO
 # state indices
 const STATE1_IDX = 1:HDIM_ISO
 const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
@@ -37,16 +35,7 @@ const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
 const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
 const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
 const S1STATE1_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO
-
-# const S1STATE2_IDX = S1STATE1_IDX[end] + 1:S1STATE1_IDX[end] + HDIM_ISO
-# const S2STATE1_IDX = S1STATE2_IDX[end] + 1:S1STATE2_IDX[end] + HDIM_ISO
 const S2STATE1_IDX = S1STATE1_IDX[end] + 1:S1STATE1_IDX[end] + HDIM_ISO
-
-const S2STATE2_IDX = S2STATE1_IDX[end] + 1:S2STATE1_IDX[end] + HDIM_ISO
-const S3STATE1_IDX = S2STATE2_IDX[end] + 1:S2STATE2_IDX[end] + HDIM_ISO
-const S3STATE2_IDX = S3STATE1_IDX[end] + 1:S3STATE1_IDX[end] + HDIM_ISO
-const S4STATE1_IDX = S3STATE2_IDX[end] + 1:S3STATE2_IDX[end] + HDIM_ISO
-const S4STATE2_IDX = S4STATE1_IDX[end] + 1:S4STATE1_IDX[end] + HDIM_ISO
 # control indices
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
 
@@ -54,7 +43,6 @@ const D2CONTROLS_IDX = 1:CONTROL_COUNT
 struct Model{SC} <: AbstractModel
 end
 RD.state_dim(::Model{SC}) where SC = (
-    # ASTATE_SIZE_BASE + SC * STATE_COUNT * HDIM_ISO
     ASTATE_SIZE_BASE + SC * HDIM_ISO
 )
 RD.control_dim(::Model{SC}) where SC = CONTROL_COUNT
@@ -77,31 +65,15 @@ function RD.discrete_dynamics(::Type{RD.RK3}, model::Model{SC}, astate::StaticVe
         state1; state2; intcontrols; controls; dcontrols;
     ]
 
-    if SC >= 2
+    if SC == 2
         negi_s1h = S1FQ_NEGI_H0_ISO + negi_hc
         negi_s1h_prop = exp(negi_s1h * dt)
         negi_s2h = S2FQ_NEGI_H0_ISO + negi_hc
         negi_s2h_prop = exp(negi_s2h * dt)
         s1state1 = negi_s1h_prop * astate[S1STATE1_IDX]
-        # s1state2 = negi_s1h_prop * astate[S1STATE2_IDX]
         s2state1 = negi_s2h_prop * astate[S2STATE1_IDX]
-        # s2state2 = negi_s2h_prop * astate[S2STATE2_IDX]
         append!(astate_, [
-            # s1state1; s1state2; s2state1; s2state2;
             s1state1; s2state1;
-        ])
-    end
-    if SC >= 4
-        negi_s3h = S3FQ_NEGI_H0_ISO + negi_hc
-        negi_s3h_prop = exp(negi_s3h * dt)
-        negi_s4h = S4FQ_NEGI_H0_ISO + negi_hc
-        negi_s4h_prop = exp(negi_s4h * dt)
-        s3state1 = negi_s3h_prop * astate[S3STATE1_IDX]
-        s3state2 = negi_s3h_prop * astate[S3STATE2_IDX]
-        s4state1 = negi_s4h_prop * astate[S4STATE1_IDX]
-        s4state2 = negi_s4h_prop * astate[S4STATE2_IDX]
-        append!(astate_, [
-            s1state1; s1state2; s2state1; s2state2;
         ])
     end
 
@@ -123,7 +95,6 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         INITIAL_STATE1;
         INITIAL_STATE2;
         zeros(3 * CONTROL_COUNT);
-        # repeat([INITIAL_STATE1; INITIAL_STATE2], sample_count);
         repeat(INITIAL_STATE1, sample_count);
     ])
     
@@ -141,7 +112,6 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         target_state1;
         target_state2;
         zeros(3 * CONTROL_COUNT);
-        # repeat([target_state1; target_state2], sample_count);
         repeat(target_state1, sample_count);
     ])
     uf = SVector{m}([
@@ -153,7 +123,6 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         fill(Inf, CONTROL_COUNT);
         fill(MAX_CONTROL_NORM_0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        # fill(Inf, sample_count * STATE_COUNT * HDIM_ISO);
         fill(Inf, sample_count * HDIM_ISO);
     ])
     x_min = SVector{n}([
@@ -161,7 +130,6 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         fill(-Inf, CONTROL_COUNT);
         fill(-MAX_CONTROL_NORM_0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        # fill(-Inf, sample_count * STATE_COUNT * HDIM_ISO);
         fill(-Inf, sample_count * HDIM_ISO);
     ])
     # controls start and end at 0
@@ -170,7 +138,6 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         fill(Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        # fill(Inf, sample_count * STATE_COUNT * HDIM_ISO);
         fill(Inf, sample_count * HDIM_ISO);
     ])
     x_min_boundary = SVector{n}([
@@ -178,7 +145,6 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         fill(-Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        # fill(-Inf, sample_count * STATE_COUNT * HDIM_ISO);
         fill(-Inf, sample_count * HDIM_ISO);
     ])
 
@@ -192,44 +158,19 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     ]) for k = 1:N]
     Z = Traj(X0, U0, dt * ones(N))
 
-    Q = [
+    Q = Diagonal(SVector{n}([
         fill(qs[1], STATE_COUNT * HDIM_ISO); # state1, state2
         fill(qs[2], 1); # intcontrol
         fill(qs[3], 1); # control
         fill(qs[4], 1); # dcontrol
-        # fill(qs[5], eval(:($sample_count >= 2 ? 
-        #                    2 * $STATE_COUNT * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
         fill(qs[5], eval(:($sample_count >= 2 ? 
                            2 * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
-        # fill(qs[6], eval(:($sample_count >= 4 ?
-        #                    2 * $STATE_COUNT * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
-    ]
-    qinds_base = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
-    qinds_s2 = qinds_base + 1:qinds_base + 2 * STATE_COUNT * HDIM_ISO
-    R = Diagonal(SVector{m}([
-        fill(qs[7], CONTROL_COUNT);
     ]))
-    # costs = Array{DiagonalCost, 1}(undef, N)
-    # for i = 1:N
-    #     if i == N
-    #         terminal = true
-    #         Qk = Diagonal(SVector{n}(Q * N))
-    #     else
-    #         terminal = false
-    #         Qk = copy(Q)
-    #         if sample_count >= 2
-    #             Qk[qinds_s2] = i * Qk[qinds_s2]
-    #         end
-    #         Qk = Diagonal(SVector{n}(Qk))
-    #     end
-    #     qk = -Qk * xf
-    #     rk = -R * uf
-    #     ck = 0.5 * xf'Qk * xf + 0.5 * uf'R * uf
-    #     costs[i] = DiagonalCost(Qk, R, qk, rk, ck, checks=true, terminal=terminal)
-    # end
-    # obj = Objective(costs)
-    Q_ = Diagonal(SVector{n}(Q))
-    obj = LQRObjective(Q_, R, Q * N, xf, N)
+    Qf = Q * N
+    R = Diagonal(SVector{m}([
+        fill(qs[6], CONTROL_COUNT);
+    ]))
+    obj = LQRObjective(Q, R, Qf, xf, N)
 
     # Must satisfy control amplitude bound.
     control_bnd = BoundConstraint(n, m, x_max=x_max, x_min=x_min)
@@ -270,12 +211,10 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     acontrols_arr = permutedims(reduce(hcat, map(Array, acontrols_raw)), [2, 1])
     astates_raw = TO.states(solver)
     astates_arr = permutedims(reduce(hcat, map(Array, astates_raw)), [2, 1])
-    # Q_raw = Array(Q)
-    # Q_arr = [Q_raw[i, i] for i in 1:size(Q_raw)[1]]
-    # Qf_raw = Array(Qf)
-    # Qf_arr = [Qf_raw[i, i] for i in 1:size(Qf_raw)[1]]
-    Q_arr = Q
-    Qf_arr = Q * N
+    Q_raw = Array(Q)
+    Q_arr = [Q_raw[i, i] for i in 1:size(Q_raw)[1]]
+    Qf_raw = Array(Qf)
+    Qf_arr = [Qf_raw[i, i] for i in 1:size(Qf_raw)[1]]
     R_raw = Array(R)
     R_arr = [R_raw[i, i] for i in 1:size(R_raw)[1]]
     cidx_arr = Array(CONTROLS_IDX)
@@ -283,36 +222,45 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     cmax = TO.max_violation(solver)
     cmax_info = TO.findmax_violation(TO.get_constraints(solver))
     iterations_ = iterations(solver)
+
+    result = Dict(
+        "acontrols" => acontrols_arr,
+        "controls_idx" => cidx_arr,
+        "d2controls_dt2_idx" => d2cidx_arr,
+        "evolution_time" => evolution_time,
+        "astates" => astates_arr,
+        "Q" => Q_arr,
+        "Qf" => Qf_arr,
+        "R" => R_arr,
+        "cmax" => cmax,
+        "cmax_info" => cmax_info,
+        "dt" => dt,
+        "sample_count" => sample_count,
+        "solver_type" => Integer(solver_type),
+        "sqrtbp" => Integer(sqrtbp),
+        "max_penalty" => max_penalty,
+        "constraint_tol" => constraint_tol,
+        "al_tol" => al_tol,
+        "integrator_type" => Integer(integrator_type),
+        "gate_type" => Integer(gate_type),
+        "save_type" => Integer(jl),
+        "iterations" => iterations_,
+        "max_iterations" => max_iterations,
+    )
     
     # save
     if save
         save_file_path = generate_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
         println("Saving this optimization to $(save_file_path)")
         h5open(save_file_path, "cw") do save_file
-            write(save_file, "acontrols", acontrols_arr)
-            write(save_file, "controls_idx", cidx_arr)
-            write(save_file, "d2controls_dt2_idx", d2cidx_arr)
-            write(save_file, "evolution_time", evolution_time)
-            write(save_file, "astates", astates_arr)
-            write(save_file, "Q", Q_arr)
-            write(save_file, "Qf", Qf_arr)
-            write(save_file, "R", R_arr)
-            write(save_file, "cmax", cmax)
-            write(save_file, "cmax_info", cmax_info)
-            write(save_file, "dt", dt)
-            write(save_file, "sample_count", sample_count)
-            write(save_file, "solver_type", Integer(solver_type))
-            write(save_file, "sqrtbp", Integer(sqrtbp))
-            write(save_file, "max_penalty", max_penalty)
-            write(save_file, "constraint_tol", constraint_tol)
-            write(save_file, "al_tol", al_tol)
-            write(save_file, "integrator_type", Integer(integrator_type))
-            write(save_file, "gate_type", Integer(gate_type))
-            write(save_file, "save_type", Integer(jl))
-            write(save_file, "iterations", iterations_)
-            write(save_file, "max_iterations", max_iterations)
+            for key in keys(result)
+                write(save_file, key, result[key])
+            end
         end
+        result["save_file_path"] = save_file_path
     end
+
+    return result
 end
 
 

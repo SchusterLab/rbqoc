@@ -709,9 +709,59 @@ const DT_EN = Dict(
 )
 
 
+# cost functions
 @inline fidelity_vec_iso2(s1, s2) = (
     (s1's2)^2 + (s1[1] * s2[3] + s1[2] * s2[4] - s1[3] * s2[1] - s1[4] * s2[2])^2
 )
+
+
+@inline gate_error_iso2a(s1::StaticVector{4}, s2::StaticVector{4}) = (
+    s1[1] * s2[1] + s1[2] * s2[2] + s1[3] * s2[3] + s1[4] * s2[4]
+)
+
+
+@inline gate_error_iso2b(s1::StaticVector{4}, s2::StaticVector{4}) = (
+    -s1[3] * s2[1] - s1[4] * s2[2] + s1[1] * s2[3] + s1[2] * s2[4]
+)
+
+
+@inline gate_error_iso2(s1::StaticVector{4}, s2::StaticVector{4}) = (
+    1 - gate_error_iso2a(s1, s2)^2 - gate_error_iso2b(s1, s2)^2
+)
+
+
+function jacobian_gate_error_iso2(s1::StaticVector{4}, s2::StaticVector{4}) :: StaticVector{4}
+    a = gate_error_iso2a(s1, s2)
+    b = gate_error_iso2b(s1, s2)
+    jac = @SVector [
+        -2 * a * s2[1] - 2 * b * s2[3];
+        -2 * a * s2[2] - 2 * b * s2[4];
+        -2 * a * s2[3] + 2 * b * s2[1];
+        -2 * a * s2[4] + 2 * b * s2[2];
+    ]
+    return jac
+end
+
+
+function hessian_gate_error_iso2(s2::StaticVector{4}) :: StaticVector{16}
+    d11 = -2 * s2[1]^2 - 2 * s2[3]^2
+    d12 = -2 * s2[1] * s2[2] -2 * s2[3] * s2[4]
+    d13 = 0
+    d14 = 2 * s2[2] * s2[3] - 2 * s2[1] * s2[4]
+    d22 = -2 * s2[2]^2 - 2 * s2[4]^2
+    d23 = -2 * s2[2] * s2[3] + 2 * s2[1] * s2[4]
+    d24 = 0
+    d33 = -2 * s2[1]^2 - 2 * s2[3]^2
+    d34 = -2 * s2[1] * s2[2] - 2 * s2[3] * s2[4]
+    d44 = -2 * s2[2]^2 - 2 * s2[4]^2
+    hes = @SMatrix [
+        d11 d12 d13 d14;
+        d12 d22 d23 d24;
+        d13 d23 d33 d34;
+        d14 d24 d34 d44;
+    ]
+    return hes
+end
 
 
 """

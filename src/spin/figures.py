@@ -83,7 +83,7 @@ class PulseType(Enum):
     d3b = 10
     corpse = 11
     d1 = 12
-    s1 = 13
+    sut8 = 13
 #ENDDEF
 
 PT_STR = {
@@ -99,7 +99,7 @@ PT_STR = {
     PulseType.d2b: "D-2",
     PulseType.d3b: "D-2",
     PulseType.corpse: "C-2",
-    PulseType.s1: "S-*",
+    PulseType.sut8: "SU-8",
 }
 
 PT_COLOR = {
@@ -115,7 +115,7 @@ PT_COLOR = {
     PulseType.d3b: "darkred",
     PulseType.corpse: "pink",
     PulseType.d1: "lightcoral",
-    PulseType.s1: "hotpink",
+    PulseType.sut8: "hotpink",
 }
 
 PT_LS = {
@@ -140,7 +140,7 @@ PT_MARKER = {
     PulseType.d2: "^",
     PulseType.d3: "d",
     PulseType.corpse: "x",
-    PulseType.s1: "*",
+    PulseType.sut8: "*",
 }
 
 # METHODS #

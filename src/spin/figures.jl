@@ -30,7 +30,7 @@ const F3D_DATA_FILE_PATH = joinpath(SAVE_PATH, "f3d.h5")
     d3b = 10
     corpse = 11
     d1 = 12
-    s1 = 13
+    sut8 = 13
 end
 
 const GT_LIST = [zpiby2, ypiby2, xpiby2]
@@ -335,10 +335,10 @@ const F2C_DATA = Dict(
         INVAL, 4, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
     ]],
     s2 => [joinpath(SPIN_OUT_PATH, "spin12/$(lpad(index, 5, '0'))_spin12.h5") for index in [
-        336, 496, 301, 302, 304, 303, 564, 306, 508, 399, 400, 506, 501
+        582, 577, 583, 590, 591, 580, 597, 593, 603, 608, 615, 621, 620
     ]],
-    s4 => [joinpath(SPIN_OUT_PATH, "spin12/$(lpad(index, 5, '0'))_spin12.h5") for index in [
-        INVAL, 498, 307, 308, 310, 309, 335, 337, 339, 500, 499, 507, INVAL
+    sut8 => [joinpath(SPIN_OUT_PATH, "spin23/$(lpad(index, 5, '0'))_spin23.h5") for index in [
+        38, 26, 50, 41, INVAL, INVAL, 11, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
     ]],
     d2 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
         105, 432, 98, 100, 99, 229, 231, 230, 232, 291, 289, 290, 292
@@ -346,11 +346,8 @@ const F2C_DATA = Dict(
     d3 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
         141, 429, 114, 115, 113, 235, 236, 234, 438, 295, 293, 294, 362
     ]],
-    s1 => [joinpath(SPIN_OUT_PATH, "spin22/$(lpad(index, 5, '0'))_spin22.h5") for index in [
-        125, 89, 52, 53, 99, 103, 131, 116, 115, 118, 119, 120, 123
-    ]]
 )
-const F2C_PT_LIST = [analytic, s2, s4, d2, d3, s1]
+const F2C_PT_LIST = [analytic, s2, sut8, d2, d3]
 const F2C_AVG_COUNT = 10
 const F2C_SIGMA = 1e-2
 const F2C_S1_NEGI_H0 = (FQ + FQ * F2C_SIGMA) * NEGI_H0_ISO
