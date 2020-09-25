@@ -22,12 +22,12 @@ const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 # problem
 const CONTROL_COUNT = 1
 const STATE_COUNT = 2
+const SAMPLE_COUNT = 2
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
+const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
+const ACONTROL_SIZE = CONTROL_COUNT
 const INITIAL_STATE1 = [1., 0, 0, 0]
 const INITIAL_STATE2 = [0., 1, 0, 0]
-const SIGMA = 1e-2
-const S1FQ_NEGI_H0_ISO = (FQ + FQ * SIGMA) * NEGI_H0_ISO
-const S2FQ_NEGI_H0_ISO = (FQ - FQ * SIGMA) * NEGI_H0_ISO
 # state indices
 const STATE1_IDX = 1:HDIM_ISO
 const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
@@ -40,145 +40,240 @@ const S2STATE1_IDX = S1STATE1_IDX[end] + 1:S1STATE1_IDX[end] + HDIM_ISO
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
 
 # model
-struct Model{SC} <: AbstractModel
+struct Model <: AbstractModel
+    h0_samples::Vector{SMatrix{HDIM_ISO, HDIM_ISO}}
 end
-RD.state_dim(::Model{SC}) where SC = (
-    ASTATE_SIZE_BASE + SC * HDIM_ISO
+@inline RD.state_dim(::Model) = ASTATE_SIZE
+@inline RD.control_dim(::Model) = ACONTROL_SIZE
+
+
+# This cost puts a gate error cost on
+# the sample states and a LQR cost on the other terms.
+# The hessian w.r.t the state and controls is constant.
+struct Cost{N,M,T} <: TO.CostFunction
+    Q::Diagonal{T, SVector{N,T}}
+    R::Diagonal{T, SVector{M,T}}
+    q::SVector{N, T}
+    c::T
+    hess_astate::Symmetric{T, SMatrix{N,N,T}}
+    target_state1::SVector{HDIM_ISO, T}
+    q_ss::T
+end
+
+function Cost(Q::Diagonal{T,SVector{N,T}}, R::Diagonal{T,SVector{M,T}},
+              xf::SVector{N,T}, target_state1::SVector{HDIM_ISO,T}, q_ss::T) where {N,M,T}
+    q = -Q * xf
+    c = 0.5 * xf' * Q * xf
+    hess_astate = zeros(N, N)
+    # For reasons unknown to the author, throwing a -1 in front
+    # of the gate error Hessian makes the cost function work.
+    # This is strange, because the gate error Hessian has been
+    # checked against autodiff.
+    hess_sample = -1 * q_ss * hessian_gate_error_iso2(target_state1)
+    hess_astate[S1STATE1_IDX, S1STATE1_IDX] = hess_sample
+    hess_astate[S2STATE1_IDX, S2STATE1_IDX] = hess_sample
+    hess_astate += Q
+    hess_astate = Symmetric(SMatrix{N, N}(hess_astate))
+    return Cost{N,M,T}(Q, R, q, c, hess_astate, target_state1, q_ss)
+end
+
+@inline TO.state_dim(cost::Cost{N,M,T}) where {N,M,T} = N
+@inline TO.control_dim(cost::Cost{N,M,T}) where {N,M,T} = M
+@inline Base.copy(cost::Cost{N,M,T}) where {N,M,T} = Cost{N,M,T}(
+    cost.Q, cost.R, cost.q, cost.c, cost.hess_astate,
+    cost.target_state1, cost.q_ss
 )
-RD.control_dim(::Model{SC}) where SC = CONTROL_COUNT
+
+@inline TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N}) where {N,M,T} = (
+    0.5 * astate' * cost.Q * astate + cost.q'astate + cost.c
+    + cost.q_ss * (
+        gate_error_iso2(astate, cost.target_state1, S1STATE1_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S2STATE1_IDX[1] - 1)
+    )
+)
+
+@inline TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N}, acontrol::SVector{M}) where {N,M,T} = (
+    TO.stage_cost(cost, astate) + 0.5 * acontrol' * cost.R * acontrol
+)
+
+function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T}) where {N,M,T}
+    E.q = (cost.Q * astate + cost.q + [
+        @SVector zeros(ASTATE_SIZE_BASE);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S1STATE1_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S2STATE1_IDX[1] - 1);
+    ])
+    return false
+end
+
+function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T},
+                      acontrol::SVector{M,T}) where {N,M,T}
+    TO.gradient!(E, cost, astate)
+    E.r = cost.R * acontrol
+    E.c = 0
+    return false
+end
+
+function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T}) where {N,M,T}
+    E.Q = cost.hess_astate
+    return true
+end
+
+function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T},
+                     acontrol::SVector{M,T}) where {N,M,T}
+    TO.hessian!(E, cost, astate)
+    E.R = cost.R
+    E.H .= 0
+    return true
+end
 
 
 # dynamics
-# Note that TO.rollout! uses RK3.
-function RD.discrete_dynamics(::Type{RD.RK3}, model::Model{SC}, astate::StaticVector,
-                                         acontrols::StaticVector, time::Real, dt::Real) where {SC}
-    negi_hc = astate[CONTROLS_IDX][1] * NEGI_H1_ISO
-    negi_s0h = FQ_NEGI_H0_ISO + negi_hc
-    negi_s0h_prop = exp(negi_s0h * dt)
-    state1 = negi_s0h_prop * astate[STATE1_IDX]
-    state2 = negi_s0h_prop * astate[STATE2_IDX]
-    intcontrols = astate[INTCONTROLS_IDX] + dt * astate[CONTROLS_IDX]
-    controls = astate[CONTROLS_IDX] + dt * astate[DCONTROLS_IDX]
-    dcontrols = astate[DCONTROLS_IDX] + dt * acontrols[D2CONTROLS_IDX]
+function RD.discrete_dynamics(::Type{RD.RK3}, model::Model, astate::StaticVector,
+                              acontrols::StaticVector, time::Real, dt::Real) where {SC}
+    negi_hc = astate[CONTROLS_IDX[1]] * NEGI_H1_ISO
+    s0h_prop = exp((FQ_NEGI_H0_ISO + negi_hc) * dt)
+    state1 = s0h_prop * astate[STATE1_IDX]
+    state2 = s0h_prop * astate[STATE2_IDX]
+    intcontrols = astate[INTCONTROLS_IDX[1]] + dt * astate[CONTROLS_IDX[1]]
+    controls = astate[CONTROLS_IDX[1]] + dt * astate[DCONTROLS_IDX[1]]
+    dcontrols = astate[DCONTROLS_IDX[1]] + dt * acontrols[D2CONTROLS_IDX[1]]
+
+    s1state1 = exp((model.h0_samples[1] + negi_hc) * dt) * astate[S1STATE1_IDX]
+    s2state1 = exp((model.h0_samples[2] + negi_hc) * dt) * astate[S2STATE1_IDX]
 
     astate_ = [
         state1; state2; intcontrols; controls; dcontrols;
+        s1state1; s2state1;
     ]
-
-    if SC == 2
-        negi_s1h = S1FQ_NEGI_H0_ISO + negi_hc
-        negi_s1h_prop = exp(negi_s1h * dt)
-        negi_s2h = S2FQ_NEGI_H0_ISO + negi_hc
-        negi_s2h_prop = exp(negi_s2h * dt)
-        s1state1 = negi_s1h_prop * astate[S1STATE1_IDX]
-        s2state1 = negi_s2h_prop * astate[S2STATE1_IDX]
-        append!(astate_, [
-            s1state1; s2state1;
-        ])
-    end
 
     return astate_
 end
 
 
+# main
 function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
-                  sqrtbp=false, sample_count=0,
-                  integrator_type=rk3, qs=[1e0, 1e0, 1e0, 1e-1, 5e0, 1e-1, 1e-1],
+                  sqrtbp=false, integrator_type=rk3, qs=[1e0, 1e0, 1e0, 1e-1, 1e0, 1e-1],
                   dt_inv=Int64(1e1), smoke_test=false, constraint_tol=1e-8, al_tol=1e-4,
-                  pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5))
-    model = Model{sample_count}()
+                  pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5),
+                  fq_cov=FQ * 1e-2, analytic_guess=false)
+    # model configuration
+    h0_samples = Array{SMatrix{HDIM_ISO, HDIM_ISO}}(undef, SAMPLE_COUNT)
+    h0_samples[1] = (FQ + fq_cov) * NEGI_H0_ISO
+    h0_samples[2] = (FQ - fq_cov) * NEGI_H0_ISO
+    model = Model(h0_samples)
     n = state_dim(model)
     m = control_dim(model)
     t0 = 0.
     tf = evolution_time
+
+    # initial state
     x0 = SVector{n}([
         INITIAL_STATE1;
         INITIAL_STATE2;
         zeros(3 * CONTROL_COUNT);
-        repeat(INITIAL_STATE1, sample_count);
+        repeat(INITIAL_STATE1, SAMPLE_COUNT);
     ])
-    
+
+    # target state
     if gate_type == xpiby2
-        target_state1 = Array(XPIBY2_ISO_1)
-        target_state2 = Array(XPIBY2_ISO_2)
+        target_state1 = XPIBY2_ISO_1
+        target_state2 = XPIBY2_ISO_2
     elseif gate_type == ypiby2
-        target_state1 = Array(YPIBY2_ISO_1)
-        target_state2 = Array(YPIBY2_ISO_2)
+        target_state1 = YPIBY2_ISO_1
+        target_state2 = YPIBY2_ISO_2
     elseif gate_type == zpiby2
-        target_state1 = Array(ZPIBY2_ISO_1)
-        target_state2 = Array(ZPIBY2_ISO_2)
+        target_state1 = ZPIBY2_ISO_1
+        target_state2 = ZPIBY2_ISO_2
     end
     xf = SVector{n}([
         target_state1;
         target_state2;
         zeros(3 * CONTROL_COUNT);
-        repeat(target_state1, sample_count);
+        repeat(target_state1, SAMPLE_COUNT);
     ])
-    uf = SVector{m}([
-        zeros(CONTROL_COUNT);
-    ])
+
     # control amplitude constraint
     x_max = SVector{n}([
         fill(Inf, STATE_COUNT * HDIM_ISO);
         fill(Inf, CONTROL_COUNT);
         fill(MAX_CONTROL_NORM_0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        fill(Inf, sample_count * HDIM_ISO);
+        fill(Inf, SAMPLE_COUNT * HDIM_ISO);
     ])
     x_min = SVector{n}([
         fill(-Inf, STATE_COUNT * HDIM_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(-MAX_CONTROL_NORM_0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, sample_count * HDIM_ISO);
+        fill(-Inf, SAMPLE_COUNT * HDIM_ISO);
     ])
-    # controls start and end at 0
+    # control amplitude constraint at boundary
     x_max_boundary = SVector{n}([
         fill(Inf, STATE_COUNT * HDIM_ISO);
         fill(Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        fill(Inf, sample_count * HDIM_ISO);
+        fill(Inf, SAMPLE_COUNT * HDIM_ISO);
     ])
     x_min_boundary = SVector{n}([
         fill(-Inf, STATE_COUNT * HDIM_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, sample_count * HDIM_ISO);
+        fill(-Inf, SAMPLE_COUNT * HDIM_ISO);
     ])
 
+    # initial trajectory
     dt = dt_inv^(-1)
     N = Int(floor(evolution_time * dt_inv)) + 1
-    U0 = [SVector{m}([
-        fill(1e-4, CONTROL_COUNT);
-    ]) for k = 1:N-1]
+    # anlaytic_guess currently only works for t_N = 56.8ns
+    if analytic_guess
+        amp = 1.25e-1
+        U0_ = zeros(N - 1)
+        U0_[1] = -amp / dt^2
+        U0_[22] = amp / dt^2
+        U0_[173] = amp / dt^2
+        U0_[195] = -amp / dt^2
+        U0_[373] = amp / dt^2
+        U0_[395] = -amp / dt^2
+        U0_[546] = -amp / dt^2
+        U0_[567] = amp / dt^2
+        U0 = [SVector{m}([
+            U0_[k]
+        ]) for k = 1:N-1]
+    else
+        U0 = [SVector{m}([
+            fill(1e-4, CONTROL_COUNT);
+        ]) for k = 1:N-1]
+    end
     X0 = [SVector{n}([
         fill(NaN, n);
     ]) for k = 1:N]
     Z = Traj(X0, U0, dt * ones(N))
 
+    # cost function
     Q = Diagonal(SVector{n}([
-        fill(qs[1], STATE_COUNT * HDIM_ISO); # state1, state2
-        fill(qs[2], 1); # intcontrol
-        fill(qs[3], 1); # control
-        fill(qs[4], 1); # dcontrol
-        fill(qs[5], eval(:($sample_count >= 2 ? 
-                           2 * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
+        fill(qs[1], STATE_COUNT * HDIM_ISO); # ψ1, ψ2
+        fill(qs[2], 1); # ∫a
+        fill(qs[3], 1); # a
+        fill(qs[4], 1); # ∂a
+        fill(0, SAMPLE_COUNT * HDIM_ISO); 
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([
         fill(qs[6], CONTROL_COUNT);
     ]))
-    obj = LQRObjective(Q, R, Qf, xf, N)
+    cost_k = Cost(Q, R, xf, target_state1, qs[5])
+    cost_f = Cost(Qf, R, xf, target_state1, qs[5])
+    objective = TO.Objective(cost_k, cost_f, N)
 
-    # Must satisfy control amplitude bound.
+    # must satisfy control amplitude bound
     control_bnd = BoundConstraint(n, m, x_max=x_max, x_min=x_min)
-    # Must statisfy conrols start and stop at 0.
+    # must statisfy conrols start and end at 0
     control_bnd_boundary = BoundConstraint(n, m, x_max=x_max_boundary, x_min=x_min_boundary)
-    # Must reach target state. Must have zero net flux.
+    # must reach target state, must have zero net flux
     target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
-    # Must obey unit norm.
+    # must obey unit norm.
     normalization_constraint_1 = NormConstraint(n, m, 1, TO.Equality(), STATE1_IDX)
     normalization_constraint_2 = NormConstraint(n, m, 1, TO.Equality(), STATE2_IDX)
     
@@ -189,8 +284,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     # add_constraint!(constraints, normalization_constraint_1, 2:N-1)
     # add_constraint!(constraints, normalization_constraint_2, 2:N-1)
 
-    # Instantiate problem and solve.
-    prob = Problem{IT_RDI[integrator_type]}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
+    # solve problem
+    prob = Problem{IT_RDI[integrator_type]}(model, objective, constraints, x0, xf, Z, N, t0, evolution_time)
     solver = ALTROSolver(prob)
     verbose_pn = verbose ? true : false
     verbose_ = verbose ? 2 : 0
@@ -206,7 +301,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
                  iterations_outer=iterations_outer, iterations=max_iterations)
     Altro.solve!(solver)
 
-    # Post-process.
+    # post-process
     acontrols_raw = TO.controls(solver)
     acontrols_arr = permutedims(reduce(hcat, map(Array, acontrols_raw)), [2, 1])
     astates_raw = TO.states(solver)
@@ -235,15 +330,15 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         "cmax" => cmax,
         "cmax_info" => cmax_info,
         "dt" => dt,
-        "sample_count" => sample_count,
+        "sample_count" => SAMPLE_COUNT,
         "solver_type" => Integer(solver_type),
         "sqrtbp" => Integer(sqrtbp),
         "max_penalty" => max_penalty,
         "constraint_tol" => constraint_tol,
         "al_tol" => al_tol,
-        "integrator_type" => Integer(integrator_type),
         "gate_type" => Integer(gate_type),
         "save_type" => Integer(jl),
+        "integrator_type" => Integer(integrator_type),
         "iterations" => iterations_,
         "max_iterations" => max_iterations,
     )
@@ -264,7 +359,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
 end
 
 
-function forward_pass(save_file_path; sample_count=0, integrator_type=rk6, gate_type=xpiby2)
+function forward_pass(save_file_path; integrator_type=rk6, gate_type=xpiby2)
     (evolution_time, d2controls, dt
      ) = h5open(save_file_path, "r+") do save_file
          save_type = SaveType(read(save_file, "save_type"))

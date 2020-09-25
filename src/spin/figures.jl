@@ -219,8 +219,8 @@ end
 ### FIGURE 2 ###
 const F2_DATA = Dict(
     analytic => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
-    s2 => joinpath(SPIN_OUT_PATH, "spin12/00496_spin12.h5"),
-    s4 => joinpath(SPIN_OUT_PATH, "spin12/00498_spin12.h5"),
+    s2 => joinpath(SPIN_OUT_PATH, "spin12/00627_spin12.h5"),
+    sut8 => joinpath(SPIN_OUT_PATH, "spin23/00094_spin23.h5"),
     d2 => joinpath(SPIN_OUT_PATH, "spin11/00432_spin11.h5"),
     d3 => joinpath(SPIN_OUT_PATH, "spin11/00429_spin11.h5"),
     s2b => joinpath(SPIN_OUT_PATH, "spin12/00508_spin12.h5"),
@@ -230,7 +230,7 @@ const F2_DATA = Dict(
 )
 
 
-const F2A_PT_LIST = [analytic, s2, s4, d2, d3]
+const F2A_PT_LIST = [analytic, s2, sut8, d2, d3]
 function gen_2a()
     pulse_types_integer = [Integer(pulse_type) for pulse_type in F2A_PT_LIST]
     pulse_type_count = size(F2A_PT_LIST)[1]
@@ -250,7 +250,7 @@ end
 
 const F2B_TRIAL_COUNT = Integer(1e2)
 const F2B_FQ_DEV = 3e-2
-const F2B_PT_LIST = [analytic, s2, s4, d2, d3, s2b, s4b, d2b, d3b]
+const F2B_PT_LIST = [analytic, s2, sut8, d2, d3, s2b, s4b, d2b, d3b]
 const F2B_AVG_COUNT = 10
 function gen_2b(;use_previous=true)
     @assert iseven(F2B_TRIAL_COUNT)
@@ -299,20 +299,20 @@ function gen_2b(;use_previous=true)
                 if (!isnothing(save_file_path_old) && save_file_path == save_file_path_old
                     && k <= avg_count_old)
                     gate_errors[i, j, k] = gate_errors_old[i, j, k]
-                    continue
-                end
-                if pulse_type == analytic
-                    res = run_sim_deqjl(
-                        1, gate_type; dynamics_type=xpiby2nodis,
-                        dt=1e-3, save=false, negi_h0=negi_h0, seed=k
-                    )
                 else
-                    res = run_sim_deqjl(
-                        1, gate_type; dynamics_type=schroed, save_file_path=save_file_path,
-                        dt=1e-3, save=false, negi_h0=negi_h0, seed=k
-                    )
+                    if pulse_type == analytic
+                        res = run_sim_deqjl(
+                            1, gate_type; dynamics_type=xpiby2nodis,
+                            dt=1e-3, save=false, negi_h0=negi_h0, seed=k
+                        )
+                    else
+                        res = run_sim_prop(
+                            1, gate_type, save_file_path;
+                            save=false, negi_h0=negi_h0, seed=k
+                        )
+                    end
+                    gate_errors[i, j, k] = 1 - res["fidelities"][end]
                 end
-                gate_errors[i, j, k] = 1 - res["fidelities"][end]
             end
         end
     end
@@ -335,10 +335,10 @@ const F2C_DATA = Dict(
         INVAL, 4, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
     ]],
     s2 => [joinpath(SPIN_OUT_PATH, "spin12/$(lpad(index, 5, '0'))_spin12.h5") for index in [
-        582, 577, 583, 590, 591, 580, 597, 593, 603, 608, 615, 621, 620
+        629, 627, 638, 655, 654, 666, 658, 665, 661, 667, 668, 681, 685
     ]],
     sut8 => [joinpath(SPIN_OUT_PATH, "spin23/$(lpad(index, 5, '0'))_spin23.h5") for index in [
-        38, 26, 50, 41, INVAL, INVAL, 11, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
+        38, 94, 103, 113, 132, 135, 125, 140, 143, 145, 158, 154, 162
     ]],
     d2 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
         105, 432, 98, 100, 99, 229, 231, 230, 232, 291, 289, 290, 292
@@ -427,7 +427,7 @@ function gen_2c(;use_previous=true)
                     print(".")
                 end
             end
-            println("")
+            println(" $(mean(gate_errors[i, j, :]))")
         end
     end
 
