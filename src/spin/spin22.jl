@@ -1,5 +1,5 @@
 """
-spin12.jl - sampling robustness
+spin22.jl - dynamic sampling robustness for the δf_q problem
 """
 
 WDIR = joinpath(@__DIR__, "../../")
@@ -8,6 +8,7 @@ include(joinpath(WDIR, "src", "spin", "spin.jl"))
 using Altro
 using HDF5
 using LinearAlgebra
+using Random
 using RobotDynamics
 using StaticArrays
 using TrajectoryOptimization
@@ -16,7 +17,7 @@ const TO = TrajectoryOptimization
 
 # paths
 const EXPERIMENT_META = "spin"
-const EXPERIMENT_NAME = "spin12"
+const EXPERIMENT_NAME = "spin22"
 const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
 # problem
@@ -25,9 +26,6 @@ const STATE_COUNT = 2
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
 const INITIAL_STATE1 = [1., 0, 0, 0]
 const INITIAL_STATE2 = [0., 1, 0, 0]
-const SIGMA = 1e-2
-const S1FQ_NEGI_H0_ISO = (FQ + FQ * SIGMA) * NEGI_H0_ISO
-const S2FQ_NEGI_H0_ISO = (FQ - FQ * SIGMA) * NEGI_H0_ISO
 # state indices
 const STATE1_IDX = 1:HDIM_ISO
 const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
@@ -35,15 +33,23 @@ const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
 const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
 const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
 const S1STATE1_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO
-const S2STATE1_IDX = S1STATE1_IDX[end] + 1:S1STATE1_IDX[end] + HDIM_ISO
+const S1STATE2_IDX = S1STATE1_IDX[end] + 1:S1STATE1_IDX[end] + HDIM_ISO
+# const S2STATE1_IDX = S1STATE2_IDX[end] + 1:S1STATE2_IDX[end] + HDIM_ISO
+# const S2STATE2_IDX = S2STATE1_IDX[end] + 1:S2STATE1_IDX[end] + HDIM_ISO
+# const S3STATE1_IDX = S2STATE2_IDX[end] + 1:S2STATE2_IDX[end] + HDIM_ISO
+# const S3STATE2_IDX = S3STATE1_IDX[end] + 1:S3STATE1_IDX[end] + HDIM_ISO
+# const S4STATE1_IDX = S3STATE2_IDX[end] + 1:S3STATE2_IDX[end] + HDIM_ISO
+# const S4STATE2_IDX = S4STATE1_IDX[end] + 1:S4STATE1_IDX[end] + HDIM_ISO
 # control indices
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
 
 # model
 struct Model{SC} <: AbstractModel
+    edist::Distributions.Sampleable
+    eamp::Float64
 end
 RD.state_dim(::Model{SC}) where SC = (
-    ASTATE_SIZE_BASE + SC * HDIM_ISO
+    ASTATE_SIZE_BASE + SC * STATE_COUNT * HDIM_ISO
 )
 RD.control_dim(::Model{SC}) where SC = CONTROL_COUNT
 
@@ -51,7 +57,8 @@ RD.control_dim(::Model{SC}) where SC = CONTROL_COUNT
 # dynamics
 # Note that TO.rollout! uses RK3.
 function RD.discrete_dynamics(::Type{RD.RK3}, model::Model{SC}, astate::StaticVector,
-                                         acontrols::StaticVector, time::Real, dt::Real) where {SC}
+                              acontrols::StaticVector, time::Real, dt::Real) where {SC}
+
     negi_hc = astate[CONTROLS_IDX][1] * NEGI_H1_ISO
     negi_s0h = FQ_NEGI_H0_ISO + negi_hc
     negi_s0h_prop = exp(negi_s0h * dt)
@@ -60,20 +67,17 @@ function RD.discrete_dynamics(::Type{RD.RK3}, model::Model{SC}, astate::StaticVe
     intcontrols = astate[INTCONTROLS_IDX] + dt * astate[CONTROLS_IDX]
     controls = astate[CONTROLS_IDX] + dt * astate[DCONTROLS_IDX]
     dcontrols = astate[DCONTROLS_IDX] + dt * acontrols[D2CONTROLS_IDX]
-
     astate_ = [
         state1; state2; intcontrols; controls; dcontrols;
     ]
 
-    if SC == 2
-        negi_s1h = S1FQ_NEGI_H0_ISO + negi_hc
+    if SC >= 1
+        negi_s1h = (FQ + model.eamp * rand(model.edist)) * NEGI_H0_ISO + negi_hc
         negi_s1h_prop = exp(negi_s1h * dt)
-        negi_s2h = S2FQ_NEGI_H0_ISO + negi_hc
-        negi_s2h_prop = exp(negi_s2h * dt)
         s1state1 = negi_s1h_prop * astate[S1STATE1_IDX]
-        s2state1 = negi_s2h_prop * astate[S2STATE1_IDX]
+        s1state2 = negi_s1h_prop * astate[S1STATE2_IDX]
         append!(astate_, [
-            s1state1; s2state1;
+            s1state1; s1state2;
         ])
     end
 
@@ -83,19 +87,21 @@ end
 
 function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
                   sqrtbp=false, sample_count=0,
-                  integrator_type=rk3, qs=[1e0, 1e0, 1e0, 1e-1, 5e0, 1e-1, 1e-1],
+                  integrator_type=rk3, qs=[1e0, 1e0, 1e0, 1e-1, 1e0, 1e0, 1e-1],
                   dt_inv=Int64(1e1), smoke_test=false, constraint_tol=1e-8, al_tol=1e-4,
-                  pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5))
-    model = Model{sample_count}()
+                  pn_steps=2, max_penalty=1e11, verbose=true, save=true, edist=STD_NORMAL,
+                  esigma=1e-2, seed=0, max_iterations=Int64(2e5), gradient_tol_int=1,
+                  dJ_counter_limit=Int(1e2),)
+    eamp = esigma * FQ
+    model = Model{sample_count}(edist, eamp)
     n = state_dim(model)
     m = control_dim(model)
     t0 = 0.
-    tf = evolution_time
     x0 = SVector{n}([
         INITIAL_STATE1;
         INITIAL_STATE2;
         zeros(3 * CONTROL_COUNT);
-        repeat(INITIAL_STATE1, sample_count);
+        repeat([INITIAL_STATE1; INITIAL_STATE2], sample_count);
     ])
     
     if gate_type == xpiby2
@@ -112,10 +118,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         target_state1;
         target_state2;
         zeros(3 * CONTROL_COUNT);
-        repeat(target_state1, sample_count);
-    ])
-    uf = SVector{m}([
-        zeros(CONTROL_COUNT);
+        repeat([target_state1; target_state2], sample_count);
     ])
     # control amplitude constraint
     x_max = SVector{n}([
@@ -123,14 +126,14 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         fill(Inf, CONTROL_COUNT);
         fill(MAX_CONTROL_NORM_0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        fill(Inf, sample_count * HDIM_ISO);
+        fill(Inf, sample_count * STATE_COUNT * HDIM_ISO);
     ])
     x_min = SVector{n}([
         fill(-Inf, STATE_COUNT * HDIM_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(-MAX_CONTROL_NORM_0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, sample_count * HDIM_ISO);
+        fill(-Inf, sample_count * STATE_COUNT * HDIM_ISO);
     ])
     # controls start and end at 0
     x_max_boundary = SVector{n}([
@@ -138,16 +141,16 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         fill(Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        fill(Inf, sample_count * HDIM_ISO);
+        fill(Inf, sample_count * STATE_COUNT * HDIM_ISO);
     ])
     x_min_boundary = SVector{n}([
         fill(-Inf, STATE_COUNT * HDIM_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, sample_count * HDIM_ISO);
+        fill(-Inf, sample_count * STATE_COUNT * HDIM_ISO);
     ])
-
+    
     dt = dt_inv^(-1)
     N = Int(floor(evolution_time * dt_inv)) + 1
     U0 = [SVector{m}([
@@ -163,13 +166,13 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         fill(qs[2], 1); # intcontrol
         fill(qs[3], 1); # control
         fill(qs[4], 1); # dcontrol
-        fill(qs[5], eval(:($sample_count >= 2 ? 
-                           2 * $HDIM_ISO : 0))); # <s1,s2>state1, <s1,s2>state2
+        fill(qs[5], eval(:($sample_count >= 1 ? $STATE_COUNT * $HDIM_ISO : 0))); # s1state1, s1state2
+        fill(qs[6], eval(:($sample_count >= 2 ? $STATE_COUNT * $HDIM_ISO : 0))); # s1state1, s1state2
     ]))
     Qf = Q * N
-    R = Diagonal(SVector{m}([
-        fill(qs[6], CONTROL_COUNT);
-    ]))
+    R = SVector{m}([
+        fill(qs[7], CONTROL_COUNT);
+    ])
     obj = LQRObjective(Q, R, Qf, xf, N)
 
     # Must satisfy control amplitude bound.
@@ -199,11 +202,16 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     iterations_inner = smoke_test ? 1 : 300
     iterations_outer = smoke_test ? 1 : 30
     n_steps = smoke_test ? 1 : pn_steps
-    set_options!(solver, square_root=sqrtbp, constraint_tolerance=constraint_tolerance,
-                 projected_newton_tolerance=al_tol, n_steps=n_steps,
-                 penalty_max=max_penalty, verbose_pn=verbose_pn, verbose=verbose_,
-                 projected_newton=projected_newton, iterations_inner=iterations_inner,
-                 iterations_outer=iterations_outer, iterations=max_iterations)
+    set_options!(
+        solver, square_root=sqrtbp, constraint_tolerance=constraint_tolerance,
+        projected_newton_tolerance=al_tol, n_steps=n_steps,
+        penalty_max=max_penalty, verbose_pn=verbose_pn, verbose=verbose_,
+        projected_newton=projected_newton, iterations_inner=iterations_inner,
+        iterations_outer=iterations_outer, iterations=max_iterations,
+        gradient_tolerance_intermediate=gradient_tol_int,
+        dJ_counter_limit=dJ_counter_limit
+    )
+    Random.seed!(seed)
     Altro.solve!(solver)
 
     # Post-process.
@@ -241,10 +249,15 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         "max_penalty" => max_penalty,
         "constraint_tol" => constraint_tol,
         "al_tol" => al_tol,
+        "gradient_tolerance_intermediate" => gradient_tol_int,
+        "dJ_counter_limit" => dJ_counter_limit,
         "integrator_type" => Integer(integrator_type),
         "gate_type" => Integer(gate_type),
         "save_type" => Integer(jl),
         "iterations" => iterations_,
+        "esigma" => esigma,
+        "edist" => string(edist),
+        "seed" => seed,
         "max_iterations" => max_iterations,
     )
     
@@ -261,63 +274,4 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     end
 
     return result
-end
-
-
-function forward_pass(save_file_path; sample_count=0, integrator_type=rk6, gate_type=xpiby2)
-    (evolution_time, d2controls, dt
-     ) = h5open(save_file_path, "r+") do save_file
-         save_type = SaveType(read(save_file, "save_type"))
-         if save_type == jl
-             d2controls_idx = read(save_file, "d2controls_dt2_idx")
-             acontrols = read(save_file, "acontrols")
-             d2controls = acontrols[:, d2controls_idx]
-             dt = read(save_file, "dt")
-             evolution_time = read(save_file, "evolution_time")
-         elseif save_type == samplejl
-             d2controls = read(save_file, "d2controls_dt2_sample")
-             dt = DT_PREF
-             ets = read(save_file, "evolution_time_sample")
-             evolution_time = Integer(floor(ets / dt)) * dt
-         end
-         return (evolution_time, d2controls, dt)
-     end
-    rdi = IT_RDI[integrator_type]
-    knot_count = Integer(floor(evolution_time / dt))
-
-    if gate_type == xpiby2
-        target_state1 = Array(XPIBY2_ISO_1)
-        target_state2 = Array(XPIBY2_ISO_2)
-    elseif gate_type == ypiby2
-        target_state1 = Array(YPIBY2_ISO_1)
-        target_state2 = Array(YPIBY2_ISO_2)
-    elseif gate_type == zpiby2
-        target_state1 = Array(ZPIBY2_ISO_1)
-        target_state2 = Array(ZPIBY2_ISO_2)
-    end
-    
-    model = Model(sample_count)
-    n = state_dim(model)
-    m = control_dim(model)
-    time = 0.
-    astate = SVector{n}([
-        INITIAL_STATE1;
-        INITIAL_STATE2;
-        zeros(3 * CONTROL_COUNT);
-        repeat([INITIAL_STATE1; INITIAL_STATE2], sample_count);
-    ])
-    acontrols = [SVector{m}([d2controls[i, 1],]) for i = 1:knot_count - 1]
-
-    for i = 1:knot_count - 1
-        astate = RD.discrete_dynamics(rdi, model, astate, acontrols[i], time, dt)
-        time = time + dt
-    end
-
-    res = Dict(
-        "astate" => astate,
-        "target_state1" => target_state1,
-        "target_state2" => target_state2,
-    )
-
-    return res
 end

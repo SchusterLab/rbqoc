@@ -18,20 +18,7 @@ const EXPERIMENT_META = "spin"
 const EXPERIMENT_NAME = "spin15"
 const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
-# Define the optimization.
-const DT_STATIC = DT_PREF
-const DT_STATIC_INV = DT_PREF_INV
-const DT_INIT = 5e-3
-const DT_INIT_INV = 2e2
-const DT_MIN = DT_INIT / 2
-const DT_MAX = DT_INIT * 2
-const CONSTRAINT_TOLERANCE = 1e-8
-const AL_KICKOUT_TOLERANCE = 1e-7
-const PN_STEPS = 2
-const MAX_PENALTY = 1e11
-const ILQR_DJ_TOL = 1e-4
-
-# Define the problem.
+# problem
 const CONTROL_COUNT = 1
 const STATE_COUNT = 2
 const ASTATE_SIZE_BASE = STATE_COUNT * STATE_SIZE_ISO + 3 * CONTROL_COUNT
@@ -49,16 +36,7 @@ const D2CONTROLS_IDX = 1:CONTROL_COUNT
 const DT_IDX = D2CONTROLS_IDX[end] + 1:D2CONTROLS_IDX[end] + 1
 
 
-# Specify logging.
-const VERBOSE = true
-const SAVE = true
-
-
-# Misc. constants
-const EMPTY_V = []
-
-
-# Define the model and dynamics.
+# model
 # DA = decay aware, TO = time optimal
 struct Model{DA, TO} <: AbstractModel
     Model(DA::Bool=true, TO::Bool=true) = new{DA, TO}()
@@ -69,45 +47,43 @@ RobotDynamics.control_dim(::Model{DA, false}) where DA = CONTROL_COUNT
 RobotDynamics.control_dim(::Model{DA, true}) where DA = CONTROL_COUNT + 1
 
 
-# base dynamics
-function RobotDynamics.dynamics(model::Model{DA, TO}, astate::StaticVector,
-                                acontrols::StaticVector, time::Real) where {DA, TO}
+# dynamics
+function RobotDynamics.discrete_dynamics(::Type{RK3}, model::Model{DA, TO}, astate::StaticVector,
+                                         acontrols::StaticVector, time::Real, dt::Real) where {DA, TO}
+    if TO
+        dt = acontrols[DT_IDX][1]^2
+    end
     negi_h = (
         FQ_NEGI_H0_ISO
         + astate[CONTROLS_IDX][1] * NEGI_H1_ISO
     )
-    delta_state1 = negi_h * astate[STATE1_IDX]
-    delta_state2 = negi_h * astate[STATE2_IDX]
-    delta_intcontrol = astate[CONTROLS_IDX]
-    delta_control = astate[DCONTROLS_IDX]
-    delta_dcontrol = acontrols[D2CONTROLS_IDX]
-    dastate = [
-        delta_state1;
-        delta_state2;
-        delta_intcontrol;
-        delta_control;
-        delta_dcontrol;
+    negi_h_prop = exp(dt * negi_h)
+    state1 = negi_h_prop * astate[STATE1_IDX]
+    state2 = negi_h_prop * astate[STATE2_IDX]
+    intcontrols = astate[INTCONTROLS_IDX] + dt * astate[CONTROLS_IDX]
+    controls = astate[CONTROLS_IDX] + dt * astate[DCONTROLS_IDX]
+    dcontrols = astate[DCONTROLS_IDX] + dt * acontrols[D2CONTROLS_IDX]
+    astate_ = [
+        state1; state2; intcontrols; controls; dcontrols;
     ]
+    
     if DA
-        push!(dastate, amp_t1_reduced_spline(astate[CONTROLS_IDX][1])^(-1))
-    end
-    if TO
-        dastate = dastate * acontrols[DT_IDX][1]^2
+        intgamma = astate[INTGAMMA_IDX][1] + dt * amp_t1_reduced_spline(astate[CONTROLS_IDX][1])^(-1)
+        push!(astate_, intgamma)
     end
     
-    return dastate
+    return astate_
 end
 
 
-function run_traj(;evolution_time=20., gate_type=zpiby2,
-                  initial_save_file_path=nothing,
-                  initial_save_type=jl, time_optimal=false,
-                  decay_aware=false,
-                  solver_type=altro, sqrtbp=false,
-                  integrator_type=rk6, max_penalty=MAX_PENALTY,
-                  qs=[1e0, 1e0, 1e0, 1e-1, 5e1, 1e-1, 1e2],
-                  smoke_test=false)
-    # Convert to trajectory optimization language.
+function run_traj(;evolution_time=20., gate_type=zpiby2, time_optimal=false,
+                  decay_aware=false, solver_type=altro, sqrtbp=false,
+                  integrator_type=rk3, qs=ones(7), smoke_test=false,
+                  al_tol=1e-4, constraint_tol=1e-8, max_penalty=1e11,
+                  pn_steps=2, save=true, verbose=true, dt_inv=Int64(1e1))
+    dt = dt_inv^(-1)
+    dt_max = (dt_inv / 2)^(-1)
+    dt_min = (dt_inv * 2)^(-1)
     model = Model(decay_aware, time_optimal)
     n = state_dim(model)
     m = control_dim(model)
@@ -179,54 +155,24 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     # Bound dt.
     u_max = SVector{m}([
         fill(Inf, CONTROL_COUNT);
-        fill(sqrt(DT_MAX), eval(:($time_optimal ? 1 : 0))); #dt
+        fill(sqrt(dt_max), eval(:($time_optimal ? 1 : 0))); #dt
     ])
     u_min = SVector{m}([
         fill(-Inf, CONTROL_COUNT);
-        fill(sqrt(DT_MIN), eval(:($time_optimal ? 1 : 0))); #dt
+        fill(sqrt(dt_min), eval(:($time_optimal ? 1 : 0))); #dt
     ])
 
     # Generate initial trajectory.
-    if time_optimal
-        # Default initial guess w/ optimization over dt.
-        dt = 1
-        N = Int(floor(evolution_time * DT_INIT_INV)) + 1
-        U0 = [SVector{m}([
-            fill(1e-4, CONTROL_COUNT);
-            fill(DT_INIT, 1);
-        ]) for k = 1:N - 1]
-    else
-        if initial_save_file_path == nothing
-            # Default initial guess.
-            dt = DT_STATIC
-            N = Int(floor(evolution_time * DT_STATIC_INV)) + 1
-            U0 = [SVector{m}(
-                fill(1e-4, CONTROL_COUNT)
-            ) for k = 1:N - 1]
-        else
-            # Initial guess pulled from initial_save_file_path.
-            (d2controls_dt2, evolution_time) = h5open(initial_save_file_path, "r") do save_file
-                 if initial_save_type == jl
-                     d2controls_dt2_idx = read(save_file, "d2controls_dt2_idx")
-                     d2controls_dt2 = read(save_file, "acontrols")[:, d2controls_dt2_idx]
-                     evolution_time = read(save_file, "evolution_time")
-                 elseif initial_save_type == samplejl
-                     d2controls_dt2 = read(save_file, "d2controls_dt2_sample")
-                     evolution_time = read(save_file, "evolution_time_sample")
-                 end
-                 return (d2controls_dt2, evolution_time)
-            end
-            # Without variable dts, evolution time will be a multiple of DT_STATIC.
-            evolution_time = Int(floor(evolution_time * DT_STATIC_INV)) * DT_STATIC
-            dt = DT_STATIC
-            N = Int(floor(evolution_time * DT_STATIC_INV)) + 1
-            U0 = [SVector{m}(d2controls_dt2[k, 1]) for k = 1:N-1]
-        end
-    end
+    N = Int(floor(evolution_time * dt_inv)) + 1
+    U0 = [SVector{m}([
+        fill(1e-4, CONTROL_COUNT);
+        fill(sqrt(dt), eval(:($time_optimal ? 1 : 0)));
+    ]) for k = 1:N - 1]
     X0 = [SVector{n}(
         fill(NaN, n)
     ) for k = 1:N]
-    Z = Traj(X0, U0, dt * ones(N))
+    dt_ = time_optimal ? 1 : dt
+    Z = Traj(X0, U0, dt_ * ones(N))
 
     # Define penalties.
     Q = Diagonal(SVector{n}([
@@ -267,33 +213,32 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
 
     # Instantiate problem and solve.
     prob = Problem{IT_RDI[integrator_type]}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
-    opts = SolverOptions(verbose=VERBOSE)
-    if smoke_test
+    opts = SolverOptions(verbose=verbose)
+    if solver_type == alilqr
         solver = AugmentedLagrangianSolver(prob, opts)
         solver.solver_uncon.opts.square_root = sqrtbp
-        solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
-        solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
-        solver.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
+        solver.opts.constraint_tolerance = al_tol
+        solver.opts.constraint_tolerance_intermediate = al_tol
         solver.opts.penalty_max = max_penalty
-        solver.opts.iterations = 1
-        solver.solver_uncon.opts.iterations = 1
-    elseif solver_type == alilqr
-        solver = AugmentedLagrangianSolver(prob, opts)
-        solver.solver_uncon.opts.square_root = sqrtbp
-        solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
-        solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
-        solver.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
-        solver.opts.penalty_max = max_penalty
+        if smoke_test
+            solver.opts.iterations = 1
+            solver.solver_uncon.opts.iterations = 1
+        end
     elseif solver_type == altro
         solver = ALTROSolver(prob, opts)
-        solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
+        solver.opts.constraint_tolerance = constraint_tol
         solver.solver_al.solver_uncon.opts.square_root = sqrtbp
-        solver.solver_al.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
-        solver.solver_al.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
+        solver.solver_al.opts.constraint_tolerance = al_tol
+        solver.solver_al.opts.constraint_tolerance_intermediate = al_tol
         solver.solver_al.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
         solver.solver_al.opts.penalty_max = max_penalty
-        solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
-        solver.solver_pn.opts.n_steps = PN_STEPS
+        solver.solver_pn.opts.constraint_tolerance = constraint_tol
+        solver.solver_pn.opts.n_steps = pn_steps
+        if smoke_test
+            solver.solver_al.opts.iterations = 1
+            solver.solver_al.solver_uncon.opts.iterations = 1
+            solver.solver_pn.opts.n_steps = 1
+        end
     end
     Altro.solve!(solver)
 
@@ -314,12 +259,14 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
     # Square the dts.
     if time_optimal
         acontrols_arr[:, DT_IDX] = acontrols_arr[:, DT_IDX] .^2
+        # acontrols_arr[:, DT_IDX] = map(abs, acontrols_arr[:, DT_IDX])
     end
     cmax = TrajectoryOptimization.max_violation(solver)
     cmax_info = TrajectoryOptimization.findmax_violation(get_constraints(solver))
+    iterations_ = iterations(solver)
     
-    # Save.
-    if SAVE
+    # save
+    if save
         save_file_path = generate_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
         println("Saving this optimization to $(save_file_path)")
         h5open(save_file_path, "cw") do save_file
@@ -338,11 +285,13 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
             write(save_file, "solver_type", Integer(solver_type))
             write(save_file, "sqrtbp", Integer(sqrtbp))
             write(save_file, "max_penalty", max_penalty)
-            write(save_file, "ctol", CONSTRAINT_TOLERANCE)
-            write(save_file, "alko", AL_KICKOUT_TOLERANCE)
-            write(save_file, "ilqr_dj_tol", ILQR_DJ_TOL)
+            write(save_file, "constraint_tol", constraint_tol)
+            write(save_file, "al_tol", al_tol)
             write(save_file, "integrator_type", Integer(integrator_type))
             write(save_file, "gate_type", Integer(gate_type))
+            write(save_file, "save_type", Integer(jl))
+            write(save_file, "iterations", iterations_)
+            write(save_file, "pn_steps", pn_steps)
         end
         if time_optimal
             # Sample the important metrics.
@@ -351,6 +300,8 @@ function run_traj(;evolution_time=20., gate_type=zpiby2,
                 write(save_file, "controls_sample", controls_sample)
                 write(save_file, "d2controls_dt2_sample", d2controls_dt2_sample)
                 write(save_file, "evolution_time_sample", evolution_time_sample)
+                o_delete(save_file, "save_type")
+                write(save_file, "save_type", Integer(samplejl))
             end
         end
     end

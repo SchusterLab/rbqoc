@@ -2,6 +2,9 @@
 spin.jl - common definitions for the spin directory
 """
 
+WDIR = joinpath(@__DIR__, "../../")
+include(joinpath(WDIR, "src", "rbqoc.jl"))
+
 using Dates
 using Dierckx
 using DifferentialEquations
@@ -11,12 +14,10 @@ using HDF5
 using Random
 using StaticArrays
 using Statistics
-
-WDIR = get(ENV, "RBQOC_PATH", "../../")
-include(joinpath(WDIR, "src", "rbqoc.jl"))
+using Zygote
 
 # paths
-const SPIN_OUT_PATH = joinpath(WDIR, "out", "spin")
+const SPIN_OUT_PATH = abspath(joinpath(WDIR, "out", "spin"))
 const FBFQ_DFQ_DATA_FILE_PATH = joinpath(SPIN_OUT_PATH, "figures", "misc", "dfq.h5")
 
 # simulation constants
@@ -29,6 +30,7 @@ const DT_NOISE_INV = 1e1
     zpiby2 = 1
     ypiby2 = 2
     xpiby2 = 3
+    xpi = 4
 end
 
 @enum DynamicsType begin
@@ -49,6 +51,10 @@ end
     zpiby2da = 17
     schroedda = 18
     empty = 19
+    ypiby2da = 20
+    xpiby2corpserwa = 21
+    xpiby2corpse = 22
+    xpicorpse = 23
 end
 
 @enum StateType begin
@@ -69,16 +75,20 @@ const DT_ST = Dict(
     lindbladnodis => st_density,
     lindbladt1 => st_density,
     lindbladt2 => st_density,
-    ypiby2nodis => st_density,
+    ypiby2nodis => st_state,
     ypiby2t1 => st_density,
     xpiby2nodis => st_state,
     xpiby2t1 => st_density,
-    zpiby2nodis => st_density,
+    zpiby2nodis => st_state,
     zpiby2t1 => st_density,
     xpiby2da => st_state,
     xpiby2t2 => st_density,
     zpiby2da => st_state,
     empty => st_state,
+    ypiby2da => st_state,
+    xpiby2corpserwa => st_state,
+    xpiby2corpse => st_state,
+    xpicorpse => st_state,
 )
 
 const GT_STR = Dict(
@@ -87,11 +97,13 @@ const GT_STR = Dict(
     xpiby2 => "X/2",
 )
 
+const HDIM = 2
+const HDIM_ISO = HDIM * 2
 struct SimParams
     controls :: Array{Float64, 2}
     control_knot_count :: Int64
     controls_dt_inv :: Int64
-    negi_h0 :: StaticMatrix
+    negi_h0 :: StaticMatrix{HDIM_ISO, HDIM_ISO}
     noise_offsets :: Array{Float64, 1}
     noise_dt_inv :: Int64
     sim_dt_inv :: Int64
@@ -99,7 +111,6 @@ end
 
 # other constants
 const DEQJL_MAXITERS = 1e10
-const DEQJL_ADAPTIVE = false
 
 
 # Define experimental constants.
@@ -111,6 +122,7 @@ const E_PLASMA = sqrt(8 * EL * EC)
 const PHI_OSC = (8 * EC / EL)^(1//4)
 # qubit frequency at flux frustration point
 const FQ = 1.4e-2 #GHz
+const WQ = 2 * pi * FQ
 const SP1FQ = FQ + FQ * 1e-2
 const SN1FQ = FQ - FQ * 1e-2
 const SP2FQ = FQ + FQ * 2e-2
@@ -160,16 +172,14 @@ const FBFQ_T1_SPLINE_ITP = extrapolate(interpolate(
     (FBFQ_ARRAY,), T1_ARRAY, Gridded(Linear())), Flat())
 const FBFQ_T1_REDUCED_SPLINE_ITP = extrapolate(interpolate(
     (FBFQ_ARRAY,), T1_ARRAY_REDUCED, Gridded(Linear())), Flat())
-# TODO: idk if hdf5 is inter-process safe
-(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS) = h5open(FBFQ_DFQ_DATA_FILE_PATH, "r") do data_file
-    fbfqs = read(data_file, "fbfqs")
-    dfqs = read(data_file, "dfqs")
-    return(fbfqs, dfqs)
-end
-const FBFQ_DFQ_SPLINE_DIERCKX = Spline1D(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS)
-const STATE_SIZE_NOISO = 2
-const STATE_SIZE_ISO = 2 * STATE_SIZE_NOISO
-const ZPIBY2_GATE_TIME = 17.86
+
+# (FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS) = h5open(FBFQ_DFQ_DATA_FILE_PATH, "r") do data_file
+#     fbfqs = read(data_file, "fbfqs")
+#     dfqs = read(data_file, "dfqs")
+#     return(fbfqs, dfqs)
+# end
+# const FBFQ_DFQ_SPLINE_DIERCKX = Spline1D(FBFQ_DFQ_FBFQS, FBFQ_DFQ_DFQS)
+
 
 # Define the system.
 # ISO indicates the object is defined in the complex to real isomorphism.
@@ -179,23 +189,20 @@ const NEGI = SA_F64[0   0  1  0 ;
                     -1  0  0  0 ;
                     0  -1  0  0 ;]
 # SIGMAX, SIGMAZ are the X and Z pauli matrices
-const SIGMAX_ISO = SA_F64[0   1   0   0;
-                          1   0   0   0;
-                          0   0   0   1;
-                          0   0   1   0]
-const SIGMAZ_ISO = SA_F64[1   0   0   0;
-                          0  -1   0   0;
-                          0   0   1   0;
-                          0   0   0  -1]
+const SIGMAX = [0 1;
+                1 0]
+const SIGMAY = [0   -1im;
+                1im 0]
+const SIGMAZ = [1 0;
+                0 -1]
+const SIGMAX_ISO = SMatrix{HDIM_ISO, HDIM_ISO, Int64}(get_mat_iso(SIGMAX))
+const SIGMAY_ISO = SMatrix{HDIM_ISO, HDIM_ISO, Int64}(get_mat_iso(SIGMAY))
+const SIGMAZ_ISO = SMatrix{HDIM_ISO, HDIM_ISO, Int64}(get_mat_iso(SIGMAZ))
 const NEGI_H0_ISO = pi * NEGI * SIGMAZ_ISO
+const NEGI_H0_ISO_BIG = pi * NEGI * SMatrix{HDIM_ISO, HDIM_ISO, BigFloat}(SIGMAZ_ISO)
 const NEGI_H1_ISO = pi * NEGI * SIGMAX_ISO
+const NEGI_H1_ISO_BIG = pi * NEGI * SMatrix{HDIM_ISO, HDIM_ISO, BigFloat}(SIGMAX_ISO)
 const FQ_NEGI_H0_ISO = FQ * NEGI_H0_ISO
-const SP1FQ_NEGI_H0_ISO = SP1FQ * NEGI_H0_ISO
-const SN1FQ_NEGI_H0_ISO = SN1FQ * NEGI_H0_ISO
-const SP2FQ_NEGI_H0_ISO = SP2FQ * NEGI_H0_ISO
-const SN2FQ_NEGI_H0_ISO = SN2FQ * NEGI_H0_ISO
-const SP3FQ_NEGI_H0_ISO = SP3FQ * NEGI_H0_ISO
-const SN3FQ_NEGI_H0_ISO = SN3FQ * NEGI_H0_ISO
 const AYPIBY2_NEGI_H1_ISO = AYPIBY2 * NEGI_H1_ISO
 # relaxation dissipation ops
 # L_{0} = |g> <e|
@@ -230,24 +237,30 @@ const NEG_GAMMAC_DOP_ISO = GAMMAC * NEG_DOP_ISO
 # gates
 const ZPIBY2 = [1-1im 0;
                 0 1+1im] / sqrt(2)
-const ZPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(ZPIBY2))
-const ZPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(ZPIBY2[:,1]))
-const ZPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(ZPIBY2[:,2]))
+const ZPIBY2_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(ZPIBY2))
+const ZPIBY2_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(ZPIBY2[:,1]))
+const ZPIBY2_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(ZPIBY2[:,2]))
 const YPIBY2 = [1 -1;
                 1  1] / sqrt(2)
-const YPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(YPIBY2))
-const YPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(YPIBY2[:,1]))
-const YPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(YPIBY2[:,2]))
+const YPIBY2_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(YPIBY2))
+const YPIBY2_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(YPIBY2[:,1]))
+const YPIBY2_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(YPIBY2[:,2]))
 const XPIBY2 = [1 -1im;
                 -1im 1] / sqrt(2)
-const XPIBY2_ISO = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}(get_mat_iso(XPIBY2))
-const XPIBY2_ISO_1 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPIBY2[:,1]))
-const XPIBY2_ISO_2 = SVector{STATE_SIZE_ISO}(get_vec_iso(XPIBY2[:,2]))
+const XPIBY2_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(XPIBY2))
+const XPIBY2_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(XPIBY2[:,1]))
+const XPIBY2_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(XPIBY2[:,2]))
+const XPI = [0 -1im;
+             -1im 0]
+const XPI_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(XPI))
+const XPI_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(XPI[:,1]))
+const XPI_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(XPI[:,2]))
 
 const GT_GATE = Dict(
     xpiby2 => XPIBY2_ISO,
     ypiby2 => YPIBY2_ISO,
     zpiby2 => ZPIBY2_ISO,
+    xpi => XPI_ISO,
 )
 
 
@@ -280,14 +293,6 @@ flux quantum. Reflects over the flux frustration point.
 
 
 """
-amp_dfq - Compute the derivative of the qubit frequency
-with respect to the flux by flux quantum from the flux drive
-amplitude.
-"""
-@inline amp_dfq(amplitude) = FBFQ_DFQ_SPLINE_DIERCKX(amp_fbfq(amplitude))
-
-
-"""
 amp_t1_poly - Compute the t1 time for the given amplitude in units
 of nanoseconds.
 
@@ -311,6 +316,14 @@ amplitude :: Array(N) - amplitude in units of GHz (no 2 pi)
 
 
 @inline amp_t1_spline_cubic(amplitude) = FBFQ_T1_SPLINE_DIERCKX(amp_fbfq_lo(amplitude))
+
+
+"""
+amp_dfq - Compute the derivative of the qubit frequency
+with respect to the flux by flux quantum from the flux drive
+amplitude.
+"""
+# amp_dfq(amplitude) = FBFQ_DFQ_SPLINE_DIERCKX(amp_fbfq(amplitude))
 
 
 """
@@ -362,7 +375,7 @@ const maxh1 = MAX_CONTROL_NORM_0 * NEGI_H1_ISO
 
 
 function dynamics_lindbladnodis_deqjl(state::StaticMatrix, params::SimParams, time::Float64)
-    knot_point = (Int(floor(time * dt_inv)) % control_knot_count) + 1
+    knot_point = (Int(floor(time * params.dt_inv)) % params.control_knot_count) + 1
     negi_h = (
         params.negi_h0
         + controls[knot_point][1] * NEGI_H1_ISO
@@ -395,7 +408,8 @@ function dynamics_lindbladt2_deqjl(state, (controls, control_knot_count, dt_inv,
         FQ_NEGI_H0_ISO
         + controls[knot_point][1] * NEGI_H1_ISO
     )
-    gammaf = GAMMAF_PREFACTOR * abs(amp_dfq(controls[knot_point][1]))
+    # gammaf = GAMMAF_PREFACTOR * abs(amp_dfq(controls[knot_point][1]))
+    gammaf = GAMMAF_PREFACTOR
     return (
         negi_h * state - state * negi_h
         + (GAMMAC + 2 * gammaf^2 * t) * NEG_DOP_ISO .* state
@@ -405,19 +419,15 @@ end
 
 const TTOT_ZPIBY2 = 17.857142857142858
 const GAMMA_ZPIBY2 = amp_t1_spline(0)^(-1)
-@inline dynamics_zpiby2nodis_deqjl(
-    density, (_, _, _, negi_h0, _), _,
-) = (
-    negi_h0 * density - density * negi_h0
+@inline dynamics_zpiby2nodis_deqjl(state::StaticVector, params::SimParams, time::Float64) = (
+    FQ_NEGI_H0_ISO * state
 )
 
 
-@inline dynamics_zpiby2t1_deqjl(
-    density, (_, _, _, _, _), _,
-) = (
+@inline dynamics_zpiby2t1_deqjl(density::StaticMatrix, params::SimParams, time::Float64) = (
     FQ_NEGI_H0_ISO * density - density * FQ_NEGI_H0_ISO
     + GAMMA_ZPIBY2 * (G_E * density * E_G + NEG_E_E_BY2 * density + density * NEG_E_E_BY2
-                + E_G * density * G_E + NEG_G_G_BY2 * density + density * NEG_G_G_BY2)    
+                      + E_G * density * G_E + NEG_G_G_BY2 * density + density * NEG_G_G_BY2)    
 )
 
 
@@ -440,31 +450,31 @@ const T2_YPIBY2 = T1_YPIBY2 + TZ_YPIBY2
 # t1 noise
 const GAMMA11_YPIBY2 = amp_t1_spline(AYPIBY2)^(-1)
 const GAMMA12_YPIBY2 = amp_t1_spline(0)^(-1)
-function dynamics_ypiby2nodis_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0, namp_dist), t)
-    t = t - Int(floor(t / TTOT_YPIBY2)) * TTOT_YPIBY2
-    if t <= T1_YPIBY2
-        negi_h = negi_h0 + H11_YPIBY2
-    elseif t <= T2_YPIBY2
-        negi_h = negi_h0
+function dynamics_ypiby2nodis_deqjl(state::StaticVector, params::SimParams, time::Float64)
+    time = rem(time, TTOT_YPIBY2)
+    if time <= T1_YPIBY2
+        negi_h = FQ_NEGI_H0_ISO + H11_YPIBY2
+    elseif time <= T2_YPIBY2
+        negi_h = FQ_NEGI_H0_ISO
     else
-        negi_h = negi_h0 + H13_YPIBY2
+        negi_h = FQ_NEGI_H0_ISO + H13_YPIBY2
     end
     return(
-        negi_h * density - density * negi_h
+        negi_h * state
     )
 end
 
 
-function dynamics_ypiby2t1_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0, namp_dist), t)
-    t = t - Int(floor(t / TTOT_YPIBY2)) * TTOT_YPIBY2
-    if t <= T1_YPIBY2
-        negi_h = negi_h0 + H11_YPIBY2
+function dynamics_ypiby2t1_deqjl(density::StaticMatrix, params::SimParams, time::Float64)
+    time = rem(time, TTOT_YPIBY2)
+    if time <= T1_YPIBY2
+        negi_h = FQ_NEGI_H0_ISO + H11_YPIBY2
         gamma1 = GAMMA11_YPIBY2
-    elseif t <= T2_YPIBY2
-        negi_h = negi_h0
+    elseif time <= T2_YPIBY2
+        negi_h = FQ_NEGI_H0_ISO
         gamma1 = GAMMA12_YPIBY2
     else
-        negi_h = negi_h0 + H13_YPIBY2
+        negi_h = FQ_NEGI_H0_ISO + H13_YPIBY2
         gamma1 = GAMMA11_YPIBY2
     end
     return(
@@ -475,7 +485,6 @@ function dynamics_ypiby2t1_deqjl(density, (controls, control_knot_count, dt_inv,
 end
 
 
-const TTOT_ZPIBY2 = 17.857142857142858
 const TTOT_XPIBY2 = 4 * TX_YPIBY2 + 2 * TZ_YPIBY2 + TTOT_ZPIBY2
 const T1_XPIBY2 = TX_YPIBY2
 const T2_XPIBY2 = T1_YPIBY2 + TZ_YPIBY2
@@ -486,19 +495,19 @@ const T6_XPIBY2 = T5_XPIBY2 + TZ_YPIBY2
 function dynamics_xpiby2nodis_deqjl(state::StaticVector, params::SimParams, time::Float64)
     time = rem(time, TTOT_XPIBY2)
     if time <= T1_XPIBY2
-        negi_h = params.negi_h0 + H11_YPIBY2
+        negi_h = params.negi_h0 + H13_YPIBY2
     elseif time <= T2_XPIBY2
         negi_h = params.negi_h0
     elseif time <= T3_XPIBY2
-        negi_h = params.negi_h0 + H13_YPIBY2
+        negi_h = params.negi_h0 + H11_YPIBY2
     elseif time <= T4_XPIBY2
         negi_h = params.negi_h0
     elseif time <= T5_XPIBY2
-        negi_h = params.negi_h0 + H13_YPIBY2
+        negi_h = params.negi_h0 + H11_YPIBY2
     elseif time <= T6_XPIBY2
         negi_h = params.negi_h0
     else
-        negi_h = params.negi_h0 + H11_YPIBY2
+        negi_h = params.negi_h0 + H13_YPIBY2
     end
     return(
         negi_h * state
@@ -509,28 +518,28 @@ end
 """
 t1 dissipation via lindblad
 """
-function dynamics_xpiby2t1_deqjl(density, (controls, control_knot_count, dt_inv, negi_h0, namp_dist), t)
-    t = t - Int(floor(t / TTOT_XPIBY2)) * TTOT_XPIBY2
-    if t <= T1_XPIBY2
-        negi_h = negi_h0 + H11_YPIBY2
+function dynamics_xpiby2t1_deqjl(density::StaticMatrix, params::SimParams, time::Float64)
+    time = rem(time, TTOT_XPIBY2)
+    if time <= T1_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO + H13_YPIBY2
         gamma1 = GAMMA11_YPIBY2
-    elseif t <= T2_XPIBY2
-        negi_h = negi_h0
+    elseif time <= T2_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO
         gamma1 = GAMMA12_YPIBY2
-    elseif t <= T3_XPIBY2
-        negi_h = negi_h0 + H13_YPIBY2
+    elseif time <= T3_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO + H11_YPIBY2
         gamma1 = GAMMA11_YPIBY2
-    elseif t <= T4_XPIBY2
-        negi_h = negi_h0
+    elseif time <= T4_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO
         gamma1 = GAMMA12_YPIBY2
-    elseif t <= T5_XPIBY2
-        negi_h = negi_h0 + H13_YPIBY2
+    elseif time <= T5_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO + H11_YPIBY2
         gamma1 = GAMMA11_YPIBY2
-    elseif t <= T6_XPIBY2
-        negi_h = negi_h0
+    elseif time <= T6_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO
         gamma1 = GAMMA12_YPIBY2
     else
-        negi_h = negi_h0 + H11_YPIBY2
+        negi_h = FQ_NEGI_H0_ISO + H13_YPIBY2
         gamma1 = GAMMA11_YPIBY2
     end
     return(
@@ -541,29 +550,105 @@ function dynamics_xpiby2t1_deqjl(density, (controls, control_knot_count, dt_inv,
 end
 
 
+function dynamics_ypiby2da_deqjl(state::StaticVector, params::SimParams, time::Float64)
+    time = rem(time, TTOT_YPIBY2)
+    noise_knot_point = Int(floor(time * params.noise_dt_inv)) + 1
+    delta_a = params.noise_offsets[noise_knot_point]
+    time = rem(time, TTOT_YPIBY2)
+    if time <= T1_YPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (AYPIBY2 + delta_a) * NEGI_H1_ISO
+    elseif time <= T2_YPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (delta_a) * NEGI_H1_ISO
+    else
+        negi_h = FQ_NEGI_H0_ISO + (-AYPIBY2 + delta_a) * NEGI_H1_ISO
+    end
+    return(
+        negi_h * state
+    )
+end
+
+
 """
 flux noise via amplitude fluctuation
 """
-function dynamics_xpiby2da_deqjl(state :: StaticVector, params :: SimParams, time :: Float64)
-    controls_time = time - Int(floor(time / TTOT_XPIBY2)) * TTOT_XPIBY2
+function dynamics_xpiby2da_deqjl(state::StaticVector, params::SimParams, time::Float64)
+    time = rem(time, TTOT_XPIBY2)
     noise_knot_point = Int(floor(time * params.noise_dt_inv)) + 1
     delta_a = params.noise_offsets[noise_knot_point]
-    if controls_time <= T1_XPIBY2
+    if time <= T1_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (-AYPIBY2 + delta_a) * NEGI_H1_ISO
+    elseif time <= T2_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (delta_a) * NEGI_H1_ISO
+    elseif time <= T3_XPIBY2
         negi_h = FQ_NEGI_H0_ISO + (AYPIBY2 + delta_a) * NEGI_H1_ISO
-    elseif controls_time <= T2_XPIBY2
+    elseif time <= T4_XPIBY2
         negi_h = FQ_NEGI_H0_ISO + (delta_a) * NEGI_H1_ISO
-    elseif controls_time <= T3_XPIBY2
-        negi_h = FQ_NEGI_H0_ISO + (-AYPIBY2 + delta_a) * NEGI_H1_ISO
-    elseif controls_time <= T4_XPIBY2
-        negi_h = FQ_NEGI_H0_ISO + (delta_a) * NEGI_H1_ISO
-    elseif controls_time <= T5_XPIBY2
-        negi_h = FQ_NEGI_H0_ISO + (-AYPIBY2 + delta_a) * NEGI_H1_ISO
-    elseif controls_time <= T6_XPIBY2
+    elseif time <= T5_XPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (AYPIBY2 + delta_a) * NEGI_H1_ISO
+    elseif time <= T6_XPIBY2
         negi_h = FQ_NEGI_H0_ISO + (delta_a) * NEGI_H1_ISO
     else
-        negi_h = FQ_NEGI_H0_ISO + (AYPIBY2 + delta_a) * NEGI_H1_ISO
+        negi_h = FQ_NEGI_H0_ISO + (-AYPIBY2 + delta_a) * NEGI_H1_ISO
     end
     return(
+        negi_h * state
+    )
+end
+
+
+const TTOT_XPIBY2C = 56.8
+const A_XPIBY2C = 0.03556243915206662
+const ARWA_XPIBY2C = 2 * A_XPIBY2C
+const T1_XPIBY2C = 30.017250262129778
+const T2_XPIBY2C = T1_XPIBY2C + 24.8850554973045
+const H11_XPIBY2C = A_XPIBY2C * NEGI_H1_ISO
+const H12_XPIBY2C = -A_XPIBY2C * NEGI_H1_ISO
+function dynamics_xpiby2corpse_deqjl(state::StaticVector, params::SimParams, time::Float64)
+    time_ = rem(time, TTOT_XPIBY2C)
+    if time_ <= T1_XPIBY2C
+        negi_h = params.negi_h0 + H11_XPIBY2C
+    elseif time_ <= T2_XPIBY2C
+        negi_h = params.negi_h0 + H12_XPIBY2C
+    else
+        negi_h = params.negi_h0 + H11_XPIBY2C
+    end
+    return (
+        negi_h * state
+    )
+end
+
+
+function dynamics_xpiby2corpserwa_deqjl(state::StaticVector, params::SimParams, time::Float64)
+    time_ = rem(time, TTOT_XPIBY2C)
+    if time_ <= T1_XPIBY2C
+        negi_h = params.negi_h0 + (ARWA_XPIBY2C * cos(WQ * time)) * NEGI_H1_ISO
+    elseif time_ <= T2_XPIBY2C
+        negi_h = params.negi_h0 + (-ARWA_XPIBY2C * cos(WQ * time)) * NEGI_H1_ISO
+    else
+        negi_h = params.negi_h0 + (ARWA_XPIBY2C * cos(WQ * time)) * NEGI_H1_ISO
+    end
+    return (
+        negi_h * state
+    )
+end
+
+
+const TTOT_XPIC = 10
+const A_XPIC = 13//60
+const T1_XPIC = 420//78
+const T2_XPIC = 720//78
+const H11_XPIC = A_XPIC * NEGI_H1_ISO_BIG
+const H12_XPIC = -A_XPIC * NEGI_H1_ISO_BIG
+function dynamics_xpicorpse_deqjl(state::StaticVector, params::SimParams, time)
+    time_ = rem(time, TTOT_XPIC)
+    if time_ <= T1_XPIC
+        negi_h = H11_XPIC # params.negi_h0 + H11_XPIC
+    elseif time_ <= T2_XPIC
+        negi_h = H12_XPIC # params.negi_h0 + 
+    else
+        negi_h = H11_XPIC # params.negi_h0 + 
+    end
+    return (
         negi_h * state
     )
 end
@@ -585,6 +670,10 @@ const DT_DYN = Dict(
     xpiby2da => dynamics_xpiby2da_deqjl,
     zpiby2da => dynamics_zpiby2da_deqjl,
     empty => dynamics_empty_deqjl,
+    ypiby2da => dynamics_ypiby2da_deqjl,
+    xpiby2corpserwa => dynamics_xpiby2corpserwa_deqjl,
+    xpiby2corpse => dynamics_xpiby2corpse_deqjl,
+    xpicorpse => dynamics_xpicorpse_deqjl,
 )
 
 
@@ -599,6 +688,10 @@ const DT_GTM = Dict(
     xpiby2t1 => TTOT_XPIBY2,
     xpiby2da => TTOT_XPIBY2,
     empty => 160.,
+    ypiby2da => TTOT_YPIBY2,
+    xpiby2corpserwa => TTOT_XPIBY2C,
+    xpiby2corpse => TTOT_XPIBY2C,
+    xpicorpse => TTOT_XPIC,
 )
 
 
@@ -612,12 +705,67 @@ const DT_EN = Dict(
     xpiby2nodis => "spin14",
     xpiby2t1 => "spin14",
     xpiby2da => "spin14",
+    ypiby2da => "spin14",
+    xpiby2corpserwa => "spin14",
+    xpiby2corpse => "spin14",
+    xpicorpse => "spin14",
 )
 
 
+# cost functions
 @inline fidelity_vec_iso2(s1, s2) = (
     (s1's2)^2 + (s1[1] * s2[3] + s1[2] * s2[4] - s1[3] * s2[1] - s1[4] * s2[2])^2
 )
+
+
+@inline gate_error_iso2a(s1::SVector, s2::SVector{HDIM_ISO}, s1o::Int64) = (
+    s1[1 + s1o] * s2[1] + s1[2 + s1o] * s2[2] + s1[3 + s1o] * s2[3] + s1[4 + s1o] * s2[4]
+)
+
+
+@inline gate_error_iso2b(s1::SVector, s2::SVector{HDIM_ISO}, s1o::Int64) = (
+    -s1[3 + s1o] * s2[1] - s1[4 + s1o] * s2[2] + s1[1 + s1o] * s2[3] + s1[2 + s1o] * s2[4]
+)
+
+
+@inline gate_error_iso2(s1::SVector, s2::SVector{HDIM_ISO}, s1o::Int64=0) = (
+    1 - gate_error_iso2a(s1, s2, s1o)^2 - gate_error_iso2b(s1, s2, s1o)^2
+)
+
+
+function jacobian_gate_error_iso2(s1::SVector, s2::SVector{HDIM_ISO},
+                                  s1o::Int64=0) :: SVector{HDIM_ISO}
+    a = 2 * gate_error_iso2a(s1, s2, s1o)
+    b = 2 * gate_error_iso2b(s1, s2, s1o)
+    jac = @SVector [
+        -a * s2[1] - b * s2[3],
+        -a * s2[2] - b * s2[4],
+        -a * s2[3] + b * s2[1],
+        -a * s2[4] + b * s2[2],
+    ]
+    return jac
+end
+
+
+function hessian_gate_error_iso2(s2::SVector{HDIM_ISO}) :: SMatrix{4, 4}
+    d11 = -2 * s2[1]^2 - 2 * s2[3]^2
+    d12 = -2 * s2[1] * s2[2] -2 * s2[3] * s2[4]
+    d13 = 0
+    d14 = 2 * s2[2] * s2[3] - 2 * s2[1] * s2[4]
+    d22 = -2 * s2[2]^2 - 2 * s2[4]^2
+    d23 = -2 * s2[2] * s2[3] + 2 * s2[1] * s2[4]
+    d24 = 0
+    d33 = -2 * s2[1]^2 - 2 * s2[3]^2
+    d34 = -2 * s2[1] * s2[2] - 2 * s2[3] * s2[4]
+    d44 = -2 * s2[2]^2 - 2 * s2[4]^2
+    hes = @SMatrix [
+        d11 d12 d13 d14;
+        d12 d22 d23 d24;
+        d13 d23 d33 d34;
+        d14 d24 d34 d44;
+    ]
+    return hes
+end
 
 
 """
@@ -644,10 +792,10 @@ function gen_rand_state_iso(;seed=0)
         state = [1, 1] / sqrt(2)
     else
         Random.seed!(seed)
-        state = rand(STATE_SIZE_NOISO) + 1im * rand(STATE_SIZE_NOISO)
-        state = state / sqrt(Real(state'state))
+        state = rand(HDIM) + 1im * rand(HDIM)
+        state = state / sqrt(real(state'state))
     end
-    return SVector{STATE_SIZE_ISO}(
+    return SVector{HDIM_ISO, BigFloat}(
         [real(state); imag(state)]
     )
 end
@@ -658,13 +806,13 @@ function gen_rand_density_iso(;seed=0)
         state = [1, 1] / sqrt(2)
     else
         Random.seed!(seed)
-        state = rand(STATE_SIZE_NOISO) + 1im * rand(STATE_SIZE_NOISO)
-        state = state / sqrt(Real(state'state))
+        state = rand(HDIM) + 1im * rand(HDIM)
+        state = state / sqrt(real(state'state))
     end
     density = state * state'
     density_r = real(density)
     density_i = imag(density)
-    density_iso = SMatrix{STATE_SIZE_ISO, STATE_SIZE_ISO}([
+    density_iso = SMatrix{HDIM_ISO, HDIM_ISO, BigFloat}([
         density_r -density_i;
         density_i density_r;
     ])
@@ -676,7 +824,8 @@ end
 Generate the modulus of the noise with the rough
 spectral density Sxx(f) = |x̂(f)|^2 = 1 / |f|
 """
-function pink_noise_from_white(count, dt_inv, ndist; seed=0, plot=false)
+function pink_noise_from_white(count, dt_inv, ndist; seed=0, plot=false,
+                               plot_step_size=100)
     Random.seed!(seed)
     freqs = fftfreq(count, dt_inv)
     pink_noise_ = Array{Complex{Float64}, 1}(rand(ndist, count))
@@ -692,16 +841,16 @@ function pink_noise_from_white(count, dt_inv, ndist; seed=0, plot=false)
     pink_noise_[1] = dt_inv / count
     # transform to time domain
     ifft!(pink_noise_)
-    # take modulus, normalize to count
+    # take real part, normalize to count
     for i = 1:length(pink_noise_)
-        pink_noise_[i] = abs(pink_noise_[i]) * count
+        pink_noise_[i] = real(pink_noise_[i]) * count
     end
     pink_noise_ = Array{Float64, 1}(pink_noise_)
 
     if plot
         plot_file_path = generate_file_path("png", "figures", joinpath(SPIN_OUT_PATH, "figures"))
-        taxis = Array(0:1:size(pink_noise_)[1] - 1) / dt_inv
-        fig = Plots.plot(taxis, pink_noise_, dpi=DPI)
+        taxis = Array(0:plot_step_size:size(pink_noise_)[1] - 1) / dt_inv
+        fig = Plots.plot(taxis, pink_noise_[1:plot_step_size:size(pink_noise_)[1]], dpi=DPI)
         Plots.savefig(fig, plot_file_path)
         println("Plotted noise to $(plot_file_path)")
     end
@@ -726,9 +875,9 @@ function pink_noise_from_spectrum(count, dt_inv)
     pink_noise_[1] = dt_inv
     # transform to time domain
     ifft!(pink_noise_)
-    # take modulus, normalize by count
+    # take real part, normalize by count
     for i = 1:length(pink_noise_)
-        pink_noise_[i] = abs(pink_noise_[i]) / count
+        pink_noise_[i] = real(pink_noise_[i]) / count
     end
     pink_noise_ = Array{Float64, 1}(pink_noise_)
 
@@ -737,70 +886,23 @@ end
 
 
 """
-run_sim_deqjl - Apply a gate multiple times and measure the fidelity
-after each application. Save the output.
-
-Arguments:
-save_file_path :: String - The file path to grab the controls from
+compute_fidelities
 """
-function run_sim_deqjl(
-    gate_count, gate_type;
-    save_file_path=nothing,
-    adaptive=DEQJL_ADAPTIVE, dynamics_type=schroed,
-    dt=DT_PREF, save=true, save_type=jl, seed=0,
-    solver=DifferentialEquations.Vern9, print_seq=false, print_final=false,
-    negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
-    noise_dt_inv=DT_NOISE_INV, seed_state=true,)
-    start_time = Dates.now()
-    # grab
-    if isnothing(save_file_path)
-        controls = Array{Float64, 2}([0 0])
-        controls_dt_inv = 0
-        control_knot_count = 0
-        gate_time = DT_GTM[dynamics_type]
-    else
-        (controls, controls_dt_inv, gate_time) = grab_controls(save_file_path; save_type=save_type)
-        control_knot_count = Int(floor(gate_time * controls_dt_inv))
-    end
-    dt_inv = dt^(-1)
-    save_times = Array(0:1:gate_count) * gate_time
-    evolution_time = gate_time * gate_count
-    knot_count = Int(ceil(evolution_time * dt_inv))
-
-    # get noise offsets
-    noise_knot_count = Int(ceil(evolution_time * noise_dt_inv)) + 1
-    noise_offsets = (namp) * pink_noise_from_white(noise_knot_count, noise_dt_inv, ndist; seed=seed)
-    
-    # integrate
-    dynamics = DT_DYN[dynamics_type]
-    state_type = DT_ST[dynamics_type]
-    state_seed = seed_state ? seed : 0
-    if state_type == st_state
-        initial_state = gen_rand_state_iso(;seed=state_seed)
-    elseif state_type == st_density
-        initial_state =  gen_rand_density_iso(;seed=state_seed)
-    end
-    tspan = (0., evolution_time)
-    params = SimParams(controls, control_knot_count, controls_dt_inv, negi_h0,
-                       noise_offsets, noise_dt_inv, dt_inv)
-    prob = ODEProblem(dynamics, initial_state, tspan, params)
-    result = solve(prob, solver(), dt=dt, saveat=save_times,
-                   maxiters=DEQJL_MAXITERS, adaptive=adaptive)
-
+function compute_fidelities(gate_count, gate_type, states)
     # Compute the fidelities.
     # All of the gates we consider are 4-cyclic up to phase.
-    fidelities = zeros(gate_count + 1)
+    state_type = length(size(states)) == 2 ? st_state : st_density
+    initial_state = state_type == st_state ? states[1, :] : states[1, :, :]
+    fidelities = zeros(BigFloat, gate_count + 1)
     g1 = GT_GATE[gate_type]
     g2 = g1^2
     g3 = g1^3
     id0 = initial_state
     if state_type == st_state
-        states_ = zeros(gate_count + 1, STATE_SIZE_ISO)
         id1 = g1 * id0
         id2 = g2 * id0
         id3 = g3 * id0
     elseif state_type == st_density
-        states_ = zeros(gate_count + 1, STATE_SIZE_ISO, STATE_SIZE_ISO)
         id1 = g1 * id0 * g1'
         id2 = g2 * id0 * g2'
         id3 = g3 * id0 * g3'
@@ -819,147 +921,132 @@ function run_sim_deqjl(
             target = id3
         end
         if state_type == st_state
-            states_[i, :] = state = result.u[i]
-            fidelities[i] = fidelity_vec_iso2(state, target)
+            fidelities[i] = fidelity_vec_iso2(states[i, :], target)
         elseif state_type == st_density
-            states_[i, :, :] = state = result.u[i]
-            fidelities[i] = abs(fidelity_mat_iso(state, target))
+            fidelities[i] = fidelity_mat_iso(states[i, :, :], target)
         end
+    end
 
-        if print_seq || (print_final && i == gate_count + 1)
-            println("fidelities[$(i)]\n$(fidelities[i])")
-            println("state")
-            show_nice(state)
-            println("")
-            println("target")
-            show_nice(target)
-            println("")
-        end
-    end
-    end_time = Dates.now()
-    run_time = end_time - start_time
-
-    # Save the data.
-    experiment_name = save_path = nothing
-    if isnothing(save_file_path)
-        experiment_name = DT_EN[dynamics_type]
-        save_path = joinpath(SPIN_OUT_PATH, experiment_name)
-    else
-        experiment_name = split(save_file_path, "/")[end - 1]
-        save_path = dirname(save_file_path)
-    end
-    data_file_path = nothing
-    if save
-        data_file_path = generate_file_path("h5", experiment_name, save_path)
-        h5open(data_file_path, "w") do data_file
-            write(data_file, "dynamics_type", Integer(dynamics_type))
-            write(data_file, "gate_count", gate_count)
-            write(data_file, "gate_time", gate_time)
-            write(data_file, "gate_type", Integer(gate_type))
-            write(data_file, "save_file_path", isnothing(save_file_path) ? "" : save_file_path)
-            write(data_file, "seed", seed)
-            write(data_file, "states", states_)
-            write(data_file, "fidelities", fidelities)
-            write(data_file, "run_time", string(run_time))
-            write(data_file, "dt", dt)
-            write(data_file, "negi_h0", Array(negi_h0))
-            write(data_file, "namp", namp)
-            write(data_file, "ndist", string(ndist))
-            write(data_file, "noise_dt_inv", noise_dt_inv)
-        end
-        println("Saved simulation to $(data_file_path)")
-    end
-    return data_file_path
+    return fidelities
 end
 
 
 """
-1 gate, many h0s
+run_sim_deqjl - Apply a gate multiple times and measure the fidelity
+after each application. Save the output.
+
+Arguments:
+save_file_path :: String - The file path to grab the controls from
+
+Returns:
+result :: Union{String, Dict} - string to save file path if save is true,
+otherwise returns a dictionary of the result
 """
-function run_sim_h0sweep_deqjl(
-    gate_type, negi_h0s;
+function run_sim_deqjl(
+    gate_count, gate_type;
     save_file_path=nothing,
-    adaptive=DEQJL_ADAPTIVE, dynamics_type=schroed,
-    dt=DT_PREF, save=true, save_type=jl, seed=0,
-    solver=DifferentialEquations.Vern9, print_seq=false)
+    adaptive=true, dynamics_type=schroed,
+    dt_inv=DT_PREF_INV, save=true, seed=0,
+    solver=DifferentialEquations.Vern9, print_seq=false, print_final=false,
+    negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
+    noise_dt_inv=DT_NOISE_INV, state_seed=nothing, reltol=1e-12, abstol=1e-12)
+    dt = BigFloat(dt_inv^(-1))
     start_time = Dates.now()
+    if isnothing(state_seed)
+        state_seed = seed
+    end
     # grab
+    analytic = false
     if isnothing(save_file_path)
         controls = Array{Float64, 2}([0 0])
+        controls_dt_inv = 0
         control_knot_count = 0
         gate_time = DT_GTM[dynamics_type]
+        analytic = true
     else
-        (controls, controls_dt_inv, gate_time) = grab_controls(save_file_path; save_type=save_type)
+        (controls, controls_dt_inv, gate_time) = grab_controls(save_file_path)
         control_knot_count = Int(floor(gate_time * controls_dt_inv))
     end
-    dt_inv = 1 / dt
-    knot_count = Int(ceil(gate_time * dt_inv))
-    save_times = [0., gate_time]
+    save_times = Array(0:1:gate_count) * gate_time
+    evolution_time = gate_time * gate_count
+    knot_count = Int(ceil(evolution_time * dt_inv))
 
-    # set up integration
+    # get noise offsets
+    noise_knot_count = Int(ceil(evolution_time * noise_dt_inv)) + 1
+    noise_offsets = (namp) * pink_noise_from_white(noise_knot_count, noise_dt_inv, ndist; seed=seed)
+    
+    # integrate
     dynamics = DT_DYN[dynamics_type]
     state_type = DT_ST[dynamics_type]
     if state_type == st_state
-        initial_state = gen_rand_state_iso(;seed=seed)
+        initial_state = gen_rand_state_iso(;seed=state_seed)
     elseif state_type == st_density
-        initial_state =  gen_rand_density_iso(;seed=seed)
+        initial_state =  gen_rand_density_iso(;seed=state_seed)
     end
-    tspan = (0., gate_time)
-
-    # integrate and compute fidelity
-    sample_count = size(negi_h0s)[1]
-    fidelities = zeros(sample_count)
-    gate = GT_GATE[gate_type]
+    tspan = (0., evolution_time)
+    params = SimParams(controls, control_knot_count, controls_dt_inv, negi_h0,
+                       noise_offsets, noise_dt_inv, dt_inv)
+    prob = ODEProblem(dynamics, initial_state, tspan, params)
+    result_deqjl = solve(prob, solver(), dt=dt, saveat=save_times,
+                         maxiters=DEQJL_MAXITERS, adaptive=adaptive,
+                         reltol=reltol, abstol=abstol)
+    
     if state_type == st_state
-        target_state = gate * initial_state
-    elseif state_type == st_density
-        target_state = gate * initial_state * gate'
-    end
-    for i = 1:sample_count
-        params = SimParams(controls, control_knot_count, controls_dt_inv, negi_h0s[i],
-                           [0.], 0., dt_inv)
-        prob = ODEProblem(dynamics, initial_state, tspan, params)
-        result = solve(prob, solver(), dt=dt, saveat=save_times,
-                       maxiters=DEQJL_MAXITERS, adaptive=adaptive)
-        final_state = result.u[end]
-        if state_type == st_state
-            fidelities[i] = fidelity_vec_iso2(final_state, target_state)
-        elseif state_type == st_density
-            fidelities[i] = fidelity_mat_iso(final_state, target_state)
+        states = zeros(gate_count + 1, HDIM_ISO)
+        states[1, :] = initial_state
+        for i = 2:gate_count + 1
+            states[i, :] = Array(result_deqjl.u[i])
         end
-        if print_seq
-            println("fidelities[$(i)] = $(fidelities[i])")
+    else
+        states = zeros(gate_count + 1, HDIM_ISO, HDIM_ISO)
+        states[1, :, :] = initial_state
+        for i = 2:gate_count + 1
+            states[i, :, :] = Array(result.u[i])
         end
     end
+    fidelities = compute_fidelities(gate_count, gate_type, states)
     end_time = Dates.now()
     run_time = end_time - start_time
-    
-    # save
-    experiment_name = save_path = nothing
-    if isnothing(save_file_path)
-        experiment_name = DT_EN[dynamics_type]
-        save_path = joinpath(SPIN_OUT_PATH, experiment_name)
-    else
-        experiment_name = split(save_file_path, "/")[end - 1]
-        save_path = dirname(save_file_path)
-    end
-    data_file_path = nothing
-    if save
-        data_file_path = generate_file_path("h5", experiment_name, save_path)
-        h5open(data_file_path, "cw") do data_file
-            write(data_file, "dynamics_type", Integer(dynamics_type))
-            write(data_file, "gate_time", gate_time)
-            write(data_file, "gate_type", Integer(gate_type))
-            write(data_file, "save_file_path", isnothing(save_file_path) ? "" : save_file_path)
-            write(data_file, "seed", seed)
-            write(data_file, "fidelities", fidelities)
-            write(data_file, "run_time", string(run_time))
-            write(data_file, "dt", dt)
-        end
-        println("Saved run_sim_h0sweep_deqjl to $(data_file_path)")
-    end
 
-    return data_file_path
+    # Generate the result.
+    result = Dict(
+        "dynamics_type" => Integer(dynamics_type),
+        "gate_count" => gate_count,
+        "gate_time" => gate_time,
+        "gate_type" => Integer(gate_type),
+        "save_file_path" => isnothing(save_file_path) ? "" : save_file_path,
+        "seed" => seed,
+        "states" => states,
+        "fidelities" => fidelities,
+        "run_time" => string(run_time),
+        "dt" => dt,
+        "negi_h0" => Array(negi_h0),
+        "namp" => namp,
+        "ndist" => string(ndist),
+        "noise_dt_inv" => noise_dt_inv,
+    )
+    
+    # Save the data.
+    if save
+        experiment_name = save_path = nothing
+        if isnothing(save_file_path)
+            experiment_name = DT_EN[dynamics_type]
+            save_path = joinpath(SPIN_OUT_PATH, experiment_name)
+        else
+            experiment_name = split(save_file_path, "/")[end - 1]
+            save_path = dirname(save_file_path)
+        end
+        data_file_path = generate_file_path("h5", experiment_name, save_path)
+        h5open(data_file_path, "w") do data_file
+            for key in keys(result)
+                write(data_file, key, result[key])
+            end
+        end
+        result["data_file_path"] = data_file_path
+        println("Saved simulation to $(data_file_path)")
+    end
+    
+    return result
 end
 
 
@@ -976,7 +1063,7 @@ function run_sim_fine_deqjl(
     dt=DT_PREF, save=true, save_type=jl, seed=0,
     solver=DifferentialEquations.Vern9, print_seq=false, print_final=false,
     negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
-    noise_dt_inv=DT_NOISE_INV, seed_state=true, save_step=1e-1)
+    noise_dt_inv=DT_NOISE_INV, save_step=1e-1)
     start_time = Dates.now()
     # grab
     if isnothing(save_file_path)
@@ -996,31 +1083,31 @@ function run_sim_fine_deqjl(
 
     # get noise offsets
     noise_knot_count = Int(ceil(evolution_time * noise_dt_inv)) + 1
-    noise_offsets = (namp) * pink_noise_from_white(noise_knot_count, noise_dt_inv, ndist; seed=seed)
+    noise_offsets = namp .* pink_noise_from_white(noise_knot_count, noise_dt_inv, ndist; seed=seed)
     
     # integrate
     dynamics = DT_DYN[dynamics_type]
     state_type = DT_ST[dynamics_type]
-    state_seed = seed_state ? seed : 0
     if state_type == st_state
-        initial_state = gen_rand_state_iso(;seed=state_seed)
+        initial_state = gen_rand_state_iso(;seed=seed)
     elseif state_type == st_density
-        initial_state =  gen_rand_density_iso(;seed=state_seed)
+        initial_state =  gen_rand_density_iso(;seed=seed)
     end
     tspan = (0., evolution_time)
     params = SimParams(controls, control_knot_count, controls_dt_inv, negi_h0,
                        noise_offsets, noise_dt_inv, dt_inv)
     prob = ODEProblem(dynamics, initial_state, tspan, params)
+
     result = solve(prob, solver(), dt=dt, saveat=save_times,
                    maxiters=DEQJL_MAXITERS, adaptive=adaptive)
 
     if state_type == st_state
-        states_ = zeros(save_count + 1, STATE_SIZE_ISO)
+        states_ = zeros(save_count + 1, HDIM_ISO)
         for i = 1:save_count
             states_[i, :] = Array(result.u[i])
         end
     elseif state_type == st_density
-        states_ = zeros(save_count + 1, STATE_SIZE_ISO, STATE_SIZE_ISO)
+        states_ = zeros(save_count + 1, HDIM_ISO, HDIM_ISO)
         for i = 1:save_count
             states_[i, :, :] = Array(result.u[i])
         end
@@ -1126,4 +1213,111 @@ function t1_average(save_file_path; save_type=jl)
     end
     
     return t1_avgs
+end
+
+
+"""
+integrate the schroedinger equation using unitary propagators
+"""
+function run_sim_prop(
+    gate_count, gate_type, save_file_path;
+    negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
+    noise_dt_inv=DT_NOISE_INV, seed=0, state_seed=nothing, save=false)
+    (controls, dt_inv, gate_time) = grab_controls(save_file_path)
+    dt = dt_inv^(-1)
+    control_knot_count = Int(floor(gate_time * dt_inv))
+    save_times = Array(0:1:gate_count) * gate_time
+    evolution_time = gate_time * gate_count
+    noise_knot_count = Int(ceil(evolution_time * noise_dt_inv)) + 1
+    noise_offsets = namp * pink_noise_from_white(noise_knot_count, noise_dt_inv, ndist; seed=seed)
+    params = SimParams(controls, control_knot_count, dt_inv, negi_h0,
+                       noise_offsets, noise_dt_inv, dt_inv)
+    
+    if isnothing(state_seed)
+        state_seed = seed
+    end
+    initial_state = state = gen_rand_state_iso(;seed=state_seed)
+    states = zeros(BigFloat, gate_count + 1, HDIM_ISO)
+    states[1, :] = Array(state)
+    time = 0.
+    
+    for i = 1:gate_count
+        for j = 1:control_knot_count
+            hamiltonian = negi_h0 + controls[j, 1] * NEGI_H1_ISO
+            unitary = exp(hamiltonian * dt)
+            state = unitary * state
+        end
+        states[i + 1, :] = state
+    end
+
+    fidelities = compute_fidelities(gate_count, gate_type, states)
+
+    result = Dict(
+        "gate_count" => gate_count,
+        "gate_type" => Integer(gate_type),
+        "seed" => seed,
+        "state_seed" => state_seed,
+        "states" => states,
+        "fidelities" => fidelities,
+        "negi_h0" => Array(negi_h0),
+        "namp" => namp,
+        "ndist" => string(ndist),
+        "noise_dt_inv" => noise_dt_inv,
+        "save_file_path" => save_file_path
+    )
+
+    return result
+end
+
+
+### TESTS ###
+function gen_rand_state_()
+    s = SVector{2}(rand(2) + 1im * rand(2))
+    return s / sqrt(s's)
+end
+
+
+function test_ge_(;seed=0, do_ge=true, do_gej=true, do_geh=true)
+    Random.seed!(seed)
+    big_ge = Int(1e4)
+    big_gej = Int(1e4)
+    big_geh = Int(1e4)
+    
+    if do_ge
+        for i = 1:big_ge
+            x1 = gen_rand_state_()
+            x2 = gen_rand_state_()
+            x1_iso = get_vec_iso(x1)
+            x2_iso = get_vec_iso(x2)
+            ge = 1 - abs(x1'x2)^2
+            ge_iso = gate_error_iso2(x1_iso, x2_iso)
+            @assert isapprox(ge, ge_iso)
+        end
+    end
+
+    if do_gej
+        for i = 1:big_gej
+            x1 = gen_rand_state_()
+            x2 = gen_rand_state_()
+            x1_iso = get_vec_iso(x1)
+            x2_iso = get_vec_iso(x2)
+            ge_aug(x1_iso_) = gate_error_iso2(x1_iso_, x2_iso)
+            (gej_z,) = Zygote.gradient(ge_aug, x1_iso)
+            gej_m = jacobian_gate_error_iso2(x1_iso, x2_iso)
+            @assert isapprox(gej_z, gej_m)
+        end
+    end
+
+    if do_geh
+        for i = 1:big_geh
+            x1 = gen_rand_state_()
+            x2 = gen_rand_state_()
+            x1_iso = get_vec_iso(x1)
+            x2_iso = get_vec_iso(x2)
+            ge_aug(x1_iso_) = gate_error_iso2(x1_iso_, x2_iso)
+            geh_z = Zygote.hessian(ge_aug, x1_iso)
+            geh_m = hessian_gate_error_iso2(x2_iso)
+            @assert isapprox(geh_z, geh_m)
+        end
+    end
 end

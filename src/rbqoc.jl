@@ -2,18 +2,18 @@
 rbqoc.jl - common definitions for the rbqoc repo
 """
 
+# paths / venv
+WDIR = joinpath(@__DIR__, "../")
+import Pkg
+Pkg.activate(WDIR)
+
 # imports
 using HDF5
 using Interpolations
 using LinearAlgebra
-import Pkg
 using Plots
 using Printf
 using RobotDynamics
-
-# paths / venv
-WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
-Pkg.activate(joinpath(WDIR))
 
 # plotting configuration and constants
 ENV["GKSwstype"] = "nul"
@@ -42,7 +42,7 @@ end
     rk2 = 1
     rk3 = 2
     rk4 = 3
-    rk6 = 4
+    # rk6 = 4
 end
 
 
@@ -50,30 +50,48 @@ const IT_RDI = Dict(
     rk2 => RobotDynamics.RK2,
     rk3 => RobotDynamics.RK3,
     rk4 => RobotDynamics.RK4,
-    rk6 => RobotDynamics.RK6,
+    # rk6 => RobotDynamics.RK6,
 )
 
 
 # methods
-function generate_file_path(extension, save_file_name, save_path)
+function generate_file_path(extension, file_name, path)
     # Ensure the path exists.
-    mkpath(save_path)
+    mkpath(path)
 
     # Create a save file name based on the one given; ensure it will
     # not conflict with others in the directory.
     max_numeric_prefix = -1
-    for (_, _, files) in walkdir(save_path)
-        for file_name in files
-            if occursin("_$(save_file_name).$(extension)", file_name)
-                max_numeric_prefix = max(parse(Int, split(file_name, "_")[1]))
+    for (_, _, files) in walkdir(path)
+        for file_name_ in files
+            if occursin("_$(file_name).$(extension)", file_name_)
+                numeric_prefix = parse(Int, split(file_name_, "_")[1])
+                max_numeric_prefix = max(numeric_prefix, max_numeric_prefix)
             end
         end
     end
+    
+    file_path = joinpath(path, "$(lpad(max_numeric_prefix + 1, 5, '0'))_$(file_name).$(extension)")
+    return file_path
+end
 
-    save_file_name = "_$(save_file_name).$(extension)"
-    save_file_name = @sprintf("%05d%s", max_numeric_prefix + 1, save_file_name)
 
-    return joinpath(save_path, save_file_name)
+function latest_file_path(extension, file_name, path)
+    max_numeric_prefix = -1
+    for (_, _, files) in walkdir(path)
+        for file_name_ in files
+            if occursin("_$(file_name).$(extension)", file_name_)
+                numeric_prefix = parse(Int, split(file_name_, "_")[1])
+                max_numeric_prefix = max(numeric_prefix, max_numeric_prefix)
+            end
+        end
+    end
+    if max_numeric_prefix == -1
+        file_path = nothing
+    else
+        file_path = joinpath(path, "$(lpad(max_numeric_prefix, 5, '0'))_$(file_name).$(extension)")
+    end
+    return file_path
 end
 
 
@@ -81,8 +99,9 @@ end
 grab_controls - do some extraction of relevant controls
 data for common h5 save formats
 """
-function grab_controls(save_file_path; save_type=jl)
+function grab_controls(save_file_path)
     data = h5open(save_file_path, "r") do save_file
+        save_type = SaveType(read(save_file, "save_type"))
         if save_type == jl
             cidx = read(save_file, "controls_idx")
             controls = read(save_file, "astates")[:, cidx]
@@ -139,15 +158,15 @@ end
 
 
 function plot_controls(save_file_paths, plot_file_path;
-                       save_types=[jl,], labels=nothing,
+                       labels=nothing,
                        title="", colors=nothing, print_out=true,
                        legend=nothing)
     fig = Plots.plot(dpi=DPI, title=title, legend=legend)
     for (i, save_file_path) in enumerate(save_file_paths)
         # Grab and prep data.
-        (controls, evolution_time) = grab_controls(save_file_path; save_type=save_types[i])
+        (controls, controls_dt_inv, evolution_time) = grab_controls(save_file_path)
         (control_eval_count, control_count) = size(controls)
-        control_eval_times = Array(1:1:control_eval_count) * DT_PREF
+        control_eval_times = Array(0:control_eval_count - 1) / controls_dt_inv
         
         # Plot.
         for j = 1:control_count

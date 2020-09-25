@@ -2,25 +2,19 @@
 figures.jl
 """
 
+WDIR = joinpath(@__DIR__, "../../")
+include(joinpath(WDIR, "src", "spin", "spin.jl"))
+
 using LaTeXStrings
 using Printf
 import Plots
 using Statistics
 
-WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
-include(joinpath(WDIR, "src", "spin", "spin.jl"))
-
-# Configure paths.
+# paths
 const EXPERIMENT_NAME = "figures"
 const SAVE_PATH = joinpath(SPIN_OUT_PATH, EXPERIMENT_NAME)
-const F1B_DATA_FILE_PATH = joinpath(SAVE_PATH, "f1b.h5")
-const F2C_DATA_FILE_PATH = joinpath(SAVE_PATH, "f2c.h5")
 const F3C_DATA_FILE_PATH = joinpath(SAVE_PATH, "f3c.h5")
 const F3D_DATA_FILE_PATH = joinpath(SAVE_PATH, "f3d.h5")
-
-# Configure plotting.
-ENV["GKSwstype"] = "nul"
-Plots.gr()
 
 # types
 @enum PulseType begin
@@ -30,54 +24,16 @@ Plots.gr()
     s4 = 4
     d2 = 5
     d3 = 6
+    s2b = 7
+    s4b = 8
+    d2b = 9
+    d3b = 10
+    corpse = 11
+    d1 = 12
+    sut8 = 13
 end
 
-const PT_STR = Dict(
-    qoc => "QOC",
-    analytic => "Anl.",
-    s2 => "S-2",
-    d2 => "D-2",
-    d3 => "D-3",
-    s4 => "S-4"
-)
-
-const PT_MARKER = Dict(
-    s2 => :circle,
-    s4 => :square,
-    d3 => :utriangle,
-    d2 => :diamond,
-)
-
-const PT_COLOR = Dict(
-    analytic => :lightskyblue,
-    qoc => :coral,
-    s2 => :limegreen,
-    s4 => :darkgreen,
-    d2 => :crimson,
-    d3 => :firebrick,
-)
-
-const PT_LINESTYLE = Dict(
-    analytic => :solid,
-    qoc => :solid,
-    s2 => :solid,
-    s4 => :dash,
-    d2 => :solid,
-    d3 => :dash,
-)
-
 const GT_LIST = [zpiby2, ypiby2, xpiby2]
-
-# plotting constants
-const ALPHA_POINT = 0.4
-const MS_DATA = 4
-const MS_POINT = 8
-const FS_AXIS_LABELS = 12
-const FS_AXIS_TICKS = 10
-const FS_ANNOTATE = 10
-const FS_LEGEND = 10
-const FG_COLOR_LEGEND = nothing
-const DPI_FINAL = Integer(1e3)
 
 # common dict keys
 const SAVEFP_KEY = 1
@@ -88,851 +44,510 @@ const ACORDS_KEY = 5
 const MARKER_KEY = 6
 const LCORDS_KEY = 7
 const DATA2FP_KEY = 8
-
-
-### ALL ###
-function plot_fidelity_by_gate_count(fidelitiess; inds=nothing, title="", ylims=(0, 1),
-                                     yticks=(0:0.1:1), legend=:best, yscale=:auto,
-                                     labels=nothing, colors=nothing, linestyles=nothing,
-                                     xlims=nothing)
-    plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
-    fig = Plots.plot(dpi=DPI_FINAL, ylims=ylims, yticks=yticks, title=title,
-                     legend=legend, yscale=yscale, xlims=xlims,
-                     tickfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS,
-                     legendfontsize=FS_LEGEND, foreground_color_legend=FG_COLOR_LEGEND)
-    gate_count = size(fidelitiess[1])[1] - 1
-    gate_count_axis = Array(0:1:gate_count)
-    if isnothing(inds)
-        inds = 1:gate_count + 1
-    end
-    for (i, fidelities) in enumerate(fidelitiess)
-        color = isnothing(colors) ? :auto : colors[i]
-        label = isnothing(labels) ? "" : labels[i]
-        linestyle = isnothing(linestyles) ? :solid : linestyles[i]
-        Plots.plot!(fig, gate_count_axis[inds], 1 .- fidelities[inds], label=label,
-                    color=color, linestyle=linestyle)
-    end
-    Plots.ylabel!("Gate Error")
-    Plots.xlabel!("Gate Count")
-    plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
-    Plots.savefig(fig, plot_file_path)
-    return plot_file_path
-end
-
+const INVAL = 99999
 
 ### FIGURE 1 ###
-const F1_GATE_COUNT = Integer(1.5e4)
-F1_PULSE_DATA = Dict(
+
+const F1_DATA = Dict(
     zpiby2 => Dict(
-        qoc => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin15/00201_spin15.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin15/00194_spin15.h5"),
-            SAVET_KEY => jl,
-        ),
-        analytic => Dict(
-            ACORDS_KEY => (0, 0.25),
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00043_spin14.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
-            SAVET_KEY => py,
-        ),
+        qoc => joinpath(SPIN_OUT_PATH, "spin15/00209_spin15.h5"),
+        analytic => joinpath(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
     ),
     ypiby2 => Dict(
-        qoc => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin15/00200_spin15.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin15/00185_spin15.h5"),
-            SAVET_KEY => jl,
-        ),
-        analytic => Dict(
-            ACORDS_KEY => (0, 0.4),
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00041_spin14.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00003_spin14.h5"),
-            SAVET_KEY => py,
-        )
+        qoc => joinpath(SPIN_OUT_PATH, "spin15/00205_spin15.h5"),
+        analytic => joinpath(SPIN_OUT_PATH, "spin14/00003_spin14.h5"),
     ),
     xpiby2 => Dict(
-        qoc => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin15/00202_spin15.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin15/00174_spin15.h5"),
-            SAVET_KEY => jl,
-        ),
-        analytic => Dict(
-            ACORDS_KEY => (0, 0.5),
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00042_spin14.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
-            SAVET_KEY => py,
-        )
+        qoc => joinpath(SPIN_OUT_PATH, "spin15/00239_spin15.h5"),
+        analytic => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
     ),
 )
+const F1_PT_LIST = [analytic, qoc]
 
-const F1A_PT_LIST = [analytic, qoc]
-function make_figure1a()
-    plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
-    save_file_paths = []; save_types = []; labels = []; colors = [];
-    subfigs = []
-    for (i, gate_type) in enumerate(instances(GateType))
-        subfig = Plots.plot()
-        if i == 2
-            Plots.ylabel!(subfig, latexstring("\$a \\ \\textrm{(GHz)}\$"))
-        elseif i == 3
-            Plots.xlabel!(subfig, latexstring("\$t \\ \\textrm{(ns)}\$"))
+
+function gen_1a()
+    gate_types = [Integer(gate_type) for gate_type in GT_LIST]
+    pulse_types = [Integer(pulse_type) for pulse_type in F1_PT_LIST]
+    save_file_paths = Array{String, 1}([])
+    for (i, gate_type) in enumerate(GT_LIST)
+        for (j, pulse_type) in enumerate(F1_PT_LIST)
+            save_file_path = F1_DATA[gate_type][pulse_type]
+            push!(save_file_paths, save_file_path)
         end
-        text_ = GT_STR[gate_type]
-        (ax, ay) = F1_PULSE_DATA[gate_type][analytic][ACORDS_KEY]
-        Plots.annotate!(subfig, ax, ay, text(text_, FS_ANNOTATE))
-        for pulse_type in F1A_PT_LIST
-            if pulse_type == analytic
-                linestyle = :solid
-            elseif pulse_type == qoc
-                linestyle = :solid
-            end
-            data = F1_PULSE_DATA[gate_type][pulse_type]
-            color = PT_COLOR[pulse_type]
-            label = "$(GT_STR[gate_type]) $(PT_STR[pulse_type])"
-            save_file_path = data[SAVEFP_KEY]
-            save_type = data[SAVET_KEY]
-            (controls, evolution_time) = grab_controls(save_file_path; save_type=save_type)
-            (control_eval_count, control_count) = size(controls)
-            control_eval_times = Array(1:1:control_eval_count) * DT_PREF
-            Plots.plot!(subfig, control_eval_times, controls[:,1], color=color, label=nothing,
-                        linestyle=linestyle)
-        end
-        push!(subfigs, subfig)
     end
-    layout = @layout [a; b; c]
-    fig = Plots.plot(subfigs[1], subfigs[2], subfigs[3], layout=layout, dpi=DPI_FINAL,
-                     ticksfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS,
-                     legendfontsize=FS_LEGEND, foreground_color_legend=FG_COLOR_LEGEND)
-    Plots.savefig(fig, plot_file_path)
-    println("Saved Figure1a to $(plot_file_path)")
+
+    data_file_path = generate_file_path("h5", "f1a", SAVE_PATH)
+    h5open(data_file_path, "w") do data_file
+        write(data_file, "save_file_paths", save_file_paths)
+        write(data_file, "gate_types", gate_types)
+        write(data_file, "pulse_types", pulse_types)
+    end
+    println("Saved f1a data to $(data_file_path)")
 end
 
 
-const GT_LS_1B = Dict(
-    zpiby2 => :solid,
-    ypiby2 => :dash,
-    xpiby2 => :dashdot,
-)
-
-function make_figure1b()
-    # TODO: get data
-    for gate_type in keys(F1_PULSE_DATA)
-        for pulse_type in keys(F1_PULSE_DATA[gate_type])
-            pulse_data = F1_PULSE_DATA[gate_type][pulse_type]
-            if !(DATAFP_KEY in keys(pulse_data))
-                # get data_file_path and write it to pulse data here
-                data_file_path = nothing
-            end
-        end
-    end
-    
-    # plot
-    fidelitiess = []; labels = []; colors = []; linestyles = []
-    for gate_type in GT_LIST
-        for pulse_type in keys(F1_PULSE_DATA[gate_type])
-            pulse_data = F1_PULSE_DATA[gate_type][pulse_type]
-            (fidelities,) = h5open(pulse_data[DATAFP_KEY], "r") do data_file
-                fidelities = read(data_file, "fidelities")
-                return (fidelities,)
-            end
-            color = PT_COLOR[pulse_type]
-            label = "$(GT_STR[gate_type]) $(PT_STR[pulse_type])"
-            linestyle = GT_LS_1B[gate_type]
-            push!(fidelitiess, fidelities)
-            push!(labels, label)
-            push!(colors, color)
-            push!(linestyles, linestyle)
-        end
-    end
-    plot_file_path = plot_fidelity_by_gate_count(
-        fidelitiess; ylims=(0, 0.05), yticks=0:0.01:0.05, legend=:topleft,
-        labels=labels, colors=colors, linestyles=linestyles,
-        xlims=(0, 1700)
-    )
-    println("Plotted Figure1b to $(plot_file_path)")
-end
-
-
-const F1C_S2_LEN = Integer(1e4)
-const GT_MK_1C = Dict(
-    zpiby2 => :diamond,
-    ypiby2 => :square,
-    xpiby2 => :utriangle,
-)
-const MS_F1C = 6
-const ALPHA_F1C = 1.
-
-function make_figure1c(;save=false)
-    # Collect data and plot.
-    max_amp = MAX_CONTROL_NORM_0
-    amps_fit = Array(range(0, stop=max_amp, length=F1C_S2_LEN))
+const F1B_SAMPLE_COUNT = Integer(5e2)
+function gen_1b()
+    gate_types = GT_LIST
+    gate_types_integer = [Integer(gt) for gt in gate_types]
+    pulse_types = F1_PT_LIST
+    pulse_types_integer = [Integer(pt) for pt in pulse_types]
+    amps_fit = Array(range(0, stop=MAX_CONTROL_NORM_0, length=F1B_SAMPLE_COUNT))
     t1s_fit =  map(amp_t1_spline_cubic, amps_fit)
     amps_data = -1 .* map(fbfq_amp, FBFQ_ARRAY)
     t1s_data = T1_ARRAY
     t1s_data_err = T1_ARRAY_ERR
-    fig = Plots.plot(dpi=DPI_FINAL, legend=:bottomright, yscale=:log10,
-                     tickfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS,
-                     legendfontsize=FS_LEGEND, foreground_color_legend=FG_COLOR_LEGEND)
-    Plots.plot!(amps_fit, t1s_fit, label=nothing, color=:mediumaquamarine)
-    Plots.scatter!(amps_data, t1s_data, yerror=t1s_data_err, label=nothing, marker=(:circle, MS_DATA),
-                   color=:mediumorchid)
-    if save
-        h5open(F1B_DATA_FILE_PATH, "w") do save_file
-            write(save_file, "amps_fit", amps_fit)
-            write(save_file, "t1s_fit", t1s_fit)
-            write(save_file, "amps_data", amps_data)
-            write(save_file, "t1s_data", t1s_data)
-            write(save_file, "t1s_data_err", t1s_data_err)
+    avg_amps = Array{Float64, 1}([])
+    avg_amps_t1 = Array{Float64, 1}([])
+
+    for (i, gate_type) in enumerate(gate_types)
+        for (j, pulse_type) in enumerate(pulse_types)
+            save_file_path = F1_DATA[gate_type][pulse_type]
+            (controls, controls_dt_inv, evolution_time) = grab_controls(save_file_path)
+            avg_amp = mean(map(abs, controls))
+            avg_amp_t1 = amp_t1_spline_cubic(avg_amp)
+            push!(avg_amps, avg_amp)
+            push!(avg_amps_t1, avg_amp_t1)
         end
     end
-    for gate_type in GT_LIST
-        for pulse_type in keys(F1_PULSE_DATA[gate_type])
-            pulse_data = F1_PULSE_DATA[gate_type][pulse_type]
-            (controls, _) = grab_controls(
-                pulse_data[SAVEFP_KEY];
-                save_type=pulse_data[SAVET_KEY]
-            )
-            avg_amp = mean(map(abs, controls[:,1]))
-            avg_t1 = amp_t1_spline_cubic(avg_amp)
-            avg_label = "$(GT_STR[gate_type]) $(PT_STR[pulse_type])"
-            println("amp: $(avg_amp), t1: $(avg_t1), label: $(avg_label)")
-            avg_color = PT_COLOR[pulse_type]
-            marker = GT_MK_1C[gate_type]
-            Plots.plot!([avg_amp], [avg_t1], label=avg_label,
-                        marker=(marker, MS_F1C), color=avg_color, alpha=ALPHA_F1C)
+    
+    data_file_path = generate_file_path("h5", "f1b", SAVE_PATH)
+    h5open(data_file_path, "w") do data_file
+        write(data_file, "amps_fit", amps_fit)
+        write(data_file, "t1s_fit", t1s_fit)
+        write(data_file, "amps_data", amps_data)
+        write(data_file, "t1s_data", t1s_data)
+        write(data_file, "t1s_data_err", t1s_data_err)
+        write(data_file, "avg_amps", avg_amps)
+        write(data_file, "avg_amps_t1", avg_amps_t1)
+        write(data_file, "pulse_types", pulse_types_integer)
+        write(data_file, "gate_types", gate_types_integer)
+    end
+    println("Saved f1b data to $(data_file_path)")
+end
+
+
+const F1C_GATE_COUNT = Integer(1.6e3)
+const F1C_AVG_COUNT = 10
+const F1C_DT = 1e-3
+function gen_1c(;use_previous=true)
+    gate_types_integer = [Integer(gt) for gt in GT_LIST]
+    gate_type_count = size(GT_LIST)[1]
+    pulse_types_integer = [Integer(pt) for pt in F1_PT_LIST]
+    pulse_type_count = size(F1_PT_LIST)[1]
+    gate_errors = zeros(gate_type_count, pulse_type_count, F1C_AVG_COUNT, F1C_GATE_COUNT + 1)
+    save_file_paths = Array{String, 2}(undef, gate_type_count, pulse_type_count)
+
+    # check for previous computation
+    if use_previous
+        data_file_path_old = latest_file_path("h5", "f1c", SAVE_PATH)
+    else
+        data_file_path_old = nothing
+    end
+    if isnothing(data_file_path_old)
+        (save_file_paths_old = gate_errors_old = gate_type_count_old = pulse_type_count_old
+         = avg_count_old = nothing)
+    else
+        (save_file_paths_old, gate_errors_old,
+         ) = h5open(data_file_path_old, "r") do data_file_old
+             save_file_paths_old = read(data_file_old, "save_file_paths")
+             gate_errors_old = read(data_file_old, "gate_errors")
+             gate_type_count_old = size(gate_errors_old)[1]
+             pulse_type_count_old = size(gate_errors_old)[2]
+             avg_count_old = size(gate_errors_old)[3]
+             gate_count_old = size(gate_errors_old)[4] - 1
+             if gate_count_old != F1C_GATE_COUNT
+                 save_file_paths_old = gate_errors_old = nothing
+             end
+             return (save_file_paths_old, gate_errors_old, gate_type_count_old,
+                     pulse_type_count_old, avg_count_old)
+         end
+    end
+    
+    for (i, gate_type) in enumerate(GT_LIST)
+        println("gt[$(i)]: $(gate_type)")
+        for (j, pulse_type) in enumerate(F1_PT_LIST)
+            print("pt[$(j)]: $(pulse_type) ")
+            save_file_path = F1_DATA[gate_type][pulse_type]
+            save_file_paths[i, j] = save_file_path
+            save_file_path_sim = pulse_type == analytic ? nothing : save_file_path
+            save_file_path_old = ((isnothing(save_file_paths_old) || i > gate_type_count_old
+                                   || j > pulse_type_count_old)
+                                  ? nothing : save_file_paths_old[i, j])
+            if pulse_type == analytic
+                if gate_type == zpiby2
+                    dynamics_type = zpiby2t1
+                elseif gate_type == ypiby2
+                    dynamics_type = ypiby2t1
+                elseif gate_type == xpiby2
+                    dynamics_type = xpiby2t1
+                end
+            else
+                dynamics_type = lindbladt1
+            end
+            for k = 1:F1C_AVG_COUNT
+                # skip redundant computation
+                if (!isnothing(save_file_path_old) && save_file_path == save_file_path_old
+                    && k <= avg_count_old)
+                    gate_errors[i, j, k, :] = gate_errors_old[i, j, k, :]
+                    print("s")
+                else
+                    res = run_sim_deqjl(
+                        F1C_GATE_COUNT, gate_type; dynamics_type=dynamics_type,
+                        save_file_path=save_file_path_sim, save=false, dt=F1C_DT,
+                        seed=k
+                    )
+                    gate_errors[i, j, k, :] = 1 .- res["fidelities"]
+                    print(".")
+                end
+            end
+            println("")
         end
     end
-    Plots.xlabel!(latexstring("\$ {<a>}_{t} \\textrm{(GHz)} \$"))
-    Plots.ylabel!(latexstring("\$T_1 \\ \\textrm{(ns)}\$"))
-    Plots.xlims!((-0.02, max_amp))
-    # plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
-    # Plots.savefig(fig, plot_file_path)
-    # println("Plotted Figure1c to $(plot_file_path)")
+    
+    data_file_path = generate_file_path("h5", "f1c", SAVE_PATH)
+    h5open(data_file_path, "w") do data_file
+        write(data_file, "pulse_types", pulse_types_integer)
+        write(data_file, "gate_types", gate_types_integer)
+        write(data_file, "gate_errors", gate_errors)
+        write(data_file, "save_file_paths", save_file_paths)
+    end
+    println("Saved f1c data to $(data_file_path)")
 end
 
 
 ### FIGURE 2 ###
-F2_DATA = Dict(
-    analytic => Dict(
-        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
-        SAVET_KEY => py,
-        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00074_spin14.h5"),
-        LCORDS_KEY => (20, 0.05),
-    ),
-    s2 => Dict(
-        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00132_spin12.h5"),
-        SAVET_KEY => jl,
-        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00200_spin12.h5"),
-        LCORDS_KEY => (30, 0.2),
-    ),
-    s4 => Dict(
-        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00229_spin12.h5"),
-        SAVET_KEY => jl,
-        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00231_spin12.h5"),
-        LCORDS_KEY => (30, 0.2),
-    ),
-    d2 => Dict(
-        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00091_spin11.h5"),
-        SAVET_KEY => jl,
-        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00092_spin11.h5"),
-        LCORDS_KEY => (45, 0.2),
-    ),
-    d3 => Dict(
-        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00110_spin11.h5"),
-        SAVET_KEY => jl,
-        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00111_spin11.h5"),
-        LCORDS_KEY => (45, 0.2),
-    ),
+const F2_DATA = Dict(
+    analytic => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
+    s2 => joinpath(SPIN_OUT_PATH, "spin12/00496_spin12.h5"),
+    s4 => joinpath(SPIN_OUT_PATH, "spin12/00498_spin12.h5"),
+    d2 => joinpath(SPIN_OUT_PATH, "spin11/00432_spin11.h5"),
+    d3 => joinpath(SPIN_OUT_PATH, "spin11/00429_spin11.h5"),
+    s2b => joinpath(SPIN_OUT_PATH, "spin12/00508_spin12.h5"),
+    s4b => joinpath(SPIN_OUT_PATH, "spin12/00339_spin12.h5"),
+    d2b => joinpath(SPIN_OUT_PATH, "spin11/00232_spin11.h5"),
+    d3b => joinpath(SPIN_OUT_PATH, "spin11/00438_spin11.h5"),
 )
 
-F2A_PT_LIST = [[analytic], [s2, s4,], [d2, d3]]
-"""
-Show the pulses.
-"""
-function make_figure2a()
-    plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
-    save_file_paths = []; save_types = []; labels = []; colors = [];
-    subfigs = []
-    for (i, pulse_types) in enumerate(F2A_PT_LIST)
-        subfig = Plots.plot()
-        if i == 2
-            Plots.ylabel!(subfig, latexstring("\$a \\ \\textrm{(GHz)}\$"))
-        elseif i == 3
-            Plots.xlabel!(subfig, latexstring("\$ t \\ \\textrm{(ns)}\$"))
-        end
-        for (j, pulse_type) in enumerate(pulse_types)
-            data = F2_PULSE_DATA[pulse_type]
-            color = PT_COLOR[pulse_type]
-            label = "$(PT_STR[pulse_type])"
-            linestyle = PT_LINESTYLE[pulse_type]
-            save_file_path = data[SAVEFP_KEY]
-            save_type = data[SAVET_KEY]
-            (controls, evolution_time) = grab_controls(save_file_path; save_type=save_type)
-            (control_eval_count, control_count) = size(controls)
-            control_eval_times = Array(1:1:control_eval_count) * DT_PREF
-            Plots.plot!(subfig, control_eval_times, controls[:,1], color=color, label=label,
-                        linestyle=linestyle, legend=:none)
-        end
-        push!(subfigs, subfig)
+
+const F2A_PT_LIST = [analytic, s2, s4, d2, d3]
+function gen_2a()
+    pulse_types_integer = [Integer(pulse_type) for pulse_type in F2A_PT_LIST]
+    pulse_type_count = size(F2A_PT_LIST)[1]
+    save_file_paths = Array{String, 1}(undef, pulse_type_count)
+    for (i, pulse_type) in enumerate(F2A_PT_LIST)
+        save_file_paths[i] = F2_DATA[pulse_type]
     end
-    layout = @layout [a; b; c]
-    fig = Plots.plot(
-        subfigs[1], subfigs[2], subfigs[3], layout=layout, dpi=DPI_FINAL,
-        ticksfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS,
-        legendfontsize=FS_LEGEND, foreground_color_legend=FG_COLOR_LEGEND,
-        legend=:outerbottomright
-    )
-    Plots.savefig(fig, plot_file_path)
-    println("Saved Figure1a to $(plot_file_path)")
+
+    data_file_path = generate_file_path("h5", "f2a", SAVE_PATH)
+    h5open(data_file_path, "w") do data_file
+        write(data_file, "save_file_paths", save_file_paths)
+        write(data_file, "pulse_types", pulse_types_integer)
+    end
+    println("Saved f2a data to $(data_file_path)")
 end
 
 
-const F2B_TRIAL_COUNT = Integer(3e2)
+const F2B_TRIAL_COUNT = Integer(1e2)
 const F2B_FQ_DEV = 3e-2
-const F2B_PT_LIST = [analytic, s2, s4, d2, d3]
-"""
-Show gate error vs. detuning
-"""
-function make_figure2b()
-    # s2 detunings
-    fq_devs = Array(range(-F2B_FQ_DEV, stop=F2B_FQ_DEV, length=F2B_TRIAL_COUNT))
-    fqs = (fq_devs .* FQ) .+ FQ
-    negi_h0s = [NEGI_H0_ISO * fq for fq in fqs]
-
-    # sweep
+const F2B_PT_LIST = [analytic, s2, s4, d2, d3, s2b, s4b, d2b, d3b]
+const F2B_AVG_COUNT = 10
+function gen_2b(;use_previous=true)
+    @assert iseven(F2B_TRIAL_COUNT)
     gate_type = xpiby2
-    for pulse_type in F2B_PT_LIST
-        # if !(DATAFP_KEY in keys(F2_PULSE_DATA[pulse_type]))
-        if true
-            if pulse_type == analytic
-                data_file_path = run_sim_h0sweep_deqjl(
-                    gate_type, negi_h0s; dynamics_type=xpiby2nodis, dt=1e-3
-                )
-            else
-                save_file_path = F2_PULSE_DATA[pulse_type][SAVEFP_KEY]
-                save_type = F2_PULSE_DATA[pulse_type][SAVET_KEY]
-                data_file_path = run_sim_h0sweep_deqjl(
-                    gate_type, negi_h0s; save_file_path=save_file_path,
-                    dynamics_type=schroed, save_type=save_type, dt=1e-3
-                )
-            end
-            h5open(data_file_path, "r+") do data_file
-                write(data_file, "fqs", fqs)
-                write(data_file, "pulse_type", Integer(pulse_type))
-            end
-            F2_PULSE_DATA[pulse_type][DATAFP_KEY] = data_file_path
-            println("datafp: $(data_file_path), gt: $(GT_STR[gate_type]), pt: $(PT_STR[pulse_type])")
-            return
+    pulse_types_integer = [Integer(pt) for pt in F2B_PT_LIST]
+    pulse_type_count = size(F2B_PT_LIST)[1]
+    fq_devs = Array(range(-F2B_FQ_DEV, stop=F2B_FQ_DEV, length=2 * F2B_TRIAL_COUNT))
+    push!(fq_devs, 0)
+    negi_h0s = [(FQ + FQ * fq_dev) * NEGI_H0_ISO for fq_dev in fq_devs]
+    gate_errors = ones(pulse_type_count, 2 * F2B_TRIAL_COUNT + 1, F2B_AVG_COUNT)
+    save_file_paths = Array{String, 1}(undef, pulse_type_count)
+
+    # check for previous computation
+    if use_previous
+        data_file_path_old = latest_file_path("h5", "f2b", SAVE_PATH)
+    else
+        data_file_path_old = nothing
+    end
+    if isnothing(data_file_path_old)
+        save_file_paths_old = nothing
+    else
+        (save_file_paths_old, gate_errors_old, avg_count_old, pulse_type_count_old
+         ) = h5open(data_file_path_old, "r") do data_file_old
+             save_file_paths_old = read(data_file_old, "save_file_paths")
+             gate_errors_old = read(data_file_old, "gate_errors")
+             pulse_type_count_old = size(gate_errors_old)[1]
+             avg_count_old = read(data_file_old, "avg_count")
+             fq_devs_old = read(data_file_old, "fq_devs")
+             if fq_devs_old != fq_devs
+                 save_file_paths_old = nothing
+             end
+            return (save_file_paths_old, gate_errors_old, avg_count_old, pulse_type_count_old)
         end
     end
 
-    # plot
-    fig = Plots.plot(dpi=DPI_FINAL, yticks=[0, 0.0025, 0.005, 0.0075], ylim=(0., 0.0075),
-                     xlim=(minimum(fq_devs), maximum(fq_devs)), xticks=[-0.1, -0.05, 0, 0.05, 0.1],
-                     legend=:none,
-                     tickfontsize=FS_AXIS_TICKS, guidefontsize=FS_AXIS_LABELS,
-                     legendfontsize=FS_LEGEND, foreground_color_legend=FG_COLOR_LEGEND)
-    for pulse_type in F2B_PT_LIST
-        pulse_data = F2_PULSE_DATA[pulse_type]
-        label = "$(PT_STR[pulse_type])"
-        linestyle = PT_LINESTYLE[pulse_type]
-        color = PT_COLOR[pulse_type]
-        data_file_path = pulse_data[DATAFP_KEY]
-        (fidelities,) = h5open(data_file_path, "r") do data_file
-            fidelities = read(data_file, "fidelities")
-            return (fidelities,)
+    for (i, pulse_type) in enumerate(F2B_PT_LIST)
+        println("pt[$(i)]: $(pulse_type)")
+        save_file_path = F2_DATA[pulse_type]
+        save_file_paths[i] = save_file_path
+        save_file_path_old = ((isnothing(save_file_paths_old) || i > pulse_type_count_old)
+                              ? nothing : save_file_paths_old[i])
+        for j = 1:2 * F2B_TRIAL_COUNT + 1
+            negi_h0 = negi_h0s[j]
+            for k = 1:F2B_AVG_COUNT
+                # skip redundant computation
+                if (!isnothing(save_file_path_old) && save_file_path == save_file_path_old
+                    && k <= avg_count_old)
+                    gate_errors[i, j, k] = gate_errors_old[i, j, k]
+                    continue
+                end
+                if pulse_type == analytic
+                    res = run_sim_deqjl(
+                        1, gate_type; dynamics_type=xpiby2nodis,
+                        dt=1e-3, save=false, negi_h0=negi_h0, seed=k
+                    )
+                else
+                    res = run_sim_deqjl(
+                        1, gate_type; dynamics_type=schroed, save_file_path=save_file_path,
+                        dt=1e-3, save=false, negi_h0=negi_h0, seed=k
+                    )
+                end
+                gate_errors[i, j, k] = 1 - res["fidelities"][end]
+            end
         end
-        Plots.plot!(fig, fq_devs, 1 .- fidelities, label=label, color=color,
-                    linestyle=linestyle)
-                    
     end
-    plot_file_path = generate_save_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
-    Plots.xlabel!(L"$\delta \omega_{q} / \omega_{q}$")
-    Plots.ylabel!("Gate Error")
-    Plots.savefig(fig, plot_file_path)
-    println("Plotted Figure2b to $(plot_file_path)")
-end
-
-
-function f2b_sweep(;save_file_path=nothing, save_type=jl)
-    fq_devs = Array(range(-F2B_FQ_DEV, stop=F2B_FQ_DEV, length=F2B_TRIAL_COUNT))
-    fqs = (fq_devs .* FQ) .+ FQ
-    negi_h0s = [NEGI_H0_ISO * fq for fq in fqs]
-    gate_type=xpiby2
-    data_file_path = run_sim_h0sweep_deqjl(
-        gate_type, negi_h0s; save_file_path=save_file_path,
-        dynamics_type=schroed, save_type=save_type, dt=1e-3
-    )
-    h5open(data_file_path, "r+") do data_file
-        write(data_file, "fqs", fqs)
+    
+    data_file_path = generate_file_path("h5", "f2b", SAVE_PATH)
+    h5open(data_file_path, "w") do data_file
+        write(data_file, "pulse_types", pulse_types_integer)
+        write(data_file, "gate_errors", gate_errors)
+        write(data_file, "save_file_paths", save_file_paths)
+        write(data_file, "avg_count", F2B_AVG_COUNT)
         write(data_file, "fq_devs", fq_devs)
     end
-    println("datafp: $(data_file_path)")
+    println("Saved f2b data to $(data_file_path)")
 end
 
 
-F2C_GATE_TIMES = [50., 56.8, 60., 70., 80., 90., 100., 110., 120., 130., 140., 150., 160.]
-F2C_DATA = Dict(
-    analytic => Dict(
-        1 => Dict(),
-        2 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00095_spin14.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00096_spin14.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
-            SAVET_KEY => py,
-        ),
-        3 => Dict(),
-        4 => Dict(),
-        5 => Dict(),
-        6 => Dict(),
-        7 => Dict(),
-        8 => Dict(),
-        9 => Dict(),
-        10 => Dict(),
-        11 => Dict(),
-        12 => Dict(),
-        13 => Dict(),
-    ),
-    s2 => Dict(
-        1 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00365_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00366_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00336_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        2 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00367_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00368_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00295_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        3 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00369_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00370_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00301_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        4 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00371_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00372_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00302_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        5 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00373_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00374_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00304_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        6 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00375_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00376_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00303_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        7 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00492_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00493_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00305_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        8 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00379_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00380_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00306_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        9 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00381_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00382_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00340_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        10 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00402_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00403_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00399_spin12.h5"),
-            SAVET_KEY => jl,
-                ),
-        11 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00404_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00405_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00400_spin12.h5"),
-            SAVET_KEY => jl,
-                ),
-        12 => Dict(
-            # DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00381_spin12.h5"),
-            # DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00382_spin12.h5"),
-            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00340_spin12.h5"),
-            SAVET_KEY => jl,
-                ),
-        13 => Dict(
-            # DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00381_spin12.h5"),
-            # DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00382_spin12.h5"),
-            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00340_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-    ),
-    s4 => Dict(
-        1 => Dict(
-            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/_spin12.h5"), #TODO
-            SAVET_KEY => jl,
-        ),
-        2 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00383_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00384_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00298_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        3 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00385_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00386_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00307_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        4 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00387_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00388_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00308_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        5 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00389_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00390_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00310_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        6 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00391_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00392_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00309_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        7 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00393_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00394_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00335_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        8 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00395_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00396_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00337_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        9 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00397_spin12.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00398_spin12.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00339_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        10 => Dict(
-            # DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00391_spin12.h5"),
-            # DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00392_spin12.h5"),
-            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00309_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        11 => Dict(
-            # DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00393_spin12.h5"),
-            # DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00394_spin12.h5"),
-            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00335_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        12 => Dict(
-            # DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00395_spin12.h5"),
-            # DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00396_spin12.h5"),
-            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00337_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-        13 => Dict(
-            # DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00397_spin12.h5"),
-            # DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00398_spin12.h5"),
-            # SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin12/00339_spin12.h5"),
-            SAVET_KEY => jl,
-        ),
-    ),
-    d2 => Dict(
-        1 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00176_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00177_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00105_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        2 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00239_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00240_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00091_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        3 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00178_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00179_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00098_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        4 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00180_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00181_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00100_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        5 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00182_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00183_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00099_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        6 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00273_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00274_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00229_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        7 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00275_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00276_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00231_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        8 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00277_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00278_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00230_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        9 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00279_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00280_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00232_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        10 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00296_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00297_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00291_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        11 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00298_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00299_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00289_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        12 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00300_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00301_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00290_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        13 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00302_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00303_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00292_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-    ),
-    d3 => Dict(
-        1 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00200_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00201_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00141_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        2 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00257_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00258_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00110_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        3 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00202_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00203_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00114_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        4 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00204_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00205_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00115_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        5 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00206_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00207_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00113_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        6 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00281_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00282_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00235_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        7 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00283_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00284_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00236_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        8 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00285_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00286_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00234_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        9 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00287_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00288_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00233_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        10 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00304_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00305_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00295_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        11 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00306_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00307_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00293_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        12 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00308_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00309_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00294_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-        13 => Dict(
-            DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00423_spin11.h5"),
-            DATA2FP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00424_spin11.h5"),
-            SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin11/00362_spin11.h5"),
-            SAVET_KEY => jl,
-        ),
-    ),
+const F2C_GATE_TIMES = [50., 56.8, 60., 70., 80., 90., 100., 110., 120., 130., 140., 150., 160.]
+const F2C_DATA = Dict(
+    analytic => [joinpath(SPIN_OUT_PATH, "spin14/$(lpad(index, 5, '0'))_spin14.h5") for index in [
+        INVAL, 4, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
+    ]],
+    s2 => [joinpath(SPIN_OUT_PATH, "spin12/$(lpad(index, 5, '0'))_spin12.h5") for index in [
+        582, 577, 583, 590, 591, 580, 597, 593, 603, 608, 615, 621, 620
+    ]],
+    sut8 => [joinpath(SPIN_OUT_PATH, "spin23/$(lpad(index, 5, '0'))_spin23.h5") for index in [
+        38, 26, 50, 41, INVAL, INVAL, 11, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
+    ]],
+    d2 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
+        105, 432, 98, 100, 99, 229, 231, 230, 232, 291, 289, 290, 292
+    ]],
+    d3 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
+        141, 429, 114, 115, 113, 235, 236, 234, 438, 295, 293, 294, 362
+    ]],
 )
-const F2C_PT_LIST = [s2, s4, d2, d3]
-function gen_2c()
-    gate_type=xpiby2
-    gtcount = size(F2C_GATE_TIMES)[1]
-    ptcount = size(F2C_PT_LIST)[1]
-    gate_errors = ones(ptcount, gtcount)
+const F2C_PT_LIST = [analytic, s2, sut8, d2, d3]
+const F2C_AVG_COUNT = 10
+const F2C_SIGMA = 1e-2
+const F2C_S1_NEGI_H0 = (FQ + FQ * F2C_SIGMA) * NEGI_H0_ISO
+const F2C_S2_NEGI_H0 = (FQ - FQ * F2C_SIGMA) * NEGI_H0_ISO
+function gen_2c(;use_previous=true)
+    gate_type = xpiby2
+    pulse_type_count = size(F2C_PT_LIST)[1]
+    pulse_types_integer = [Integer(pulse_type) for pulse_type in F2C_PT_LIST]
+    gate_time_count = size(F2C_GATE_TIMES)[1]
+    gate_errors = ones(pulse_type_count, gate_time_count, 2 * F2C_AVG_COUNT)
+    save_file_paths = Array{String, 2}(undef, pulse_type_count, gate_time_count)
+
+    # check for previous computation
+    if use_previous
+        data_file_path_old = latest_file_path("h5", "f2c", SAVE_PATH)
+    else
+        data_file_path_old = nothing
+    end
+    if isnothing(data_file_path_old)
+        save_file_paths_old = nothing
+    else
+        (save_file_paths_old, gate_errors_old, avg_count_old
+         ) = h5open(data_file_path_old, "r") do data_file_old
+            save_file_paths_old = read(data_file_old, "save_file_paths")
+            gate_errors_old = read(data_file_old, "gate_errors")
+            avg_count_old = read(data_file_old, "avg_count")
+            return (save_file_paths_old, gate_errors_old, avg_count_old)
+         end
+        pulse_type_count_old = size(gate_errors_old)[1]
+        gate_time_count_old = size(gate_errors_old)[2]
+    end
+
     for (i, pulse_type) in enumerate(F2C_PT_LIST)
-        println("pt: $(pulse_type)")
+        println("pt[$(i)]: $(pulse_type)")
         for (j, gate_time) in enumerate(F2C_GATE_TIMES)
-            data = F2C_DATA[pulse_type][j]
-            keys_ = keys(data)
-            if !(SAVEFP_KEY in keys_)
+            print("gt[$(j)]: $(gate_time) ")
+            save_file_path = F2C_DATA[pulse_type][j]
+            save_file_paths[i, j] = save_file_path
+            save_file_path_old = ((isnothing(save_file_paths_old) ||
+                                   i > pulse_type_count_old || j > gate_time_count_old)
+                                  ? nothing : save_file_paths_old[i, j])
+            if !isnothing(findfirst("$(INVAL)", save_file_path))
+                println("INVAL")
                 continue
-            elseif DATAFP_KEY in keys_ && DATA2FP_KEY in keys_
-                data_file_path1 = data[DATAFP_KEY]
-                data_file_path2 = data[DATAFP_KEY]
-            else
-                save_file_path = data[SAVEFP_KEY]
-                save_type = data[SAVET_KEY]
-                println("gt[$(j)]: $(gate_time)")
-                data_file_path1 = run_sim_deqjl(
-                    1, gate_type; save_file_path=save_file_path,
-                    save_type=save_type, dynamics_type=schroed, dt=1e-3,
-                    negi_h0=SP1FQ_NEGI_H0_ISO,
-                )
-                data_file_path2 = run_sim_deqjl(
-                    1, gate_type; save_file_path=save_file_path,
-                    save_type=save_type, dynamics_type=schroed, dt=1e-3,
-                    negi_h0=SN1FQ_NEGI_H0_ISO,
-                )
             end
-            (fidelity1,) = h5open(data_file_path1, "r") do df1
-                fidelity1 = read(df1, "fidelities")[end]
-                return (fidelity1,)
+            for k = 1:F2C_AVG_COUNT
+                # skip redundant computation
+                if (!isnothing(save_file_path_old) && save_file_path == save_file_path_old
+                    && k <= avg_count_old)
+                    gate_errors[i, j, (k - 1) * 2 + 1] = gate_errors_old[i, j, (k - 1) * 2 + 1]
+                    gate_errors[i, j, (k - 1) * 2 + 2] = gate_errors_old[i, j, (k - 1) * 2 + 2]
+                    print("s")
+                else
+                    if pulse_type == analytic
+                        res1 = run_sim_deqjl(
+                            1, gate_type; dynamics_type=xpiby2nodis,
+                            negi_h0=F2C_S1_NEGI_H0, save=false, seed=k
+                        )
+                        res2 = run_sim_deqjl(
+                            1, gate_type; dynamics_type=xpiby2nodis,
+                            negi_h0=F2C_S2_NEGI_H0, save=false, seed=k
+                        )
+                    else
+                        res1 = run_sim_prop(
+                            1, gate_type, save_file_path;
+                            negi_h0=F2C_S1_NEGI_H0, save=false, seed=k,
+                        )
+                        res2 = run_sim_prop(
+                            1, gate_type, save_file_path;
+                            negi_h0=F2C_S2_NEGI_H0, save=false, seed=k,
+                        )
+                    end
+                    ge1 = 1 - res1["fidelities"][end]
+                    ge2 = 1 - res2["fidelities"][end]
+                    gate_errors[i, j, (k - 1) * 2 + 1] = ge1
+                    gate_errors[i, j, (k - 1) * 2 + 2] = ge2
+                    print(".")
+                end
             end
-            (fidelity2,) = h5open(data_file_path2, "r") do df2
-                fidelity2 = read(df2, "fidelities")[end]
-                return (fidelity2,)
-            end
-            fidelity = mean([fidelity1, fidelity2])
-            gate_errors[i, j] = 1 - fidelity
+            println("")
         end
     end
-    h5open(F2C_DATA_FILE_PATH, "w") do data_file
+
+    data_file_path = generate_file_path("h5", "f2c", SAVE_PATH)
+    h5open(data_file_path, "w") do data_file
         write(data_file, "gate_errors", gate_errors)
         write(data_file, "gate_times", F2C_GATE_TIMES)
-        write(data_file, "pulse_types", [Integer(pulse_type) for pulse_type in F2C_PT_LIST])
+        write(data_file, "pulse_types", pulse_types_integer)
+        write(data_file, "save_file_paths", save_file_paths)
+        write(data_file, "avg_count", F2C_AVG_COUNT)
     end
+    print("Saved f2c data to $(data_file_path)")
 end
 
 
 ### FIGURE 3 ###
-F3_DATA = Dict(
-    s2 => Dict(
-        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin18/00003_spin18.h5"),
-        SAVET_KEY => jl,
-        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin18/00053_spin18.h5")
-    ),
-    s4 => Dict(
-        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin18/00005_spin18.h5"),
-        SAVET_KEY => jl,
-        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin18/00054_spin18.h5")
-    ),
-    d2 => Dict(
-        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin17/00003_spin17.h5"),
-        SAVET_KEY => jl,
-        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin17/00051_spin17.h5"),
-    ),
-    d3 => Dict(
-        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin17/00005_spin17.h5"),
-        SAVET_KEY => jl,
-        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin17/00052_spin17.h5"),
-    ),
-    analytic => Dict(
-        SAVEFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
-        SAVET_KEY => py,
-        DATAFP_KEY => joinpath(SPIN_OUT_PATH, "spin14/00101_spin14.h5"),
-    ),
+const F3_DATA = Dict(
+    analytic => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
+    s2 => joinpath(SPIN_OUT_PATH, "spin18/00003_spin18.h5"),
+    s4 => joinpath(SPIN_OUT_PATH, "spin18/00005_spin18.h5"),
+    d2 => joinpath(SPIN_OUT_PATH, "spin17/00003_spin17.h5"),
+    d3 => joinpath(SPIN_OUT_PATH, "spin17/00005_spin17.h5"),
 )
 
-F3A_GATE_COUNT = Integer(1700)
-F3A_DT = 1e-3
-function make_figure3a()
-    # compute
-    gate_type = ypiby2
-    dynamics_type = lindbladcfn
-    for pulse_type in keys(F3_DATA)
-        pulse_data = F3_DATA[pulse_type]
-        if isnothing(pulse_data[DATAFP_KEY])
-            save_file_path = pulse_data[SAVEFP_KEY]
-            save_type = pulse_data[SAVET_KEY]
-            data_file_path = run_sim_deqjl(
-                F3A_GATE_COUNT, gate_type; save_file_path=save_file_path,
-                save_type=save_type, dynamics_type=dynamics_type, dt=F3A_DT
-            )
-            pulse_data[DATAFP_KEY] = data_file_path
-        end
+const F3A_PT_LIST = [analytic, s2, s4, d2, d3]
+function gen_3a()
+    pulse_types_integer = [Integer(pulse_type) for pulse_type in F3A_PT_LIST]
+    pulse_type_count = size(F3A_PT_LIST)[1]
+    save_file_paths = Array{String, 1}(undef, pulse_type_count)
+    for (i, pulse_type) in enumerate(F3A_PT_LIST)
+        save_file_paths[i] = F3_DATA[pulse_type]
+    end
+
+    data_file_path = generate_file_path("h5", "f3a", SAVE_PATH)
+    h5open(data_file_path, "w") do data_file
+        write(data_file, "save_file_paths", save_file_paths)
+        write(data_file, "pulse_types", pulse_types_integer)
+    end
+    println("Saved f3a data to $(data_file_path)")
+end
+
+
+const F3B_PT_LIST = [analytic, s2, s4, d2, d3]
+const F3B_AVG_COUNT = 10
+const F3B_GATE_COUNT = 1000
+const F3B_DT = 1e-3
+function gen_3b(;use_previous=true)
+    gate_type = xpiby2
+    pulse_types_integer = [Integer(pulse_type) for pulse_type in F3B_PT_LIST]
+    pulse_type_count = size(F3B_PT_LIST)[1]
+    save_file_paths = Array{String, 1}(undef, pulse_type_count)
+    gate_errors = ones(pulse_type_count, F3B_GATE_COUNT + 1, F3B_AVG_COUNT)
+
+    # check for previous computation
+    if use_previous
+        data_file_path_old = latest_file_path("h5", "f3b", SAVE_PATH)
+    else
+        data_file_path_old = nothing
+    end
+    if !isnothing(data_file_path_old)
+        (save_file_paths_old, gate_errors_old, avg_count_old
+         ) = h5open(data_file_path_old, "r") do data_file_old
+             gate_count_old = read(data_file_old, "gate_count")
+             pulse_types_integer_old = read(data_file_old, "pulse_types")
+             if gate_count_old == F3B_GATE_COUNT && pulse_types_integer_old == pulse_types_integer
+                 save_file_paths_old = read(data_file_old, "save_file_paths")
+                 gate_errors_old = read(data_file_old, "gate_errors")
+                 avg_count_old = read(data_file_old, "avg_count")
+             else
+                 save_file_paths_old = gate_errors_old = avg_count_old = nothing
+             end
+             return (save_file_paths_old, gate_errors_old, avg_count_old)
+         end
+    else
+        save_file_paths_old = gate_errors_old = avg_count_old = nothing
     end
     
-    # plot
-    colors = []; fidelitiess = []; labels = []
-    for pulse_type in keys(F3_DATA)
-        (fidelities,) = h5open(F3_DATA[pulse_type][SAVEFP_KEY], "r") do save_file
-            fidelities = read(save_file, "fidelities")
-            return (fidelities,)
+
+    for (i, pulse_type) in enumerate(F3B_PT_LIST)
+        print("pt[$(i)]: $(pulse_type) ")
+        save_file_path = F3_DATA[pulse_type]
+        save_file_paths[i] = save_file_path
+        save_file_path_old = isnothing(save_file_paths_old) ? nothing : save_file_paths_old[i]
+        dynamics_type = pulse_type == analytic ? xpiby2da : schroedda
+        save_file_path_sim = pulse_type == analytic ? nothing : save_file_path
+        for j = 1:F3B_AVG_COUNT
+            # avoid redundant computation
+            if (!isnothing(save_file_path_old) && save_file_path == save_file_path_old
+                && j <= avg_count_old)
+                gate_errors[i, :, j] = gate_errors_old[i, :, j]
+                print("s")
+            else
+                res = run_sim_deqjl(F3B_GATE_COUNT, gate_type;
+                                    save_file_path=save_file_path_sim,
+                                    dynamics_type=dynamics_type,
+                                    dt=F3B_DT, seed=j, save=false)
+                gate_errors[i, :, j] = 1 .- res["fidelities"]
+                print(".")
+            end
         end
-        color = F3_DATA[pulse_type][COLOR_KEY]
-        label = "$(PT_STR[pulse_type])"
-        push!(colors, color)
-        push!(fideltiess, fidelities)
-        push!(labels, label)
+        println("")
     end
-    plot_file_path = plot_fidelity_by_gate_count(fidelitiess; labels=labels, colors=colors)
-    println("Plotted Figure3a to $(plot_file_path)")
+
+    data_file_path = generate_file_path("h5", "f3b", SAVE_PATH)
+    h5open(data_file_path, "w") do data_file
+        write(data_file, "save_file_paths", save_file_paths)
+        write(data_file, "pulse_types", pulse_types_integer)
+        write(data_file, "gate_errors", gate_errors)
+        write(data_file, "avg_count", F3B_AVG_COUNT)
+        write(data_file, "gate_count", F3B_GATE_COUNT)
+    end
+    println("Saved f3b data to $(data_file_path)")
 end
 
 
 """
-gen_3cdata - generate an average of the flux noise used in fig3b,
+gen_3c - generate an average of the flux noise used in fig3b,
 see rbqoc/src/spin/spin.jl/run_sim_deqjl for noise construction
 """
-function gen_3cdata()
+function gen_3c()
     noise_dt_inv = DT_NOISE_INV
     noise_dist = STD_NORMAL
     noise_amp = NAMP_PREFACTOR
@@ -972,14 +587,12 @@ function gen_3cdata()
 end
 
 
-const SIGMAX = [0 1;
-                1 0]
-const SIGMAY = [0   -1im;
-                1im 0]
-const SIGMAZ = [1 0;
-                0 -1]
 const F3D_SAVE_STEP = 1e-1
 const F3D_PTS = [analytic, s2, s4, d2, d3]
+"""
+gen_3d - used for generating expectation values of an evolution
+to plot on bloch sphere
+"""
 function gen_3d()
     pulse_types_int = [Integer(pulse_type) for pulse_type in F3D_PTS]
     point_count = Integer(ceil(56.80 * F3D_SAVE_STEP^(-1)))
@@ -1021,8 +634,135 @@ function gen_3d()
 end
 
 
-function make_figure1()
-    make_figure1a()
-    make_figure1b()
-    make_figure1c()
+const F4_DATA = Dict(
+    corpse => joinpath(SPIN_OUT_PATH, "spin14/00124_spin14.h5"),
+    s2 => nothing,
+    s4 => nothing,
+    d1 => joinpath(SPIN_OUT_PATH, "spin19/00025_spin19.h5"),
+    d2 => joinpath(SPIN_OUT_PATH, "spin19/00026_spin19.h5"),
+)
+
+const F4A_PTS = [corpse, s2, s4, d1, d2]
+function gen_4a()
+    pulse_types_integer = [Integer(pulse_type) for pulse_type in F4A_PTS]
+    pulse_type_count = size(F4A_PTS)[1]
+    save_file_paths = Array{String, 1}(undef, pulse_type_count)
+    for (i, pulse_type) in enumerate(F4A_PTS)
+        save_file_path = F4_DATA[pulse_type]
+        save_file_paths[i] = isnothing(save_file_path) ? "" : save_file_path
+    end
+
+    data_file_path = generate_file_path("h5", "f4a", SAVE_PATH)
+    h5open(data_file_path, "w") do data_file
+        write(data_file, "save_file_paths", save_file_paths)
+        write(data_file, "pulse_types", pulse_types_integer)
+    end
+    println("Saved f4a data to $(data_file_path)")
+end
+
+
+const F4B_PTS = [corpse, s2, s4, d1, d2]
+const F4B_TRIAL_COUNT = Integer(1e2)
+const F4B_FQ_DEV = 2e-2
+const F4B_AVG_COUNT = 10
+const F4B_DT_INV = Int64(1e4) # go down to 1e5 if want ge < 10^-10
+function gen_4b(;use_previous=true)
+    gate_type = xpi
+    pulse_types_integer = [Integer(pt) for pt in F4B_PTS]
+    pulse_type_count = size(F4B_PTS)[1]
+    fq_devs = Array(range(-F4B_FQ_DEV, stop=F4B_FQ_DEV, length=2 * F4B_TRIAL_COUNT))
+    push!(fq_devs, 0)
+    negi_h0s = [fq_dev * NEGI_H0_ISO for fq_dev in fq_devs]
+    gate_errors = ones(pulse_type_count, 2 * F4B_TRIAL_COUNT + 1, F4B_AVG_COUNT)
+    save_file_paths = Array{String, 1}(undef, pulse_type_count)
+
+    # check for previous computation
+    if use_previous
+        data_file_path_old = latest_file_path("h5", "f4b", SAVE_PATH)
+    else
+        data_file_path_old = nothing
+    end
+    if isnothing(data_file_path_old)
+        save_file_paths_old = nothing
+    else
+        (save_file_paths_old, gate_errors_old, avg_count_old, pulse_type_count_old
+         ) = h5open(data_file_path_old, "r") do data_file_old
+             save_file_paths_old = read(data_file_old, "save_file_paths")
+             gate_errors_old = read(data_file_old, "gate_errors")
+             pulse_type_count_old = size(gate_errors_old)[1]
+             avg_count_old = read(data_file_old, "avg_count")
+             fq_devs_old = read(data_file_old, "fq_devs")
+             if fq_devs_old != fq_devs
+                 save_file_paths_old = nothing
+             end
+            return (save_file_paths_old, gate_errors_old, avg_count_old, pulse_type_count_old)
+        end
+    end
+
+    for (i, pulse_type) in enumerate(F4B_PTS)
+        println("pt[$(i)]: $(pulse_type)")
+        save_file_path = F4_DATA[pulse_type]
+        save_file_paths[i] = isnothing(save_file_path) ? "" : save_file_path
+        if isnothing(save_file_path)
+            continue
+        end
+        save_file_path_old = ((isnothing(save_file_paths_old) || i > pulse_type_count_old)
+                              ? nothing : save_file_paths_old[i])
+        save_file_path_sim = pulse_type == corpse ? nothing : save_file_path
+        if pulse_type == corpse
+            dynamics_type = xpicorpse
+        else
+            dynamics_type = schroed
+        end
+
+        for j = 1:2 * F4B_TRIAL_COUNT + 1
+            negi_h0 = negi_h0s[j]
+            for k = 1:F4B_AVG_COUNT
+                # skip redundant computation
+                if (!isnothing(save_file_path_old) && save_file_path == save_file_path_old
+                    && k <= avg_count_old)
+                    gate_errors[i, j, k] = gate_errors_old[i, j, k]
+                else
+                    res = run_sim_deqjl(
+                        1, gate_type; dynamics_type=dynamics_type,
+                        save_file_path=save_file_path_sim,
+                        dt_inv=F4B_DT_INV, save=false, negi_h0=negi_h0, seed=k
+                    )
+                    gate_errors[i, j, k] = 1 - res["fidelities"][end]
+                end
+            end
+        end
+    end
+    
+    data_file_path = generate_file_path("h5", "f4b", SAVE_PATH)
+    h5open(data_file_path, "w") do data_file
+        write(data_file, "pulse_types", pulse_types_integer)
+        write(data_file, "gate_errors", gate_errors)
+        write(data_file, "save_file_paths", save_file_paths)
+        write(data_file, "avg_count", F4B_AVG_COUNT)
+        write(data_file, "fq_devs", fq_devs)
+    end
+    println("Saved f4b data to $(data_file_path)")
+end
+
+
+"""
+generate all required figure data
+"""
+function gen_all(;use_previous=true)
+    gen_1a()
+    gen_1b()
+    gen_1c(;use_previous=use_previous)
+    gen_2a()
+    gen_2b(;use_previous=use_previous)
+    gen_2c(;use_previous=use_previous)
+    gen_3a()
+    gen_3b(;use_previous=use_previous)
+end
+
+
+# If you run `julia figures.jl` all of the figure data will be
+# generated from scratch.
+if String(@__FILE__) == String(joinpath(pwd(), PROGRAM_FILE))
+    gen_all(;use_previous=false)
 end
