@@ -103,7 +103,7 @@ PT_STR = {
 }
 
 PT_COLOR = {
-    PulseType.analytic: "blue",
+    PulseType.analytic: "skyblue",
     PulseType.qoc: "red",
     PulseType.s2: "lime",
     PulseType.s4: "green",
@@ -115,7 +115,7 @@ PT_COLOR = {
     PulseType.d3b: "darkred",
     PulseType.corpse: "pink",
     PulseType.d1: "lightcoral",
-    PulseType.sut8: "hotpink",
+    PulseType.sut8: "green",
 }
 
 PT_LS = {
@@ -131,16 +131,17 @@ PT_LS = {
     PulseType.d3b: DASH_LS,
     PulseType.corpse: "solid",
     PulseType.d1: "solid",
+    PulseType.sut8: "solid",
 }
 
 PT_MARKER = {
-    PulseType.analytic: "x",
+    PulseType.analytic: "*",
     PulseType.s2: "o",
     PulseType.s4: "s",
     PulseType.d2: "^",
     PulseType.d3: "d",
     PulseType.corpse: "x",
-    PulseType.sut8: "*",
+    PulseType.sut8: "s",
 }
 
 # METHODS #
@@ -459,18 +460,18 @@ def make_figure2a():
         label = "{}".format(PT_STR[pulse_type])
         linestyle = "solid" #PT_LS[pulse_type]
         save_file_path = save_file_paths[i]
-        (controls, evolution_time) = grab_controls(save_file_path)
+        (controls, evolution_time, dt) = grab_controls(save_file_path)
         (control_eval_count, control_count) = controls.shape
-        control_eval_times = np.arange(0, control_eval_count, 1) * DT_PREF
+        control_eval_times = np.arange(0, control_eval_count, 1) * dt
         axs[i].plot(control_eval_times, controls[:, 0], color=color, label=label,
-                    linestyle=linestyle, zorder=2, linewidth=LW)
+                    linestyle=linestyle, linewidth=LW, zorder=2)
         axs[i].set_xlim((0 - F2A_XEPS, 56.80 + F2A_XEPS))
         if pulse_type == PulseType.analytic:
             axs[i].set_ylim(-0.15, 0.15)
             axs[i].set_yticks([-0.1, 0, 0.1])
-        elif pulse_type == PulseType.s2 or pulse_type == PulseType.s4:
-            axs[i].set_ylim(-0.1, 0.1)
-            axs[i].set_yticks([-0.06, 0, 0.06])
+        elif pulse_type == PulseType.s2:
+            axs[i].set_ylim(-0.63, 0.63)
+            axs[i].set_yticks([-0.4, 0, 0.4])
         else:
             axs[i].set_ylim((-0.63, 0.63))
             axs[i].set_yticks([-0.4, 0, 0.4])
@@ -481,7 +482,7 @@ def make_figure2a():
     #ENDFOR
     axs[0].text(3, 0.05, "Anl.", fontsize=TEXT_FS)
     fig.text(0.3, 0.75, "S-2", fontsize=TEXT_FS)
-    fig.text(0.3, 0.59, "S-4", fontsize=TEXT_FS)
+    fig.text(0.3, 0.59, "SU-8", fontsize=TEXT_FS)
     axs[3].text(3, 0.25, "D-2", fontsize=TEXT_FS)
     axs[4].text(3, 0.25, "D-3", fontsize=TEXT_FS)
     axs[2].set_ylabel("$a$ (GHz)", fontsize=LABEL_FS)
@@ -489,7 +490,7 @@ def make_figure2a():
     axs[4].set_xticks([0 - F2A_XEPS, 25, 50])
     axs[4].set_xticklabels(["0", "25", "50"])
     fig.text(0, 0.955, "(a)", fontsize=TEXT_FS)
-    plt.subplots_adjust(left=0.26, right=0.997, top=0.96, bottom=0.15, hspace=0., wspace=None)
+    plt.subplots_adjust(left=0.23, right=0.997, top=0.96, bottom=0.15, hspace=0., wspace=None)
     plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     plt.savefig(plot_file_path, dpi=DPI_FINAL)
     print("Saved Figure2a to {}"
@@ -519,7 +520,8 @@ def make_figure2b():
     fig = plt.figure(figsize=(PAPER_TW * 0.23, PAPER_TW * 0.315))
     ax = plt.gca()
     for (i, pulse_type) in enumerate(pulse_types):
-        if pulse_type in [PulseType.s2, PulseType.s4, PulseType.s2b, PulseType.s4b]:
+        if pulse_type in [PulseType.s2, PulseType.sut8, PulseType.d3,
+                          PulseType.s2b, PulseType.s4b, PulseType.d3b]:
             continue
         #ENDIF
         linestyle = PT_LS[pulse_type]
@@ -556,7 +558,15 @@ def make_figure2b():
 
 
 F2C_MS = 30
+F2C_MSS = 40
 F2C_MEW = 0.5
+F2C_PT_ZO = {
+    PulseType.analytic: 6,
+    PulseType.s2: 3,
+    PulseType.sut8: 2,
+    PulseType.d2: 5,
+    PulseType.d3: 4,
+}
 def make_figure2c():
     fig = plt.figure(figsize=(PAPER_TW * 0.4, PAPER_TW * 0.315))
     ax = plt.gca()
@@ -572,19 +582,21 @@ def make_figure2c():
         label = "{}".format(PT_STR[pulse_type])
         color = PT_COLOR[pulse_type]
         marker = PT_MARKER[pulse_type]
+        marker_size = F2C_MSS if marker == "*" else F2C_MS
+        zorder = F2C_PT_ZO[pulse_type]
         for (j, gate_time) in enumerate(gate_times):
             gate_error = gate_errors[i, j]
             plt.scatter([gate_time], [gate_error], color=color,
-                        marker=marker, s=F2C_MS, linewidths=F2C_MEW,
-                        edgecolors="black")
+                        marker=marker, s=marker_size, linewidths=F2C_MEW,
+                        edgecolors="black", zorder=zorder)
         #ENDFOR
         plt.scatter([], [], label=label, color=color, linewidths=F2C_MEW,
                     s=F2C_MS, marker=marker, edgecolors="black")
     #ENDFOR
-    plt.ylim(0, 1.6e-4)
+    plt.ylim(0, 1.3e-4)
     plt.yticks(
-        np.array([0, 0.5, 1.0, 1.5]) * 1e-4,
-        ["0.0", "0.5", "1.0", "1.5"],
+        np.array([0, 0.5, 1.0]) * 1e-4,
+        ["0.0", "0.5", "1.0"],
     )
     plt.xticks([50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160],
                ["", "60", "", "80", "", "100", "", "120", "", "140", "", "160"])

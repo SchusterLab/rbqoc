@@ -1,5 +1,5 @@
 """
-spin23.jl - unscented transform robustness for the δf_q problem
+spin23.jl - unscented transform robustness for the δfq problem
 """
 
 WDIR = joinpath(@__DIR__, "../../")
@@ -45,7 +45,7 @@ const S7STATE1_IDX = S6STATE1_IDX[end] + 1:S6STATE1_IDX[end] + HDIM_ISO
 const S8STATE1_IDX = S7STATE1_IDX[end] + 1:S7STATE1_IDX[end] + HDIM_ISO
 const SAMPLE_COUNT = 8
 const SAMPLE_COUNT_INV = 1//8
-const ASTATE_SIZE = ASTATE_SIZE_BASE # + SAMPLE_COUNT * HDIM_ISO
+const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
 const ACONTROL_SIZE = CONTROL_COUNT
 # control indices
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
@@ -62,14 +62,14 @@ end
 
 
 function unscented_transform!(model::Model, z::AbstractKnotPoint{T,N,M}) where {T,N,M}
-    s11 = z.z[S1STATE1_IDX]
-    s21 = z.z[S2STATE1_IDX]
-    s31 = z.z[S3STATE1_IDX]
-    s41 = z.z[S4STATE1_IDX]
-    s51 = z.z[S5STATE1_IDX]
-    s61 = z.z[S6STATE1_IDX]
-    s71 = z.z[S7STATE1_IDX]
-    s81 = z.z[S8STATE1_IDX]
+    s11 = SVector{HDIM_ISO}(z.z[S1STATE1_IDX])
+    s21 = SVector{HDIM_ISO}(z.z[S2STATE1_IDX])
+    s31 = SVector{HDIM_ISO}(z.z[S3STATE1_IDX])
+    s41 = SVector{HDIM_ISO}(z.z[S4STATE1_IDX])
+    s51 = SVector{HDIM_ISO}(z.z[S5STATE1_IDX])
+    s61 = SVector{HDIM_ISO}(z.z[S6STATE1_IDX])
+    s71 = SVector{HDIM_ISO}(z.z[S7STATE1_IDX])
+    s81 = SVector{HDIM_ISO}(z.z[S8STATE1_IDX])
     
     s1m = SAMPLE_COUNT_INV .* (
         s11 + s21 + s31 + s41
@@ -87,16 +87,20 @@ function unscented_transform!(model::Model, z::AbstractKnotPoint{T,N,M}) where {
         d1 * d1' + d2 * d2' + d3 * d3' + d4 * d4'
         + d5 * d5' + d6 * d6' + d7 * d7' + d8 * d8'
     )
-    cov_chol = model.alpha * cholesky(cov, check=false).L
+    cov_chol = model.alpha * cholesky(cov).L
 
-    s11 = s1m + cov_chol[1:HDIM_ISO, 1]
-    s21 = s1m - cov_chol[1:HDIM_ISO, 1]
-    s31 = s1m + cov_chol[1:HDIM_ISO, 2]
-    s41 = s1m - cov_chol[1:HDIM_ISO, 2]
-    s51 = s1m + cov_chol[1:HDIM_ISO, 3]
-    s61 = s1m - cov_chol[1:HDIM_ISO, 3]
-    s71 = s1m + cov_chol[1:HDIM_ISO, 4]
-    s81 = s1m - cov_chol[1:HDIM_ISO, 4]
+    cc1 = SVector{HDIM_ISO}(cov_chol[1:HDIM_ISO, 1])
+    cc2 = SVector{HDIM_ISO}(cov_chol[1:HDIM_ISO, 2])
+    cc3 = SVector{HDIM_ISO}(cov_chol[1:HDIM_ISO, 3])
+    cc4 = SVector{HDIM_ISO}(cov_chol[1:HDIM_ISO, 4])
+    s11 = s1m + cc1
+    s21 = s1m - cc1
+    s31 = s1m + cc2
+    s41 = s1m - cc2
+    s51 = s1m + cc3
+    s61 = s1m - cc3
+    s71 = s1m + cc4
+    s81 = s1m - cc4
     model.s1_samples[1] = s11 ./ sqrt(s11's11)
     model.s1_samples[2] = s21 ./ sqrt(s21's21)
     model.s1_samples[3] = s31 ./ sqrt(s31's31)
@@ -124,18 +128,18 @@ function discrete_dynamics_(model::Model, astate::StaticVector{ASTATE_SIZE},
     controls = astate[CONTROLS_IDX[1]] + dt * astate[DCONTROLS_IDX[1]]
     dcontrols = astate[DCONTROLS_IDX[1]] + dt * acontrol[D2CONTROLS_IDX[1]]
 
-    # s11 = exp(dt * (model.fq_samples[1] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[1]
-    # s21 = exp(dt * (model.fq_samples[2] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[2]
-    # s31 = exp(dt * (model.fq_samples[3] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[3]
-    # s41 = exp(dt * (model.fq_samples[4] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[4]
-    # s51 = exp(dt * (model.fq_samples[5] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[5]
-    # s61 = exp(dt * (model.fq_samples[6] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[6]
-    # s71 = exp(dt * (model.fq_samples[7] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[7]
-    # s81 = exp(dt * (model.fq_samples[8] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[8]
+    s11 = exp(dt * (model.fq_samples[1] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[1]
+    s21 = exp(dt * (model.fq_samples[2] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[2]
+    s31 = exp(dt * (model.fq_samples[3] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[3]
+    s41 = exp(dt * (model.fq_samples[4] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[4]
+    s51 = exp(dt * (model.fq_samples[5] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[5]
+    s61 = exp(dt * (model.fq_samples[6] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[6]
+    s71 = exp(dt * (model.fq_samples[7] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[7]
+    s81 = exp(dt * (model.fq_samples[8] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[8]
     
     astate_ = [
         state1; state2; intcontrols; controls; dcontrols;
-        # s11; s21; s31; s41; s51; s61; s71; s81;
+        s11; s21; s31; s41; s51; s61; s71; s81;
     ]
     
     return astate_
@@ -144,7 +148,7 @@ end
 
 # Note that TO.rollout! uses RK3.
 function RD.discrete_dynamics(::Type{RK3}, model::Model, z::AbstractKnotPoint{T,N,M}) where {T,N,M}
-    # unscented_transform!(model, z)
+    unscented_transform!(model, z)
     return discrete_dynamics_(model, RD.state(z), RD.control(z), z.t, z.dt)
 end
 
@@ -152,7 +156,7 @@ end
 function RD.discrete_jacobian!(::Type{RK3}, ∇f, model::Model, z::AbstractKnotPoint{T,N,M}) where {T,N,M}
     ix,iu,idt = z._x, z._u, N+M+1
     t = z.t
-    # unscented_transform!(model, z)
+    unscented_transform!(model, z)
     fd_aug(s) = discrete_dynamics_(model, s[ix], s[iu], t, z.dt)
     ∇f .= ForwardDiff.jacobian(fd_aug, SVector{N+M}(z.z))
     return nothing
@@ -160,74 +164,58 @@ end
 
 
 # This cost puts a gate error cost on
-# the sample states and a quadratic cost on the other terms.
+# the sample states and a LQR cost on the other terms.
 # The hessian w.r.t the state and controls is constant.
 struct Cost{N,M,T} <: TO.CostFunction
-    hess_astate::Symmetric{T, SMatrix{N,N,T}}
+    Q::Diagonal{T, SVector{N,T}}
     R::Diagonal{T, SVector{M,T}}
+    q::SVector{N, T}
+    c::T
+    hess_astate::Symmetric{T, SMatrix{N,N,T}}
     target_state1::SVector{HDIM_ISO, T}
-    target_state2::SVector{HDIM_ISO, T}
-    q_s::SVector{1, T}
-    q_inta::SVector{1, T}
-    q_a::SVector{1, T}
-    q_da::SVector{1, T}
-    q_ss::SVector{1, T}
+    q_ss::T
 end
 
-function Cost(target_state1::SVector{HDIM_ISO, T}, target_state2::SVector{HDIM_ISO, T},
-              q_s::T, q_inta::T, q_a::T, q_da::T, q_ss::T, r_d2a::T) where {T}
-    N = ASTATE_SIZE
-    M = ACONTROL_SIZE
+function Cost(Q::Diagonal{T,SVector{N,T}}, R::Diagonal{T,SVector{M,T}},
+              xf::SVector{N,T}, target_state1::SVector{HDIM_ISO,T}, q_ss::T) where {N,M,T}
+    q = -Q * xf
+    c = 0.5 * xf' * Q * xf
     hess_astate = zeros(N, N)
     # For reasons unkown to the author, throwing a -1 in front
     # of the gate error Hessian makes the cost function work.
-    hess_astate[STATE1_IDX, STATE1_IDX] = q_s * -1 * hessian_gate_error_iso2(target_state1)
-    hess_astate[STATE2_IDX, STATE2_IDX] = q_s * -1 * hessian_gate_error_iso2(target_state2)
-    hess_astate[INTCONTROLS_IDX, INTCONTROLS_IDX] .= q_inta
-    hess_astate[CONTROLS_IDX, CONTROLS_IDX] .= q_a
-    hess_astate[DCONTROLS_IDX, DCONTROLS_IDX] .= q_da
-    # hess_sample = qs[5] * hessian_gate_error_iso2(target_state1)
-    # hess_astate[S1STATE1_IDX, S1STATE1_IDX] = hess_sample
-    # hess_astate[S2STATE1_IDX, S2STATE1_IDX] = hess_sample
-    # hess_astate[S3STATE1_IDX, S3STATE1_IDX] = hess_sample
-    # hess_astate[S4STATE1_IDX, S4STATE1_IDX] = hess_sample
-    # hess_astate[S5STATE1_IDX, S5STATE1_IDX] = hess_sample
-    # hess_astate[S6STATE1_IDX, S6STATE1_IDX] = hess_sample
-    # hess_astate[S7STATE1_IDX, S7STATE1_IDX] = hess_sample
-    # hess_astate[S8STATE1_IDX, S8STATE1_IDX] = hess_sample
+    hess_sample = -1 * q_ss * hessian_gate_error_iso2(target_state1)
+    hess_astate[S1STATE1_IDX, S1STATE1_IDX] = hess_sample
+    hess_astate[S2STATE1_IDX, S2STATE1_IDX] = hess_sample
+    hess_astate[S3STATE1_IDX, S3STATE1_IDX] = hess_sample
+    hess_astate[S4STATE1_IDX, S4STATE1_IDX] = hess_sample
+    hess_astate[S5STATE1_IDX, S5STATE1_IDX] = hess_sample
+    hess_astate[S6STATE1_IDX, S6STATE1_IDX] = hess_sample
+    hess_astate[S7STATE1_IDX, S7STATE1_IDX] = hess_sample
+    hess_astate[S8STATE1_IDX, S8STATE1_IDX] = hess_sample
+    hess_astate += Q
     hess_astate = Symmetric(SMatrix{N, N}(hess_astate))
-    R = Diagonal(SVector{M}(r_d2a))
-    return Cost{N,M,T}(
-        hess_astate, R, target_state1, target_state2, SVector{1}(q_s),
-        SVector{1}(q_inta), SVector{1}(q_a), SVector{1}(q_da), SVector{1}(q_ss)
-    )
+    return Cost{N,M,T}(Q, R, q, c, hess_astate, target_state1, q_ss)
 end
 
 @inline TO.state_dim(cost::Cost{N,M,T}) where {N,M,T} = N
 @inline TO.control_dim(cost::Cost{N,M,T}) where {N,M,T} = M
 @inline Base.copy(cost::Cost{N,M,T}) where {N,M,T} = Cost{N,M,T}(
-        cost.hess_astate, cost.R, cost.target_state1, cost.target_state2, cost.q_s,
-        cost.q_inta, cost.q_a, cost.q_da, cost.q_ss
+    cost.Q, cost.R, cost.q, cost.c, cost.hess_astate,
+    cost.target_state1, cost.q_ss
 )
 
 @inline TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N}) where {N,M,T} = (
-    cost.q_s[1] * (
-        gate_error_iso2(astate, cost.target_state1, STATE1_IDX[1] - 1)
-        + gate_error_iso2(astate, cost.target_state2, STATE2_IDX[1] - 1)
+    0.5 * astate' * cost.Q * astate + cost.q'astate + cost.c
+    + cost.q_ss * (
+        gate_error_iso2(astate, cost.target_state1, S1STATE1_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S2STATE1_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S3STATE1_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S4STATE1_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S5STATE1_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S6STATE1_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S7STATE1_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S8STATE1_IDX[1] - 1)
     )
-    + 0.5 * cost.q_inta[1] * astate[INTCONTROLS_IDX[1]]^2
-    + 0.5 * cost.q_a[1] * astate[CONTROLS_IDX[1]]^2
-    + 0.5 * cost.q_da[1] * astate[DCONTROLS_IDX[1]]^2
-    # + cost.q_ss * (
-    #     gate_error_iso2(astate, cost.target_state1, S1STATE1_IDX[1] - 1)
-    #     + gate_error_iso2(astate, cost.target_state1, S2STATE1_IDX[1] - 1)
-    #     + gate_error_iso2(astate, cost.target_state1, S3STATE1_IDX[1] - 1)
-    #     + gate_error_iso2(astate, cost.target_state1, S4STATE1_IDX[1] - 1)
-    #     + gate_error_iso2(astate, cost.target_state1, S5STATE1_IDX[1] - 1)
-    #     + gate_error_iso2(astate, cost.target_state1, S6STATE1_IDX[1] - 1)
-    #     + gate_error_iso2(astate, cost.target_state1, S7STATE1_IDX[1] - 1)
-    #     + gate_error_iso2(astate, cost.target_state1, S8STATE1_IDX[1] - 1)
-    # )
 )
 
 @inline TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N}, acontrol::SVector{M}) where {N,M,T} = (
@@ -235,24 +223,19 @@ end
 )
 
 function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T}) where {N,M,T}
-    E.q = [
-        cost.q_s[1] * jacobian_gate_error_iso2(astate, cost.target_state1, STATE1_IDX[1] - 1);
-        cost.q_s[1] * jacobian_gate_error_iso2(astate, cost.target_state2, STATE2_IDX[1] - 1);
-        cost.q_inta * astate[INTCONTROLS_IDX[1]];
-        cost.q_a * astate[CONTROLS_IDX[1]];
-        cost.q_da * astate[DCONTROLS_IDX[1]];
-        # cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S1STATE1_IDX[1] - 1);
-        # cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S2STATE1_IDX[1] - 1);
-        # cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S3STATE1_IDX[1] - 1);
-        # cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S4STATE1_IDX[1] - 1);
-        # cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S5STATE1_IDX[1] - 1);
-        # cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S6STATE1_IDX[1] - 1);
-        # cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S7STATE1_IDX[1] - 1);
-        # cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S8STATE1_IDX[1] - 1);
-    ]
+    E.q = (cost.Q * astate + cost.q + [
+        @SVector zeros(ASTATE_SIZE_BASE);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S1STATE1_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S2STATE1_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S3STATE1_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S4STATE1_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S5STATE1_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S6STATE1_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S7STATE1_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S8STATE1_IDX[1] - 1);
+    ])
     return false
 end
-
 
 function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T},
                       acontrol::SVector{M,T}) where {N,M,T}
@@ -262,48 +245,16 @@ function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SV
     return false
 end
 
-
 function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T}) where {N,M,T}
     E.Q = cost.hess_astate
     return true
 end
-
 
 function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T},
                      acontrol::SVector{M,T}) where {N,M,T}
     TO.hessian!(E, cost, astate)
     E.R = cost.R
     E.H .= 0
-    return true
-end
-
-
-# This constraint ensures the gate error goes to zero.
-struct GateErrorConstraint{N,P,T} <: TO.StateConstraint
-    target_state::SVector{P,T}
-    inds::UnitRange{Int}
-end
-
-function GateErrorConstraint(target_state::SVector{P,T}, inds::UnitRange{Int}, astate_size::Int) where {N,P,T}
-    return GateErrorConstraint{astate_size, P,T}(target_state, inds)
-end
-
-@inline Base.copy(con::GateErrorConstraint{N,P,T}) where {N,P,T} = GateErrorConstraint{N,P,T}(con.target_state,
-                                                                                              con.inds)
-@inline Base.length(con::GateErrorConstraint{N,P,T}) where {N,P,T} = P
-@inline TO.sense(con::GateErrorConstraint) = TO.Equality()
-@inline TO.state_dim(con::GateErrorConstraint{N,P,T}) where {N,P,T} = N
-@inline TO.is_bound(con::GateErrorConstraint) = true
-@inline TO.evaluate(con::GateErrorConstraint, astate::SVector) = gate_error_iso2(astate, con.target_state,
-                                                                                 con.inds[1] - 1)
-
-function TO.jacobian!(∇c, con::GateErrorConstraint, z::AbstractKnotPoint)
-    ∇c = jacobian_gate_error_iso2(z.z, con.target_state, con.inds[1] - 1);
-end
-
-function TO.∇jacobian!(G, con::GateErrorConstraint, z::AbstractKnotPoint{T,N,M}, λ::AbstractVector) where {T,N,M}
-    G = λ[1] * -1 * hessian_gate_error_iso2(con.target_state)
-    G .+= G
     return true
 end
 
@@ -333,10 +284,10 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         INITIAL_STATE2;
         zeros(3 * CONTROL_COUNT);
     ]
-    # for i = 1:SAMPLE_COUNT
-    #     sample = INITIAL_STATE1 .+ rand(astate_dist, HDIM_ISO)
-    #     append!(x0_, sample ./ sqrt(sample'sample))
-    # end
+    for i = 1:SAMPLE_COUNT
+        sample = INITIAL_STATE1 .+ rand(astate_dist, HDIM_ISO)
+        append!(x0_, sample ./ sqrt(sample'sample))
+    end
     x0 = SVector{n}(x0_)
 
     # target state
@@ -354,38 +305,38 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         target_state1;
         target_state2;
         zeros(3 * CONTROL_COUNT);
-        # repeat(target_state1, SAMPLE_COUNT);
+        repeat(target_state1, SAMPLE_COUNT);
     ])
     
     # control amplitude constraint
     x_max = SVector{n}([
         fill(Inf, STATE_COUNT * HDIM_ISO);
         fill(Inf, CONTROL_COUNT);
-        fill(MAX_CONTROL_NORM_0, 1); # control
+        fill(MAX_CONTROL_NORM_0, 1); # a
         fill(Inf, CONTROL_COUNT);
-        # fill(Inf, SAMPLE_COUNT * HDIM_ISO);
+        fill(Inf, SAMPLE_COUNT * HDIM_ISO);
     ])
     x_min = SVector{n}([
         fill(-Inf, STATE_COUNT * HDIM_ISO);
         fill(-Inf, CONTROL_COUNT);
-        fill(-MAX_CONTROL_NORM_0, 1); # control
+        fill(-MAX_CONTROL_NORM_0, 1); # a
         fill(-Inf, CONTROL_COUNT);
-        # fill(-Inf, SAMPLE_COUNT * HDIM_ISO);
+        fill(-Inf, SAMPLE_COUNT * HDIM_ISO);
     ])
-    # controls start and end at 0
+    # control amplitude constraint at boundary
     x_max_boundary = SVector{n}([
         fill(Inf, STATE_COUNT * HDIM_ISO);
         fill(Inf, CONTROL_COUNT);
-        fill(0, 1); # control
+        fill(0, 1); # a
         fill(Inf, CONTROL_COUNT);
-        # fill(Inf, SAMPLE_COUNT * HDIM_ISO);
+        fill(Inf, SAMPLE_COUNT * HDIM_ISO);
     ])
     x_min_boundary = SVector{n}([
         fill(-Inf, STATE_COUNT * HDIM_ISO);
         fill(-Inf, CONTROL_COUNT);
-        fill(0, 1); # control
+        fill(0, 1); # a
         fill(-Inf, CONTROL_COUNT);
-        # fill(-Inf, SAMPLE_COUNT * HDIM_ISO);
+        fill(-Inf, SAMPLE_COUNT * HDIM_ISO);
     ])
 
     # initial trajectory
@@ -400,8 +351,19 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     Z = Traj(X0, U0, dt * ones(N))
 
     # cost function
-    cost_k = Cost(target_state1, target_state2, qs[1], qs[2], qs[3], qs[4], qs[5], qs[6])
-    cost_f = Cost(target_state1, target_state2, qs[1] * N, qs[2] * N, qs[3] * N, qs[4] * N, qs[5] * N, qs[6])
+    Q = Diagonal(SVector{n}([
+        fill(qs[1], STATE_COUNT * HDIM_ISO); # ψ1, ψ2
+        fill(qs[2], CONTROL_COUNT); # ∫a
+        fill(qs[3], CONTROL_COUNT); # a
+        fill(qs[4], CONTROL_COUNT); # ∂a
+        fill(0, SAMPLE_COUNT * HDIM_ISO);
+    ]))
+    Qf = Q * N
+    R = Diagonal(SVector{m}([
+        fill(qs[6], CONTROL_COUNT); # ∂2a
+    ]))
+    cost_k = Cost(Q, R, xf, target_state1, qs[5])
+    cost_f = Cost(Qf, R, xf, target_state1, qs[5])
     objective = TO.Objective(cost_k, cost_f, N)
 
     # constraints
@@ -416,8 +378,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     normalization_constraint_2 = NormConstraint(n, m, 1, TO.Equality(), STATE2_IDX)
     
     constraints = ConstraintList(n, m, N)
-    # add_constraint!(constraints, control_bnd, 2:N-2)
-    # add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
+    add_constraint!(constraints, control_bnd, 2:N-2)
+    add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
     add_constraint!(constraints, target_astate_constraint, N:N)
     # add_constraint!(constraints, normalization_constraint_1, 2:N-1)
     # add_constraint!(constraints, normalization_constraint_2, 2:N-1)
