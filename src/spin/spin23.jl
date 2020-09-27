@@ -260,7 +260,7 @@ end
 
 
 # main
-function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
+function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
                   sqrtbp=false, integrator_type=rk3, qs=[1e0, 1e0, 1e0, 1e-1, 1e0, 1e-1],
                   dt_inv=Int64(1e1), smoke_test=false, constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true,

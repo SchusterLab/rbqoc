@@ -593,16 +593,17 @@ def make_figure2c():
         plt.scatter([], [], label=label, color=color, linewidths=F2C_MEW,
                     s=F2C_MS, marker=marker, edgecolors="black")
     #ENDFOR
-    plt.ylim(0, 1.3e-4)
+    plt.ylim(4.3e-5, 4.8e-5)
     plt.yticks(
-        np.array([0, 0.5, 1.0]) * 1e-4,
-        ["0.0", "0.5", "1.0"],
+        np.array([4.4, 4.6, 4.8]) * 1e-5,
+        ["4.4", "4.6", "4.8"],
     )
-    plt.xticks([50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160],
-               ["", "60", "", "80", "", "100", "", "120", "", "140", "", "160"])
+    # plt.xticks([50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160],
+    #            ["", "60", "", "80", "", "100", "", "120", "", "140", "", "160"])
+    plt.xticks([18, 20, 22, 24, 26, 28, 30, 32, 34])
     ax.tick_params(direction="in", labelsize=TICK_FS)
     plt.xlabel("$t_{N}$ (ns)", fontsize=LABEL_FS)
-    plt.ylabel("Gate Error ($10^{-4}$)", fontsize=LABEL_FS)
+    plt.ylabel("Gate Error ($10^{-5}$)", fontsize=LABEL_FS)
     plt.legend(frameon=False, loc="lower left", bbox_to_anchor=(-0.03, 0),
                handletextpad=0.2, fontsize=8, ncol=2, columnspacing=0.)
     fig.text(0, 0.955, "(b)", fontsize=TEXT_FS)

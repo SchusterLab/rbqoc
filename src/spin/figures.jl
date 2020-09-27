@@ -329,22 +329,22 @@ function gen_2b(;use_previous=true)
 end
 
 
-const F2C_GATE_TIMES = [50., 56.8, 60., 70., 80., 90., 100., 110., 120., 130., 140., 150., 160.]
+const F2C_GATE_TIMES = [18., 20., 22., 24., 26., 28., 30., 32., 34.] # 9
 const F2C_DATA = Dict(
     analytic => [joinpath(SPIN_OUT_PATH, "spin14/$(lpad(index, 5, '0'))_spin14.h5") for index in [
-        INVAL, 4, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
+        0, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
     ]],
     s2 => [joinpath(SPIN_OUT_PATH, "spin12/$(lpad(index, 5, '0'))_spin12.h5") for index in [
-        629, 627, 638, 655, 654, 666, 658, 665, 661, 667, 668, 681, 685
+        692, 706, 707, 708, 709, 710, 711, 712, 730,
     ]],
     sut8 => [joinpath(SPIN_OUT_PATH, "spin23/$(lpad(index, 5, '0'))_spin23.h5") for index in [
-        38, 94, 103, 113, 132, 135, 125, 140, 143, 145, 158, 154, 162
+        166, 168, 173, 169, 170, 171, 175, 173, 174
     ]],
     d2 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
-        105, 432, 98, 100, 99, 229, 231, 230, 232, 291, 289, 290, 292
+        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, 447
     ]],
     d3 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
-        141, 429, 114, 115, 113, 235, 236, 234, 438, 295, 293, 294, 362
+        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
     ]],
 )
 const F2C_PT_LIST = [analytic, s2, sut8, d2, d3]
@@ -403,11 +403,11 @@ function gen_2c(;use_previous=true)
                 else
                     if pulse_type == analytic
                         res1 = run_sim_deqjl(
-                            1, gate_type; dynamics_type=xpiby2nodis,
+                            1, gate_type; dynamics_type=zpiby2nodis,
                             negi_h0=F2C_S1_NEGI_H0, save=false, seed=k
                         )
                         res2 = run_sim_deqjl(
-                            1, gate_type; dynamics_type=xpiby2nodis,
+                            1, gate_type; dynamics_type=zpiby2nodis,
                             negi_h0=F2C_S2_NEGI_H0, save=false, seed=k
                         )
                     else
