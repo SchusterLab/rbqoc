@@ -109,8 +109,8 @@ function unscented_transform!(model::Model, z::AbstractKnotPoint{T,N,M}) where {
     model.s1_samples[6] = s61 ./ sqrt(s61's61)
     model.s1_samples[7] = s71 ./ sqrt(s71's71)
     model.s1_samples[8] = s81 ./ sqrt(s81's81)
-    rand!(model.fq_dist, model.fq_samples)
-    model.fq_samples .+= FQ
+    # rand!(model.fq_dist, model.fq_samples)
+    # model.fq_samples .+= FQ
 
     return nothing
 end
@@ -272,7 +272,10 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
     astate_dist = Distributions.Normal(0., astate_cov)
     s1_samples = [SVector{HDIM_ISO}(zeros(HDIM_ISO)) for i = 1:SAMPLE_COUNT]
     fq_dist = Distributions.Normal(0., fq_cov)
-    fq_samples = MVector{SAMPLE_COUNT}(zeros(SAMPLE_COUNT))
+    fq_samples = MVector{SAMPLE_COUNT}([
+        fill(FQ + fq_cov, Int(SAMPLE_COUNT / 2));
+        fill(FQ - fq_cov, Int(SAMPLE_COUNT / 2));
+    ])
     model = Model(s1_samples, fq_samples, fq_dist, alpha)
     n = RD.state_dim(model)
     m = RD.control_dim(model)

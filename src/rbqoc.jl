@@ -104,11 +104,11 @@ function grab_controls(save_file_path)
         save_type = SaveType(read(save_file, "save_type"))
         if save_type == jl
             cidx = read(save_file, "controls_idx")
-            controls = read(save_file, "astates")[:, cidx]
+            controls = read(save_file, "astates")[1:end - 1, cidx]
             evolution_time = read(save_file, "evolution_time")
             controls_dt_inv = "dt" in names(save_file) ? read(save_file, "dt")^(-1) : DT_PREF_INV
         elseif save_type == samplejl
-            controls = read(save_file, "controls_sample")
+            controls = read(save_file, "controls_sample")[1:end - 1]
             evolution_time = read(save_file, "evolution_time_sample")
             controls_dt_inv = DT_PREF_INV
         elseif save_type == py

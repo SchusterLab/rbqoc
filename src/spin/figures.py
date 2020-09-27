@@ -84,6 +84,8 @@ class PulseType(Enum):
     corpse = 11
     d1 = 12
     sut8 = 13
+    d1b = 14
+    sut8b = 15
 #ENDDEF
 
 PT_STR = {
@@ -107,15 +109,18 @@ PT_COLOR = {
     PulseType.qoc: "red",
     PulseType.s2: "lime",
     PulseType.s4: "green",
-    PulseType.d2: "red",
+    PulseType.d2: "darkred",
     PulseType.d3: "darkred",
     PulseType.s2b: "lime",
     PulseType.s4b: "green",
-    PulseType.d2b: "red",
+    PulseType.d2b: "darkred",
     PulseType.d3b: "darkred",
     PulseType.corpse: "pink",
     PulseType.d1: "lightcoral",
     PulseType.sut8: "green",
+    PulseType.d1: "red",
+    PulseType.d1b: "red",
+    PulseType.sut8b: "green"
 }
 
 PT_LS = {
@@ -132,16 +137,19 @@ PT_LS = {
     PulseType.corpse: "solid",
     PulseType.d1: "solid",
     PulseType.sut8: "solid",
+    PulseType.d1b: DASH_LS,
+    PulseType.sut8b: DASH_LS,
 }
 
 PT_MARKER = {
     PulseType.analytic: "*",
     PulseType.s2: "o",
-    PulseType.s4: "s",
-    PulseType.d2: "^",
-    PulseType.d3: "d",
-    PulseType.corpse: "x",
     PulseType.sut8: "s",
+    PulseType.d1: "^",
+    PulseType.d2: "d",
+    PulseType.corpse: "x",
+    PulseType.d3: "d",
+    PulseType.s4: "s",
 }
 
 # METHODS #
@@ -447,6 +455,7 @@ def make_figure1c():
 # FIGURE 2 #
 
 F2A_XEPS = 3e-1
+F2A_TF = 18.
 def make_figure2a():
     data_file_path = latest_file_path("h5", "f2a", SAVE_PATH)
     with h5py.File(data_file_path, "r") as data_file:
@@ -465,7 +474,7 @@ def make_figure2a():
         control_eval_times = np.arange(0, control_eval_count, 1) * dt
         axs[i].plot(control_eval_times, controls[:, 0], color=color, label=label,
                     linestyle=linestyle, linewidth=LW, zorder=2)
-        axs[i].set_xlim((0 - F2A_XEPS, 56.80 + F2A_XEPS))
+        axs[i].set_xlim((0 - F2A_XEPS, F2A_TF + F2A_XEPS))
         if pulse_type == PulseType.analytic:
             axs[i].set_ylim(-0.15, 0.15)
             axs[i].set_yticks([-0.1, 0, 0.1])
@@ -483,12 +492,12 @@ def make_figure2a():
     axs[0].text(3, 0.05, "Anl.", fontsize=TEXT_FS)
     fig.text(0.3, 0.75, "S-2", fontsize=TEXT_FS)
     fig.text(0.3, 0.59, "SU-8", fontsize=TEXT_FS)
-    axs[3].text(3, 0.25, "D-2", fontsize=TEXT_FS)
-    axs[4].text(3, 0.25, "D-3", fontsize=TEXT_FS)
+    axs[3].text(3, 0.25, "D-1", fontsize=TEXT_FS)
+    axs[4].text(3, 0.25, "D-2", fontsize=TEXT_FS)
     axs[2].set_ylabel("$a$ (GHz)", fontsize=LABEL_FS)
     axs[4].set_xlabel("$t$ (ns)", fontsize=LABEL_FS)
-    axs[4].set_xticks([0 - F2A_XEPS, 25, 50])
-    axs[4].set_xticklabels(["0", "25", "50"])
+    axs[4].set_xticks([0, 9, 18])
+    axs[4].set_xticklabels(["0", "9", "18"])
     fig.text(0, 0.955, "(a)", fontsize=TEXT_FS)
     plt.subplots_adjust(left=0.23, right=0.997, top=0.96, bottom=0.15, hspace=0., wspace=None)
     plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
@@ -520,8 +529,8 @@ def make_figure2b():
     fig = plt.figure(figsize=(PAPER_TW * 0.23, PAPER_TW * 0.315))
     ax = plt.gca()
     for (i, pulse_type) in enumerate(pulse_types):
-        if pulse_type in [PulseType.s2, PulseType.sut8, PulseType.d3,
-                          PulseType.s2b, PulseType.s4b, PulseType.d3b]:
+        if pulse_type in [PulseType.s2, PulseType.s2b, PulseType.sut8, PulseType.sut8b,
+                          PulseType.d1, PulseType.d2, PulseType.d2b]:
             continue
         #ENDIF
         linestyle = PT_LS[pulse_type]
@@ -544,8 +553,10 @@ def make_figure2b():
     ax.tick_params(direction="in", labelsize=TICK_FS)
     plt.xlabel("$|\delta f_{q} / f_{q}| \; (\%)$", fontsize=LABEL_FS)
     plt.ylabel("Gate Error", fontsize=LABEL_FS)
-    plt.plot([], [], label="$t_{N} = 56.8$ns", linestyle="solid", color="black")
-    plt.plot([], [], label="$t_{N} = 120$ns", linestyle="dashed", color="black")
+    # plt.plot([], [], label="$t_{N} = 56.8$ns", linestyle="solid", color="black")
+    # plt.plot([], [], label="$t_{N} = 120$ns", linestyle="dashed", color="black")
+    plt.plot([], [], label="$t_{N} = 18$ns", linestyle="solid", color="black")
+    plt.plot([], [], label="$t_{N} = 34$ns", linestyle="dashed", color="black")
     plt.legend(frameon=False, loc="lower left", bbox_to_anchor=(0.04, 0.02),
                fontsize=8, handlelength=1.5, handletextpad=0.4)
     fig.text(0, 0.955, "(c)", fontsize=TEXT_FS)
@@ -564,8 +575,8 @@ F2C_PT_ZO = {
     PulseType.analytic: 6,
     PulseType.s2: 3,
     PulseType.sut8: 2,
-    PulseType.d2: 5,
-    PulseType.d3: 4,
+    PulseType.d1: 5,
+    PulseType.d2: 4,
 }
 def make_figure2c():
     fig = plt.figure(figsize=(PAPER_TW * 0.4, PAPER_TW * 0.315))
@@ -593,13 +604,10 @@ def make_figure2c():
         plt.scatter([], [], label=label, color=color, linewidths=F2C_MEW,
                     s=F2C_MS, marker=marker, edgecolors="black")
     #ENDFOR
-    plt.ylim(4.3e-5, 4.8e-5)
-    plt.yticks(
-        np.array([4.4, 4.6, 4.8]) * 1e-5,
-        ["4.4", "4.6", "4.8"],
-    )
-    # plt.xticks([50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160],
-    #            ["", "60", "", "80", "", "100", "", "120", "", "140", "", "160"])
+    plt.ylim(3.3e-5, 4.8e-5)
+    yticks_ = np.arange(32, 48 + 1, 2)
+    ytick_labels = ["{:.1f}".format(ytick * 1e-1) for ytick in yticks_]
+    plt.yticks(yticks_ * 1e-6, ytick_labels)
     plt.xticks([18, 20, 22, 24, 26, 28, 30, 32, 34])
     ax.tick_params(direction="in", labelsize=TICK_FS)
     plt.xlabel("$t_{N}$ (ns)", fontsize=LABEL_FS)
