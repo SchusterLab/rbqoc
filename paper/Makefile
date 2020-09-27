@@ -2,7 +2,7 @@ PDF=pdflatex
 BIB=bibtex
 LATEXOBJS= *.aux *.log *.out *.pdf *.bbl *.blg
 
-PHEADER=paper
+PHEADER=main
 PSRCS=$(PHEADER).tex
 
 .PHONY: all clean
