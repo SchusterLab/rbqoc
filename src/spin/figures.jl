@@ -341,7 +341,7 @@ const F2C_DATA = Dict(
         166, 168, 173, 169, 170, 171, 175, 173, 174
     ]],
     d2 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
-        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, 447
+        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, 457
     ]],
     d3 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
         INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
