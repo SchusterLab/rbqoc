@@ -33,12 +33,7 @@ const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
 const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
 const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
 const DSTATE1_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO
-# const DSTATE2_IDX = DSTATE1_IDX[end] + 1:DSTATE1_IDX[end] + HDIM_ISO
-# const D2STATE1_IDX = DSTATE2_IDX[end] + 1:DSTATE2_IDX[end] + HDIM_ISO
-# const D2STATE2_IDX = DSTATE1_IDX[end] + 1:DSTATE1_IDX[end] + HDIM_ISO
 const D2STATE1_IDX = DSTATE1_IDX[end] + 1:DSTATE1_IDX[end] + HDIM_ISO
-# const D3STATE1_IDX = D2STATE2_IDX[end] + 1:D2STATE2_IDX[end] + HDIM_ISO
-# const D3STATE2_IDX = D3STATE1_IDX[end] + 1:D3STATE1_IDX[end] + HDIM_ISO
 const D3STATE1_IDX = D2STATE1_IDX[end] + 1:D2STATE1_IDX[end] + HDIM_ISO
 # control indices
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
@@ -47,7 +42,6 @@ const D2CONTROLS_IDX = 1:CONTROL_COUNT
 struct Model{DO} <: AbstractModel
 end
 @inline RD.state_dim(::Model{DO}) where {DO} = (
-    # ASTATE_SIZE_BASE + DO * STATE_COUNT * HDIM_ISO
     ASTATE_SIZE_BASE + DO * HDIM_ISO
 )
 @inline RD.control_dim(::Model) = ACONTROL_SIZE
@@ -55,8 +49,8 @@ end
 # dynamics
 const NEGI2_H0_ISO = 2 * NEGI_H0_ISO
 const NEGI3_H0_ISO = 3 * NEGI_H0_ISO
-function RD.discrete_dynamics(::Type{RK3}, model::Model{DO}, astate::StaticVector,
-                              acontrol::StaticVector, time::Real, dt::Real) where {DO}
+function RD.discrete_dynamics(::Type{RK3}, model::Model{DO}, astate::SVector,
+                              acontrol::SVector, time::Real, dt::Real) where {DO}
     negi_h = (
         FQ_NEGI_H0_ISO
         + astate[CONTROLS_IDX][1] * NEGI_H1_ISO
@@ -76,26 +70,17 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model{DO}, astate::StaticVecto
 
     if DO >= 1
         dstate1_ = astate[DSTATE1_IDX]
-        # dstate2_ = astate[DSTATE2_IDX]
         dstate1 = h_prop * (dstate1_ + dt * NEGI_H0_ISO * state1_)
-        # dstate2 = h_prop * (dstate2_ + dt * NEGI_H0_ISO * state2_)
-        # append!(astate_, [dstate1; dstate2])
         append!(astate_, dstate1)
     end
     if DO >= 2
         d2state1_ = astate[D2STATE1_IDX]
-        # d2state2_ = astate[D2STATE2_IDX]
         d2state1 = h_prop * (d2state1_ + dt * NEGI2_H0_ISO * dstate1_)
-        # d2state2 = h_prop * (d2state2_ + dt * NEGI2_H0_ISO * dstate2_)
-        # append!(astate_, [d2state1; d2state2])
         append!(astate_, d2state1)
     end
     if DO >= 3
         d3state1_ = astate[D3STATE1_IDX]
-        # d2state2_ = astate[D3STATE2_IDX]
         d3state1 = h_prop * (d3state1_ + dt * NEGI3_H0_ISO * d2state1_)
-        # d3state2 = h_prop * (d3state2_ + dt * NEGI3_H0_ISO * d2state2_)
-        # append!(astate_, [d3state1; d3state2])
         append!(astate_, d3state1)
     end
 
@@ -104,7 +89,7 @@ end
 
 
 # main
-function run_traj(;gate_type=zpiby2, evolution_time=56.8, solver_type=altro,
+function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
                   sqrtbp=false, derivative_order=0, integrator_type=rk3, qs=ones(7),
                   smoke_test=false, dt_inv=Int64(1e1), constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5))
@@ -119,7 +104,6 @@ function run_traj(;gate_type=zpiby2, evolution_time=56.8, solver_type=altro,
         INITIAL_STATE1;
         INITIAL_STATE2;
         zeros(3 * CONTROL_COUNT);
-        # zeros(derivative_order * STATE_COUNT * HDIM_ISO);
         zeros(derivative_order * HDIM_ISO);
     ])
 
@@ -138,7 +122,6 @@ function run_traj(;gate_type=zpiby2, evolution_time=56.8, solver_type=altro,
         target_state1;
         target_state2;
         zeros(3 * CONTROL_COUNT);
-        # zeros(derivative_order * STATE_COUNT * HDIM_ISO);
         zeros(derivative_order * HDIM_ISO);
     ])
     
@@ -148,7 +131,6 @@ function run_traj(;gate_type=zpiby2, evolution_time=56.8, solver_type=altro,
         fill(Inf, CONTROL_COUNT);
         fill(MAX_CONTROL_NORM_0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        # fill(Inf, derivative_order * STATE_COUNT * HDIM_ISO)
         fill(Inf, derivative_order * HDIM_ISO)
     ])
     x_min = SVector{n}([
@@ -156,7 +138,6 @@ function run_traj(;gate_type=zpiby2, evolution_time=56.8, solver_type=altro,
         fill(-Inf, CONTROL_COUNT);
         fill(-MAX_CONTROL_NORM_0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        # fill(-Inf, derivative_order * STATE_COUNT * HDIM_ISO)
         fill(-Inf, derivative_order * HDIM_ISO)
     ])
     # control amplitude constraint at boundary
@@ -165,7 +146,6 @@ function run_traj(;gate_type=zpiby2, evolution_time=56.8, solver_type=altro,
         fill(Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        # fill(Inf, derivative_order * STATE_COUNT * HDIM_ISO)
         fill(Inf, derivative_order * HDIM_ISO)
     ]
     x_min_boundary = [
@@ -173,7 +153,6 @@ function run_traj(;gate_type=zpiby2, evolution_time=56.8, solver_type=altro,
         fill(-Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        # fill(-Inf, derivative_order * STATE_COUNT * HDIM_ISO)
         fill(-Inf, derivative_order * HDIM_ISO)
     ]
 
@@ -194,9 +173,6 @@ function run_traj(;gate_type=zpiby2, evolution_time=56.8, solver_type=altro,
         fill(qs[2], 1); # int_control
         fill(qs[3], 1); # control
         fill(qs[4], 1); # dcontrol_dt
-        # fill(qs[5], eval(:($derivative_order >= 1 ? $STATE_COUNT * $HDIM_ISO : 0))); # dstate<1,2>
-        # fill(qs[6], eval(:($derivative_order >= 2 ? $STATE_COUNT * $HDIM_ISO : 0))); # d2state<1,2>
-        # fill(qs[7], eval(:($derivative_order >= 3 ? $STATE_COUNT * $HDIM_ISO : 0))); # d3state<1,2>
         fill(qs[5], eval(:($derivative_order >= 1 ? $HDIM_ISO : 0))); # dstate<1,2>
         fill(qs[6], eval(:($derivative_order >= 2 ? $HDIM_ISO : 0))); # d2state<1,2>
         fill(qs[7], eval(:($derivative_order >= 3 ? $HDIM_ISO : 0))); # d3state<1,2>
@@ -300,7 +276,7 @@ function run_traj(;gate_type=zpiby2, evolution_time=56.8, solver_type=altro,
 end
 
 
-function forward_pass(save_file_path; derivative_order=0, integrator_type=rk6)
+function forward_pass(save_file_path; derivative_order=0, integrator_type=rk3)
     (evolution_time, d2controls, dt
      ) = h5open(save_file_path, "r+") do save_file
          save_type = SaveType(read(save_file, "save_type"))
@@ -329,12 +305,12 @@ function forward_pass(save_file_path; derivative_order=0, integrator_type=rk6)
         INITIAL_STATE1;
         INITIAL_STATE2;
         zeros(3 * CONTROL_COUNT);
-        zeros(derivative_order * STATE_COUNT * HDIM_ISO);
+        zeros(derivative_order * HDIM_ISO);
     ])
     acontrols = [SVector{m}([d2controls[i, 1],]) for i = 1:knot_count - 1]
 
     for i = 1:knot_count - 1
-        astate = RD.discrete_dynamics(rdi, model, astate, acontrols[i], time, dt)
+        astate = SVector{n}(RD.discrete_dynamics(rdi, model, astate, acontrols[i], time, dt))
         time = time + dt
     end
 

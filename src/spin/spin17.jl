@@ -1,6 +1,9 @@
 """
-spin11.jl - derivative robustness for control amplitude
+spin17.jl - derivative robustness for the δa problem
 """
+
+WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
+include(joinpath(WDIR, "src", "spin", "spin.jl"))
 
 using Altro
 using HDF5
@@ -8,143 +11,103 @@ using LinearAlgebra
 using RobotDynamics
 using StaticArrays
 using TrajectoryOptimization
+const RD = RobotDynamics
 const TO = TrajectoryOptimization
-
-WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
-include(joinpath(WDIR, "src", "spin", "spin.jl"))
 
 # paths
 const EXPERIMENT_META = "spin"
 const EXPERIMENT_NAME = "spin17"
 const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
-# Define the optimization.
-const CONTROL_COUNT = 1
-const DT_STATIC = DT_PREF
-const DT_STATIC_INV = DT_PREF_INV
-const CONSTRAINT_TOLERANCE = 1e-8
-const AL_KICKOUT_TOLERANCE = 1e-7
-const PN_STEPS = 5
-const MAX_PENALTY = 1e11
-const ILQR_DJ_TOL = 1e-4
-
-# Define the problem.
+# problem
 const CONTROL_COUNT = 1
 const STATE_COUNT = 2
-const ASTATE_SIZE_BASE = STATE_COUNT * STATE_SIZE_ISO + 3 * CONTROL_COUNT
+const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
+const ACONTROL_SIZE = CONTROL_COUNT
 const INITIAL_STATE1 = [1., 0, 0, 0]
 const INITIAL_STATE2 = [0., 1, 0, 0]
 # state indices
-const STATE1_IDX = 1:STATE_SIZE_ISO
-const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + STATE_SIZE_ISO
+const STATE1_IDX = 1:HDIM_ISO
+const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
 const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
 const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
 const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
-const DSTATE1_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + STATE_SIZE_ISO
-const DSTATE2_IDX = DSTATE1_IDX[end] + 1:DSTATE1_IDX[end] + STATE_SIZE_ISO
-const D2STATE1_IDX = DSTATE2_IDX[end] + 1:DSTATE2_IDX[end] + STATE_SIZE_ISO
-const D2STATE2_IDX = D2STATE1_IDX[end] + 1:D2STATE1_IDX[end] + STATE_SIZE_ISO
-const D3STATE1_IDX = D2STATE2_IDX[end] + 1:D2STATE2_IDX[end] + STATE_SIZE_ISO
-const D3STATE2_IDX = D3STATE1_IDX[end] + 1:D3STATE1_IDX[end] + STATE_SIZE_ISO
+const DSTATE1_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO
+const D2STATE1_IDX = DSTATE1_IDX[end] + 1:DSTATE1_IDX[end] + HDIM_ISO
+const D3STATE1_IDX = D2STATE1_IDX[end] + 1:D2STATE1_IDX[end] + HDIM_ISO
 # control indices
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
 
-# Specify logging.
-const VERBOSE = true
-const SAVE = true
-
-# Misc. constants
-EMPTY_V = []
-
-
-# Define the dynamics.
+# model
 struct Model{DO} <: AbstractModel
-    Model(DO::Int64=0) = new{DO}()
 end
-RobotDynamics.state_dim(::Model{DO}) where DO = (
-    ASTATE_SIZE_BASE + DO * STATE_COUNT * STATE_SIZE_ISO
+@inline RD.state_dim(::Model{DO}) where {DO} = (
+    ASTATE_SIZE_BASE + DO * HDIM_ISO
 )
-RobotDynamics.control_dim(::Model{DO}) where DO = CONTROL_COUNT
+@inline RD.control_dim(::Model) = ACONTROL_SIZE
 
-const DNEGI_H = NEGI_H1_ISO
-const DNEGI_H2 = 2 * NEGI_H1_ISO
-const DNEGI_H3 = 3 * NEGI_H1_ISO
-function RobotDynamics.dynamics(model::Model{DO}, astate::StaticVector,
-                                acontrols::StaticVector, time::Real) where DO
+# dynamics
+const NEGI2_H1_ISO = 2 * NEGI_H1_ISO
+const NEGI3_H1_ISO = 3 * NEGI_H1_ISO
+function RD.discrete_dynamics(::Type{RK3}, model::Model{DO}, astate::SVector,
+                              acontrol::SVector, time::Real, dt::Real) where {DO}
     negi_h = (
         FQ_NEGI_H0_ISO
         + astate[CONTROLS_IDX][1] * NEGI_H1_ISO
     )
-    delta_state1 = negi_h * astate[STATE1_IDX]
-    delta_state2 = negi_h * astate[STATE2_IDX]
-    delta_intcontrol = astate[CONTROLS_IDX]
-    delta_control = astate[DCONTROLS_IDX]
-    delta_dcontrol = acontrols[D2CONTROLS_IDX]
+    h_prop = exp(negi_h * dt)
+    state1_ = astate[STATE1_IDX]
+    state2_ = astate[STATE2_IDX]
+    state1 =  h_prop * state1_
+    state2 = h_prop * state2_
+    intcontrols = astate[INTCONTROLS_IDX] + astate[CONTROLS_IDX] * dt
+    controls = astate[CONTROLS_IDX] + astate[DCONTROLS_IDX] * dt
+    dcontrols = astate[DCONTROLS_IDX] + acontrol[D2CONTROLS_IDX] * dt
 
-    if DO == 2
-        delta_dstate1 = DNEGI_H * astate[STATE1_IDX] + negi_h * astate[DSTATE1_IDX]
-        delta_dstate2 = DNEGI_H * astate[STATE2_IDX] + negi_h * astate[DSTATE2_IDX]
-        delta_d2state1 = DNEGI_H2 * astate[DSTATE1_IDX] + negi_h * astate[D2STATE1_IDX]
-        delta_d2state2 = DNEGI_H2 * astate[DSTATE2_IDX] + negi_h * astate[D2STATE2_IDX]
-        delta_astate = [
-            delta_state1;
-            delta_state2;
-            delta_intcontrol;
-            delta_control;
-            delta_dcontrol;
-            delta_dstate1;
-            delta_dstate2;
-            delta_d2state1;
-            delta_d2state2;
-        ]
-    elseif DO == 3
-        delta_dstate1 = DNEGI_H * astate[STATE1_IDX] + negi_h * astate[DSTATE1_IDX]
-        delta_dstate2 = DNEGI_H * astate[STATE2_IDX] + negi_h * astate[DSTATE2_IDX]
-        delta_d2state1 = DNEGI_H2 * astate[DSTATE1_IDX] + negi_h * astate[D2STATE1_IDX]
-        delta_d2state2 = DNEGI_H2 * astate[DSTATE2_IDX] + negi_h * astate[D2STATE2_IDX]
-        delta_d3state1 = DNEGI_H3 * astate[D2STATE1_IDX] + negi_h * astate[D3STATE1_IDX]
-        delta_d3state2 = DNEGI_H3 * astate[D2STATE2_IDX] + negi_h * astate[D3STATE2_IDX]
-        delta_astate = [
-            delta_state1;
-            delta_state2;
-            delta_intcontrol;
-            delta_control;
-            delta_dcontrol;
-            delta_dstate1;
-            delta_dstate2;
-            delta_d2state1;
-            delta_d2state2;
-            delta_d3state1;
-            delta_d3state2;
-        ]
-    else
-        delta_astate = [
-            delta_state1;
-            delta_state2;
-            delta_intcontrol;
-            delta_control;
-            delta_dcontrol;
-        ]
+    astate_ = [
+        state1; state2; intcontrols; controls; dcontrols;
+    ]
+
+    if DO >= 1
+        dstate1_ = astate[DSTATE1_IDX]
+        dstate1 = h_prop * (dstate1_ + dt * NEGI_H1_ISO * state1_)
+        append!(astate_, dstate1)
+    end
+    if DO >= 2
+        d2state1_ = astate[D2STATE1_IDX]
+        d2state1 = h_prop * (d2state1_ + dt * NEGI2_H1_ISO * dstate1_)
+        append!(astate_, d2state1)
+    end
+    if DO >= 3
+        d3state1_ = astate[D3STATE1_IDX]
+        d3state1 = h_prop * (d3state1_ + dt * NEGI3_H1_ISO * d2state1_)
+        append!(astate_, d3state1)
     end
 
-    return delta_astate
+    return astate_
 end
 
 
-function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
-                  postsample=false, initial_save_file_path=nothing,
-                  initial_save_type=jl, sqrtbp=false, derivative_order=0,
-                  integrator_type=rk6, max_penalty=MAX_PENALTY, qs=nothing)
-    model = Model(derivative_order)
+# main
+function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
+                  sqrtbp=false, derivative_order=0, integrator_type=rk3, qs=ones(7),
+                  smoke_test=false, dt_inv=Int64(1e1), constraint_tol=1e-8, al_tol=1e-4,
+                  pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5))
+    # model configuration
+    model = Model{derivative_order}()
     n = state_dim(model)
     m = control_dim(model)
     t0 = 0.
+
+    # initial state
     x0 = SVector{n}([
         INITIAL_STATE1;
         INITIAL_STATE2;
         zeros(3 * CONTROL_COUNT);
-        zeros(derivative_order * STATE_COUNT * STATE_SIZE_ISO);
+        zeros(derivative_order * HDIM_ISO);
     ])
+
+    # target state
     if gate_type == xpiby2
         target_state1 = Array(XPIBY2_ISO_1)
         target_state2 = Array(XPIBY2_ISO_2)
@@ -159,92 +122,74 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         target_state1;
         target_state2;
         zeros(3 * CONTROL_COUNT);
-        zeros(derivative_order * STATE_COUNT * STATE_SIZE_ISO);
+        zeros(derivative_order * HDIM_ISO);
     ])
+    
     # control amplitude constraint
     x_max = SVector{n}([
-        fill(Inf, STATE_COUNT * STATE_SIZE_ISO);
+        fill(Inf, STATE_COUNT * HDIM_ISO);
         fill(Inf, CONTROL_COUNT);
         fill(MAX_CONTROL_NORM_0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        fill(Inf, derivative_order * STATE_COUNT * STATE_SIZE_ISO)
+        fill(Inf, derivative_order * HDIM_ISO)
     ])
     x_min = SVector{n}([
-        fill(-Inf, STATE_COUNT * STATE_SIZE_ISO);
+        fill(-Inf, STATE_COUNT * HDIM_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(-MAX_CONTROL_NORM_0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, derivative_order * STATE_COUNT * STATE_SIZE_ISO)
+        fill(-Inf, derivative_order * HDIM_ISO)
     ])
-    # controls start and end at 0
+    # control amplitude constraint at boundary
     x_max_boundary = [
-        fill(Inf, STATE_COUNT * STATE_SIZE_ISO);
+        fill(Inf, STATE_COUNT * HDIM_ISO);
         fill(Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(Inf, CONTROL_COUNT);
-        fill(Inf, derivative_order * STATE_COUNT * STATE_SIZE_ISO)
+        fill(Inf, derivative_order * HDIM_ISO)
     ]
     x_min_boundary = [
-        fill(-Inf, STATE_COUNT * STATE_SIZE_ISO);
+        fill(-Inf, STATE_COUNT * HDIM_ISO);
         fill(-Inf, CONTROL_COUNT);
         fill(0, 1); # control
         fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, derivative_order * STATE_COUNT * STATE_SIZE_ISO)
+        fill(-Inf, derivative_order * HDIM_ISO)
     ]
 
-    if isnothing(initial_save_file_path)
-        dt = DT_STATIC
-        N = Int(floor(evolution_time * DT_STATIC_INV)) + 1
-        U0 = [SVector{m}(
-            fill(1e-4, CONTROL_COUNT)
-        ) for k = 1:N-1]
-    else
-        (d2controls, evolution_time) = h5open(initial_save_file_path, "r") do save_file
-            if initial_save_type == jl
-                d2controls_idx = read(save_file, "d2controls_idx")
-                d2controls = read(save_file, "acontrols")[:, d2controls_idx]
-                evolution_time = read(save_file, "evolution_time")
-            elseif initial_save_type == samplejl
-                d2controls = read(save_file, "d2controls_sample")
-                evolution_time = read(save_file, "evolution_time_sample")
-            end
-            return (d2controls, evolution_time)
-        end
-        evolution_time = Int(floor(evolution_time * DT_STATIC_INV)) * DT_STATIC
-        dt = DT_STATIC
-        N = Int(floor(evolution_time * DT_STATIC_INV)) + 1
-        U0 = [SVector{m}(d2controls[k, 1]) for k = 1:N-1]
-    end
+    # initial trajectory
+    dt = dt_inv^(-1)
+    N = Int(floor(evolution_time * dt_inv)) + 1
+    U0 = [SVector{m}(
+        fill(1e-4, CONTROL_COUNT)
+    ) for k = 1:N-1]
     X0 = [SVector{n}([
         fill(NaN, n);
     ]) for k = 1:N]
     Z = Traj(X0, U0, dt * ones(N))
 
-    if isnothing(qs)
-        qs = zeros(8)
-    end
+    # cost function
     Q = Diagonal(SVector{n}([
-        fill(qs[1], STATE_COUNT * STATE_SIZE_ISO); # state1, state2
+        fill(qs[1], STATE_COUNT * HDIM_ISO); # state1, state2
         fill(qs[2], 1); # int_control
         fill(qs[3], 1); # control
         fill(qs[4], 1); # dcontrol_dt
-        fill(qs[5], eval(:($derivative_order >= 1 ? $STATE_COUNT * $STATE_SIZE_ISO : 0))); # dstate<1,2>
-        fill(qs[6], eval(:($derivative_order >= 2 ? $STATE_COUNT * $STATE_SIZE_ISO : 0))); # d2state<1,2>
-        fill(qs[7], eval(:($derivative_order >= 3 ? $STATE_COUNT * $STATE_SIZE_ISO : 0))); # d3state<1,2>
+        fill(qs[5], eval(:($derivative_order >= 1 ? $HDIM_ISO : 0))); # dstate<1,2>
+        fill(qs[6], eval(:($derivative_order >= 2 ? $HDIM_ISO : 0))); # d2state<1,2>
+        fill(qs[7], eval(:($derivative_order >= 3 ? $HDIM_ISO : 0))); # d3state<1,2>
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([
         fill(qs[8], CONTROL_COUNT);
     ]))
-    obj = LQRObjective(Q, R, Qf, xf, N)
+    objective = LQRObjective(Q, R, Qf, xf, N)
 
-    # Must satisfy control amplitude bound.
+    # must satisfy control amplitude bound
     control_bnd = BoundConstraint(n, m, x_max=x_max, x_min=x_min)
-    # Must statisfy conrols start and stop at 0.
+    # must statisfy conrols start and end at 0
     control_bnd_boundary = BoundConstraint(n, m, x_max=x_max_boundary, x_min=x_min_boundary)
-    # Must reach target state. Must have zero net flux.
+    # must reach target state, must have zero net flux
     target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
-    # Must obey unit norm.
+    # must obey unit norm.
     normalization_constraint_1 = NormConstraint(n, m, 1, TO.Equality(), STATE1_IDX)
     normalization_constraint_2 = NormConstraint(n, m, 1, TO.Equality(), STATE2_IDX)
     
@@ -255,32 +200,25 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     # add_constraint!(constraints, normalization_constraint_1, 2:N-1)
     # add_constraint!(constraints, normalization_constraint_2, 2:N-1)
 
-    # Instantiate problem and solve.
-    prob = Problem{IT_RDI[integrator_type]}(model, obj, constraints, x0, xf, Z, N, t0, evolution_time)
-    opts = SolverOptions(verbose=VERBOSE)
-    solver = AugmentedLagrangianSolver(prob, opts)
-    if solver_type == alilqr
-        solver = AugmentedLagrangianSolver(prob, opts)
-        solver.solver_uncon.opts.square_root = sqrtbp
-        solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
-        solver.opts.constraint_tolerance_intermediate = CONSTRAINT_TOLERANCE
-        solver.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
-        solver.opts.penalty_max = max_penalty
-    elseif solver_type == altro
-        solver = ALTROSolver(prob, opts)
-        solver.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
-        solver.solver_al.solver_uncon.opts.square_root = sqrtbp
-        solver.solver_al.opts.constraint_tolerance = AL_KICKOUT_TOLERANCE
-        solver.solver_al.opts.constraint_tolerance_intermediate = AL_KICKOUT_TOLERANCE
-        solver.solver_al.opts.cost_tolerance_intermediate = ILQR_DJ_TOL
-        solver.solver_al.opts.penalty_max = max_penalty
-        solver.solver_pn.opts.constraint_tolerance = CONSTRAINT_TOLERANCE
-        solver.solver_pn.opts.n_steps = PN_STEPS
-    end
+    # solve problem
+    prob = Problem{IT_RDI[integrator_type]}(model, objective, constraints, x0, xf, Z, N, t0, evolution_time)
+    solver = ALTROSolver(prob)
+    verbose_pn = verbose ? true : false
+    verbose_ = verbose ? 2 : 0
+    projected_newton = solver_type == altro ? true : false
+    constraint_tolerance = solver_type == altro ? constraint_tol : al_tol
+    iterations_inner = smoke_test ? 1 : 300
+    iterations_outer = smoke_test ? 1 : 30
+    n_steps = smoke_test ? 1 : pn_steps
+    set_options!(solver, square_root=sqrtbp, constraint_tolerance=constraint_tolerance,
+                 projected_newton_tolerance=al_tol, n_steps=n_steps,
+                 penalty_max=max_penalty, verbose_pn=verbose_pn, verbose=verbose_,
+                 projected_newton=projected_newton, iterations_inner=iterations_inner,
+                 iterations_outer=iterations_outer, iterations=max_iterations)
     Altro.solve!(solver)
 
-    # Post-process.
-    acontrols_raw = controls(solver)
+    # post-process
+    acontrols_raw = TO.controls(solver)
     acontrols_arr = permutedims(reduce(hcat, map(Array, acontrols_raw)), [2, 1])
     astates_raw = TO.states(solver)
     astates_arr = permutedims(reduce(hcat, map(Array, astates_raw)), [2, 1])
@@ -293,46 +231,46 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     cidx_arr = Array(CONTROLS_IDX)
     d2cidx_arr = Array(D2CONTROLS_IDX)
     cmax = TrajectoryOptimization.max_violation(solver)
-    cmax_info = TrajectoryOptimization.findmax_violation(get_constraints(solver))
+    cmax_info = TrajectoryOptimization.findmax_violation(TO.get_constraints(solver))
+    iterations_ = Altro.iterations(solver)
+
+    result = Dict(
+        "acontrols" => acontrols_arr,
+        "controls_idx" => cidx_arr,
+        "d2controls_dt2_idx" => d2cidx_arr,
+        "evolution_time" => evolution_time,
+        "astates" => astates_arr,
+        "Q" => Q_arr,
+        "Qf" => Qf_arr,
+        "R" => R_arr,
+        "cmax" => cmax,
+        "cmax_info" => cmax_info,
+        "dt" => dt,
+        "derivative_order" => derivative_order,
+        "solver_type" => Integer(solver_type),
+        "sqrtbp" => Integer(sqrtbp),
+        "max_penalty" => max_penalty,
+        "constraint_tol" => constraint_tol,
+        "al_tol" => al_tol,
+        "gate_type" => Integer(gate_type),
+        "save_type" => Integer(jl),
+        "integrator_type" => Integer(integrator_type),
+        "iterations" => iterations_,
+        "max_iterations" => max_iterations,
+        "pn_steps" => pn_steps,
+    )
     
-    # Save.
-    if SAVE
-        save_file_path = generate_save_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
+    # save
+    if save
+        save_file_path = generate_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
         println("Saving this optimization to $(save_file_path)")
         h5open(save_file_path, "cw") do save_file
-            write(save_file, "acontrols", acontrols_arr)
-            write(save_file, "controls_idx", cidx_arr)
-            write(save_file, "d2controls_idx", d2cidx_arr)
-            write(save_file, "evolution_time", evolution_time)
-            write(save_file, "astates", astates_arr)
-            write(save_file, "Q", Q_arr)
-            write(save_file, "Qf", Qf_arr)
-            write(save_file, "R", R_arr)
-            write(save_file, "cmax", cmax)
-            write(save_file, "cmax_info", cmax_info)
-            write(save_file, "dt", dt)
-            write(save_file, "derivative_order", derivative_order)
-            write(save_file, "solver_type", Integer(solver_type))
-            write(save_file, "sqrtbp", Integer(sqrtbp))
-            write(save_file, "max_penalty", max_penalty)
-            write(save_file, "ctol", CONSTRAINT_TOLERANCE)
-            write(save_file, "alko", AL_KICKOUT_TOLERANCE)
-            write(save_file, "ilqr_dj_tol", ILQR_DJ_TOL)
-            write(save_file, "integrator_type", Integer(integrator_type))
-            write(save_file, "gate_type", Integer(gate_type))
-            write(save_file, "save_type", Integer(jl))
-        end
-
-        if postsample
-            (csample, d2csample, etsample) = sample_controls(save_file_path)
-            h5open(save_file_path, "r+") do save_file
-                write(save_file, "controls_sample", csample)
-                write(save_file, "d2controls_sample", d2csample)
-                write(save_file, "evolution_time_sample", etsample)
-                o_delete(save_file, "save_type")
-                write(save_file, "save_type", Integer(samplejl))
+            for key in keys(result)
+                write(save_file, key, result[key])
             end
         end
+        result["save_file_path"] = save_file_path
     end
-end
 
+    return result
+end
