@@ -1,5 +1,5 @@
 """
-spin23.jl - unscented transform robustness for the δfq problem
+spin25.jl - unscented sampling robustness for the δa problem
 """
 
 WDIR = joinpath(@__DIR__, "../../")
@@ -20,7 +20,7 @@ const TO = TrajectoryOptimization
 
 # paths
 const EXPERIMENT_META = "spin"
-const EXPERIMENT_NAME = "spin23"
+const EXPERIMENT_NAME = "spin25"
 const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
 # problem
@@ -51,24 +51,42 @@ const ACONTROL_SIZE = CONTROL_COUNT
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
 
 # model
-module Data
-using RobotDynamics
-using StaticArrays
-const RD = RobotDynamics
-const HDIM_ISO = 4
 mutable struct Model <: RD.AbstractModel
-    cov::MMatrix{HDIM_ISO + 1, HDIM_ISO + 1}
-    fq_cov::Float64
+    s1_samples::Array{SVector{HDIM_ISO}, 1}
+    fq_samples::MVector{SAMPLE_COUNT}
+    fq_dist::Distributions.Sampleable
     alpha::Float64
 end
-end
-Model = Data.Model
 @inline RD.state_dim(model::Model) = ASTATE_SIZE
 @inline RD.control_dim(model::Model) = ACONTROL_SIZE
 
 
 function unscented_transform!(model::Model, z::AbstractKnotPoint{T,N,M}) where {T,N,M}
-
+    s11 = SVector{HDIM_ISO}(z.z[S1STATE1_IDX])
+    s21 = SVector{HDIM_ISO}(z.z[S2STATE1_IDX])
+    s31 = SVector{HDIM_ISO}(z.z[S3STATE1_IDX])
+    s41 = SVector{HDIM_ISO}(z.z[S4STATE1_IDX])
+    s51 = SVector{HDIM_ISO}(z.z[S5STATE1_IDX])
+    s61 = SVector{HDIM_ISO}(z.z[S6STATE1_IDX])
+    s71 = SVector{HDIM_ISO}(z.z[S7STATE1_IDX])
+    s81 = SVector{HDIM_ISO}(z.z[S8STATE1_IDX])
+    
+    s1m = SAMPLE_COUNT_INV .* (
+        s11 + s21 + s31 + s41
+        + s51 + s61 + s71 + s81
+    )
+    d1 = s11 - s1m
+    d2 = s21 - s1m
+    d3 = s31 - s1m
+    d4 = s41 - s1m
+    d5 = s51 - s1m
+    d6 = s61 - s1m
+    d7 = s71 - s1m
+    d8 = s81 - s1m
+    cov = 0.5 .* (
+        d1 * d1' + d2 * d2' + d3 * d3' + d4 * d4'
+        + d5 * d5' + d6 * d6' + d7 * d7' + d8 * d8'
+    )
     cov_chol = model.alpha * cholesky(cov).L
 
     cc1 = SVector{HDIM_ISO}(cov_chol[1:HDIM_ISO, 1])
@@ -99,9 +117,8 @@ end
 
 
 # dynamics
-function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::StaticVector{ASTATE_SIZE},
-                              acontrol::StaticVector{ACONTROL_SIZE}, time::Real, dt::Real)
-    # normal dynamics
+function discrete_dynamics_(model::Model, astate::StaticVector{ASTATE_SIZE},
+                            acontrol::StaticVector{ACONTROL_SIZE}, time::Real, dt::Real)
     negi_hc = astate[CONTROLS_IDX[1]] * NEGI_H1_ISO
     negi_s0h = FQ_NEGI_H0_ISO + negi_hc
     negi_s0h_prop = exp(negi_s0h * dt)
@@ -111,46 +128,7 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::StaticVector{AS
     controls = astate[CONTROLS_IDX[1]] + dt * astate[DCONTROLS_IDX[1]]
     dcontrols = astate[DCONTROLS_IDX[1]] + dt * acontrol[D2CONTROLS_IDX[1]]
 
-    # unscented transform
-    s11 = SVector{HDIM_ISO}(astate[S1STATE1_IDX])
-    s21 = SVector{HDIM_ISO}(astate[S2STATE1_IDX])
-    s31 = SVector{HDIM_ISO}(astate[S3STATE1_IDX])
-    s41 = SVector{HDIM_ISO}(astate[S4STATE1_IDX])
-    s51 = SVector{HDIM_ISO}(astate[S5STATE1_IDX])
-    s61 = SVector{HDIM_ISO}(astate[S6STATE1_IDX])
-    s71 = SVector{HDIM_ISO}(astate[S7STATE1_IDX])
-    s81 = SVector{HDIM_ISO}(astate[S8STATE1_IDX])
-    # compute state mean
-    s1m = SAMPLE_COUNT_INV .* (
-        s11 + s21 + s31 + s41
-        + s51 + s61 + s71 + s81
-    )
-    # compute state covariance
-    d1 = s11 - s1m
-    d2 = s21 - s1m
-    d3 = s31 - s1m
-    d4 = s41 - s1m
-    d5 = s51 - s1m
-    d6 = s61 - s1m
-    d7 = s71 - s1m
-    d8 = s81 - s1m
-    s_cov = 0.5 .* (
-        d1 * d1' + d2 * d2' + d3 * d3' + d4 * d4'
-        + d5 * d5' + d6 * d6' + d7 * d7' + d8 * d8'
-    )
-    # perform cholesky decomposition on joint covariance
-    model.cov[1:HDIM_ISO, 1:HDIM_ISO] = s_cov
-    model.cov[HDIM_ISO + 1, HDIM_ISO + 1] = model.fq_cov
-    println("before")
-    show_nice(model.cov)
-    println("")
-    cov_chol = model.alpha * cholesky(Symmetric(model.cov)).L
-    println("after")
-    show_nice(cov_chol)
-    println("")
-    
-    s11 = exp(dt * ((FQ + cov_chol[HDIM_ISO + 1, 1]) * NEGI_H0_ISO + negi_hc)) * (s1m + cov_chol[1:HDIM_ISO, 1])
-    s21 = exp(dt * ((FQ + cov_chol[HDIM_ISO + 1, 2]) * NEGI_H0_ISO + negi_hc)) * (s1m + cov_chol[1:HDIM_ISO, 1])
+    s11 = exp(dt * (model.fq_samples[1] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[1]
     s21 = exp(dt * (model.fq_samples[2] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[2]
     s31 = exp(dt * (model.fq_samples[3] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[3]
     s41 = exp(dt * (model.fq_samples[4] * NEGI_H0_ISO + negi_hc)) * model.s1_samples[4]
@@ -165,6 +143,23 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::StaticVector{AS
     ]
     
     return astate_
+end
+
+
+# Note that TO.rollout! uses RK3.
+function RD.discrete_dynamics(::Type{RK3}, model::Model, z::AbstractKnotPoint{T,N,M}) where {T,N,M}
+    unscented_transform!(model, z)
+    return discrete_dynamics_(model, RD.state(z), RD.control(z), z.t, z.dt)
+end
+
+
+function RD.discrete_jacobian!(::Type{RK3}, ∇f, model::Model, z::AbstractKnotPoint{T,N,M}) where {T,N,M}
+    ix,iu,idt = z._x, z._u, N+M+1
+    t = z.t
+    unscented_transform!(model, z)
+    fd_aug(s) = discrete_dynamics_(model, s[ix], s[iu], t, z.dt)
+    ∇f .= ForwardDiff.jacobian(fd_aug, SVector{N+M}(z.z))
+    return nothing
 end
 
 
@@ -270,25 +265,30 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
                   dt_inv=Int64(1e1), smoke_test=false, constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true,
                   fq_cov=FQ * 1e-2, max_iterations=Int64(2e5), gradient_tol_int=1,
-                  dJ_counter_limit=Int(1e2), state_cov=1e-2, seed=0, alpha=1.,
+                  dJ_counter_limit=Int(1e2), astate_cov=1e-2, seed=0, alpha=1.,
                   iterations_linesearch=20, line_search_lower_bound=1e-8,
                   line_search_upper_bound=10.)
     Random.seed!(seed)
-    cov = @MMatrix zeros(HDIM_ISO + 1, HDIM_ISO + 1)
-    model = Model(cov, fq_cov, alpha)
+    astate_dist = Distributions.Normal(0., astate_cov)
+    s1_samples = [SVector{HDIM_ISO}(zeros(HDIM_ISO)) for i = 1:SAMPLE_COUNT]
+    fq_dist = Distributions.Normal(0., fq_cov)
+    fq_samples = MVector{SAMPLE_COUNT}([
+        fill(FQ + fq_cov, Int(SAMPLE_COUNT / 2));
+        fill(FQ - fq_cov, Int(SAMPLE_COUNT / 2));
+    ])
+    model = Model(s1_samples, fq_samples, fq_dist, alpha)
     n = RD.state_dim(model)
     m = RD.control_dim(model)
     t0 = 0.
 
     # initial state
-    state_dist = Distributions.Normal(0., state_cov)
     x0_ = [
         INITIAL_STATE1;
         INITIAL_STATE2;
         zeros(3 * CONTROL_COUNT);
     ]
     for i = 1:SAMPLE_COUNT
-        sample = INITIAL_STATE1 .+ rand(state_dist, HDIM_ISO)
+        sample = INITIAL_STATE1 .+ rand(astate_dist, HDIM_ISO)
         append!(x0_, sample ./ sqrt(sample'sample))
     end
     x0 = SVector{n}(x0_)
@@ -460,46 +460,4 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     end
 
     return result
-end
-
-
-function sample_diffs(saved)
-    knot_count = size(saved["astates"], 1)
-    diffs_ = zeros(SAMPLE_COUNT, knot_count)
-    fds_ = zeros(SAMPLE_COUNT, knot_count)
-    for i = 1:knot_count
-        x11 = saved["astates"][i, S1STATE1_IDX]
-        x21 = saved["astates"][i, S2STATE1_IDX]
-        x31 = saved["astates"][i, S3STATE1_IDX]
-        x41 = saved["astates"][i, S4STATE1_IDX]
-        x51 = saved["astates"][i, S5STATE1_IDX]
-        x61 = saved["astates"][i, S6STATE1_IDX]
-        x71 = saved["astates"][i, S7STATE1_IDX]
-        x81 = saved["astates"][i, S8STATE1_IDX]
-        d11 = x11 - XPIBY2_ISO_1
-        d21 = x21 - XPIBY2_ISO_1
-        d31 = x31 - XPIBY2_ISO_1
-        d41 = x41 - XPIBY2_ISO_1
-        d51 = x51 - XPIBY2_ISO_1
-        d61 = x61 - XPIBY2_ISO_1
-        d71 = x71 - XPIBY2_ISO_1
-        d81 = x81 - XPIBY2_ISO_1
-        diffs_[1, i] = d11'd11
-        diffs_[2, i] = d21'd21
-        diffs_[3, i] = d31'd31
-        diffs_[4, i] = d41'd41
-        diffs_[5, i] = d51'd51
-        diffs_[6, i] = d61'd61
-        diffs_[7, i] = d71'd71
-        diffs_[8, i] = d81'd81
-        fds_[1, i] = fidelity_vec_iso2(x11, XPIBY2_ISO_1)
-        fds_[2, i] = fidelity_vec_iso2(x21, XPIBY2_ISO_1)
-        fds_[3, i] = fidelity_vec_iso2(x31, XPIBY2_ISO_1)
-        fds_[4, i] = fidelity_vec_iso2(x41, XPIBY2_ISO_1)
-        fds_[5, i] = fidelity_vec_iso2(x51, XPIBY2_ISO_1)
-        fds_[6, i] = fidelity_vec_iso2(x61, XPIBY2_ISO_1)
-        fds_[7, i] = fidelity_vec_iso2(x71, XPIBY2_ISO_1)
-        fds_[8, i] = fidelity_vec_iso2(x81, XPIBY2_ISO_1)
-    end
-    return (diffs_, fds_)
 end

@@ -91,6 +91,28 @@ const DT_ST = Dict(
     xpicorpse => st_state,
 )
 
+const DT_AN = Dict(
+    schroed => false,
+    schroedda => false,
+    lindbladnodis => false,
+    lindbladt1 => false,
+    lindbladt2 => false,
+    ypiby2nodis => true,
+    ypiby2t1 => true,
+    xpiby2nodis => true,
+    xpiby2t1 => true,
+    zpiby2nodis => true,
+    zpiby2t1 => true,
+    xpiby2da => true,
+    xpiby2t2 => true,
+    zpiby2da => true,
+    empty => true,
+    ypiby2da => true,
+    xpiby2corpserwa => true,
+    xpiby2corpse => true,
+    xpicorpse => true,
+)
+
 const GT_STR = Dict(
     zpiby2 => "Z/2",
     ypiby2 => "Y/2",
@@ -424,6 +446,17 @@ const GAMMA_ZPIBY2 = amp_t1_spline(0)^(-1)
 )
 
 
+function integrate_prop_zpiby2nodis!(gate_count::Int, states::Array{T, 2},
+                                     state::SVector, params::SimParams) where {T}
+    states[1, :] = state
+    for i = 2:gate_count + 1
+        prop = exp(TTOT_ZPIBY2 * params.negi_h0)
+        state = prop * state
+        states[i, :] = state
+    end
+end
+
+
 @inline dynamics_zpiby2t1_deqjl(density::StaticMatrix, params::SimParams, time::Float64) = (
     FQ_NEGI_H0_ISO * density - density * FQ_NEGI_H0_ISO
     + GAMMA_ZPIBY2 * (G_E * density * E_G + NEG_E_E_BY2 * density + density * NEG_E_E_BY2
@@ -512,6 +545,15 @@ function dynamics_xpiby2nodis_deqjl(state::StaticVector, params::SimParams, time
     return(
         negi_h * state
     )
+end
+
+
+function integrate_prop_xpiby2nodis!(gate_count::Int, states::Array{T, 2},
+                                     state::SVector, params::SimParams) where {T}
+    states[1, :] = state
+    for i = 2:gate_count + 1
+        continue
+    end
 end
 
 
@@ -766,6 +808,8 @@ const DT_DYN = Dict(
 
 # integartor lookup
 const DT_INT = Dict(
+    zpiby2nodis => integrate_prop_zpiby2nodis!,
+    xpiby2nodis => integrate_prop_xpiby2nodis!,
     xpiby2da => integrate_prop_xpiby2da!,
 )
 
@@ -1286,7 +1330,7 @@ function run_sim_prop(
     negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
     noise_dt_inv=DT_NOISE_INV, seed=0, state_seed=nothing, save=false,
     dynamics_type=schroed)
-    if isnothing(save_file_path)
+    if DT_AN[dynamics_type]
         gate_time = DT_GTM[dynamics_type]
         controls = zeros(1, 1)
         control_knot_count = dt_inv = 0
