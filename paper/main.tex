@@ -60,7 +60,7 @@
   of the optimization algorithm.
   In this work we achieve a factor of $5$ increase in longitudinal relaxation times
   for the gate set of a fluxonium qubit
-  using a computationally efficient metric in optimizaiton.
+  using a computationally efficient metric in optimization.
 \end{abstract}
 
 \maketitle
@@ -464,15 +464,17 @@ generated initial states. The $X/2$ gate
   \end{subfigure}
   
   \caption{
-    (a) X/2 gates robust to qubit frequency detunings constructed using the
-    analytic, 2-point sampling, 8-point unscented sampling, and (2\textsuperscript{nd},
-    3\textsuperscript{rd})-order derivative methods at a gate duration of $56.8$ns.
+    (a) Z/2 gates constructed using the
+    analytic, 2-point sampling, 8-point unscented sampling, and the 1\textsuperscript{st}
+    and 2\textsuperscript{nd} order derivative methods. The gates
+    shown for the robust methods are the solutions at twice the analytic
+    gate time.
     (b) Single gate error as
     a function of the gate duration at a one-percent
     detuning from the nominal qubit frequency for all methods.
     (c) Single gate error as a function of the detuning from the nominal
-    qubit frequency at gate durations of $56.8$ns and $120$ns for the analytic
-    and 2\textsuperscript{nd}-order derivative methods.
+    qubit frequency at multiples of the analytic gate duration for the analytic
+    and 1\textsuperscript{st} order derivative methods.
   }
 \end{figure*}
 
@@ -497,15 +499,17 @@ generated initial states. The $X/2$ gate
 \end{figure}
 
 %% S5
-\section{Robustness to Parameter Deviations}
-(Strategy) Magentic flux noise,
-Johnson-Nyquist current noise present in the flux bias
-lines, and temperature dependent gain fluctuations
-may cause the flux amplitude to deviate from its
-desired value by an amount $\delta a$. Additionally,
-residual calibration errors and fluctuations may cause
+\section{Robustness to Static Parameter Deviations}
+(Strategy) Uncertainty in the Hamiltonian parameters lead
+to erroneous 
+The uncertainty Hamiltonian parameters are known to
+some finite experimental accuracy. Further,
+experimental fluctuations may cause parameters to deviate
+from their
 the qubit frequency to deviate from its measured value
-by an amount $\delta f_{q}$.
+by an amount $\delta f_{q}$. There are other situations that
+arise where this is useful, such as static amplitude
+offsets or static gain offsets.
 
 System parameter
 deviations are typically addressed with dynamic decoupling
@@ -583,7 +587,7 @@ gate subject to a constant qubit frequency detuning
 %% of the Bloch sphere
 %% designed to compensate for erroneous rotations
 %% (see Appendix).
-We take $\sigma_{f_{q}} = 1\% f_{q}$ to be one standard devation, and equip
+We take $\sigma_{f_{q}} / f_{q} = 1\%$ to be one standard devation, and equip
 the sampling robustness methods accordingly.
 For each method we compute the gate error for one simulated gate application
 subject to the stated deviant dynamics.
@@ -606,19 +610,6 @@ that the 3\textsuperscript{rd}-order method is able to achieve a lower norm of t
 3\textsuperscript{rd}-order state derivative at the cost of higher 1\textsuperscript{st}-order
 and 2\textsuperscript{nd}-order derivatives than the 2\textsuperscript{nd}-order method (see Table 3).
 
-%% T2
-\begin{table}
-  \begin{tabular}{c | c | c | c}
-    Method & ${\lvert \partial_{f_{q}} \ket{\psi} \rvert}^{2}$ ($10^{3}$)
-    & ${\lvert \partial^{2}_{f_{q}} \ket{\psi} \rvert}^{2}$ ($10^{7}$)
-    & ${\lvert \partial^{3}_{f_{q}} \ket{\psi} \rvert}^{2}$ ($10^{12}$)\\
-    \hline
-    D-2 & 8.706 & 8.331 & 3.692\\
-    D-3 & 9.643 & 9.095 & 3.345\\
-  \end{tabular}
-  \caption{Norm of basis state derivatives undergoing a $X/2$ gate for the derivative methods at $t_{N} = 56.8$ns}
-\end{table}
-
 Further, we observe that the derivative methods are able
 to take advantage of an increased gate duration to achieve greater robustness,
 while the sampling methods are unable to. The tradeoff between gate error and
@@ -628,8 +619,22 @@ derivative method (using the 50ns and 150ns points, include this remark?). Addit
 no optimization converged for gate durations less than 50ns., and robustness commensurate
 with the analytic pulse at a shorter gate duration was not able to be achieved.
 
+%% T2
+\begin{table}
+  \begin{tabular}{c | c | c}
+    Method & ${\lvert \partial_{f_{q}} \ket{\psi_{N}} \rvert}^{2}$ ($10^{3}$)
+    & ${\lvert \partial^{2}_{f_{q}} \ket{\psi_{N}} \rvert}^{2}$ ($10^{7}$)\\
+    \hline
+    D-1 & 2.509 & 13.292\\
+    D-2 & 3.711 & 1.452\\
+  \end{tabular}
+  \caption{Norm of the first basis state's derivate with respect to the qubit frequency
+    for $X/2$ gates optimized using the derivative methods. The norms are computed
+    at the end of the gate's duration $t_{N} = 110$ns.}
+\end{table}
 
-%% TODO: maybe add new section
+
+\section{Robustness to Stochastic Parameter Deviations} %% S6
 (Comparison) An additional task of interest is to mitigate
 stochastic parameter deviations. For the fluxonium qubit, magnetic flux noise
 acts to modify the flux amplitude from its intended value by an amount $\delta a$.
@@ -646,7 +651,7 @@ flux noise amplitude $A_{\Phi} = 5.21 \mu \Phi_{0}$.
 (Results) ...
 
 
-%% S6
+%% S7
 \section{Conclusion}
 We have proposed some schemes and they work well.
 
@@ -654,7 +659,7 @@ We have proposed some schemes and they work well.
 %% ACK
 \begin{acknowledgments}
   The authors would like to thank Helin Zhang for experimental assistance,
-  and Stephen Lyon (maybe) and Daniel Weiss for useful discussions.
+  and Daniel Weiss for useful discussions.
 \end{acknowledgments}
 
 
