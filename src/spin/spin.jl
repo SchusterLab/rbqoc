@@ -420,7 +420,7 @@ end
 const TTOT_ZPIBY2 = 17.857142857142858
 const GAMMA_ZPIBY2 = amp_t1_spline(0)^(-1)
 @inline dynamics_zpiby2nodis_deqjl(state::StaticVector, params::SimParams, time::Float64) = (
-    FQ_NEGI_H0_ISO * state
+    params.negi_h0 * state
 )
 
 
@@ -578,21 +578,109 @@ function dynamics_xpiby2da_deqjl(state::StaticVector, params::SimParams, time::F
     if time <= T1_XPIBY2
         negi_h = FQ_NEGI_H0_ISO + (-AYPIBY2 + delta_a) * NEGI_H1_ISO
     elseif time <= T2_XPIBY2
-        negi_h = FQ_NEGI_H0_ISO + (delta_a) * NEGI_H1_ISO
+        negi_h = FQ_NEGI_H0_ISO + delta_a * NEGI_H1_ISO
     elseif time <= T3_XPIBY2
         negi_h = FQ_NEGI_H0_ISO + (AYPIBY2 + delta_a) * NEGI_H1_ISO
     elseif time <= T4_XPIBY2
-        negi_h = FQ_NEGI_H0_ISO + (delta_a) * NEGI_H1_ISO
+        negi_h = FQ_NEGI_H0_ISO + delta_a * NEGI_H1_ISO
     elseif time <= T5_XPIBY2
         negi_h = FQ_NEGI_H0_ISO + (AYPIBY2 + delta_a) * NEGI_H1_ISO
     elseif time <= T6_XPIBY2
-        negi_h = FQ_NEGI_H0_ISO + (delta_a) * NEGI_H1_ISO
+        negi_h = FQ_NEGI_H0_ISO + delta_a * NEGI_H1_ISO
     else
         negi_h = FQ_NEGI_H0_ISO + (-AYPIBY2 + delta_a) * NEGI_H1_ISO
     end
     return(
         negi_h * state
     )
+end
+
+
+"""
+this function assumes noise_dt_inv = 1e1
+"""
+function integrate_prop_xpiby2da!(gate_count::Int, states::Array{T, 2}, state::SVector, params::SimParams) where {T}
+    dt = 1e-1
+    states[1, :] = state
+    for i = 1:gate_count
+        for j = 1:21
+            amp = -AYPIBY2 + params.noise_offsets[j]
+            prop = exp(dt * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+            state = prop * state
+        end
+        amp = -AYPIBY2 + params.noise_offsets[22]
+        prop = exp((T1_XPIBY2 - 2.1) * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+        state = prop * state
+        amp = params.noise_offsets[22]
+        prop = exp((2.2 - T1_XPIBY2) * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+        state = prop * state
+        for j = 23:173
+            amp = params.noise_offsets[j]
+            prop = exp(dt * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+            state = prop * state
+        end
+        amp = params.noise_offsets[174]
+        prop = exp((T2_XPIBY2 - 17.3) * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+        state = prop * state
+        amp = AYPIBY2 + params.noise_offsets[174]
+        prop = exp((17.4 - T2_XPIBY2) * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+        state = prop * state
+        for j = 175:194
+            amp = AYPIBY2 + params.noise_offsets[j]
+            prop = exp(dt * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+            state = prop * state
+        end
+        amp = AYPIBY2 + params.noise_offsets[195]
+        prop = exp((T3_XPIBY2 - 19.4) * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+        state = prop * state
+        amp = params.noise_offsets[195]
+        prop = exp((19.5 - T3_XPIBY2) * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+        state = prop * state
+        for j = 196:373
+            amp = params.noise_offsets[j]
+            prop = exp(dt * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+            state = prop * state
+        end
+        amp = params.noise_offsets[374]
+        prop = exp((T4_XPIBY2 - 37.3) * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+        state = prop * state
+        amp = AYPIBY2 + params.noise_offsets[374]
+        prop = exp((37.4 - T4_XPIBY2) * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+        state = prop * state
+        for j = 375:394
+            amp = AYPIBY2 + params.noise_offsets[j]
+            prop = exp(dt * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+            state = prop * state
+        end
+        amp = AYPIBY2 + params.noise_offsets[395]
+        prop = exp((T5_XPIBY2 - 39.4) * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+        state = prop * state
+        amp = params.noise_offsets[395]
+        prop = exp((39.5 - T5_XPIBY2) * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+        state = prop * state
+        for j = 396:546
+            amp = params.noise_offsets[j]
+            prop = exp(dt * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+            state = prop * state
+        end
+        amp = params.noise_offsets[547]
+        prop = exp((T6_XPIBY2 - 54.6) * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+        state = prop * state
+        amp = -AYPIBY2 + params.noise_offsets[547]
+        prop = exp((54.7 - T6_XPIBY2) * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+        state = prop * state
+        for j = 548:568
+            amp = -AYPIBY2 + params.noise_offsets[j]
+            prop = exp(dt * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+            state = prop * state
+        end
+        amp = -AYPIBY2 + params.noise_offsets[569]
+        prop = exp((TTOT_XPIBY2 - 56.8) * (FQ_NEGI_H0_ISO + amp * NEGI_H1_ISO))
+        state = prop * state
+        
+        # save state
+        states[i + 1, :] = state
+    end
 end
 
 
@@ -674,6 +762,11 @@ const DT_DYN = Dict(
     xpiby2corpserwa => dynamics_xpiby2corpserwa_deqjl,
     xpiby2corpse => dynamics_xpiby2corpse_deqjl,
     xpicorpse => dynamics_xpicorpse_deqjl,
+)
+
+# integartor lookup
+const DT_INT = Dict(
+    xpiby2da => integrate_prop_xpiby2da!,
 )
 
 
@@ -821,67 +914,36 @@ end
 
 
 """
-Generate the modulus of the noise with the rough
-spectral density Sxx(f) = |x̂(f)|^2 = 1 / |f|
+Generate noise with spectral density
+Sxx(f) = |x̂(f)|^2 = f^(1/2)
+
+References:
+[0] https://dsp.stackexchange.com/questions/322/pink-1-f-pseudo-random-noise-generation
+[1] https://www.mathworks.com/help/matlab/ref/filter.html;jsessionid=6d7d2599d97bf87d3ac199b5eaef
+[2] https://ccrma.stanford.edu/~jos/filters/
 """
-function pink_noise_from_white(count, dt_inv, ndist; seed=0, plot=false,
-                               plot_step_size=100)
+function gen_pink_noise(count, dt_inv, ndist; seed=0)
+    b1 = 0.049922035
+    b2 = -0.095993537
+    b3 = 0.050612699
+    b4 = -0.004408786
+    a1 = 1
+    a2 = -2.494956002
+    a3 = 2.017265875
+    a4 = -0.522189400
     Random.seed!(seed)
-    freqs = fftfreq(count, dt_inv)
-    pink_noise_ = Array{Complex{Float64}, 1}(rand(ndist, count))
-    # transform white noise to frequency domain
-    fft!(pink_noise_)
-    # square root of the spectral density is the
-    # fourier transform of the noise
-    # normalize by count
-    for i in 2:length(pink_noise_)
-        pink_noise_[i] = pink_noise_[i] / (sqrt(abs(freqs[i])) * count)
+    xs = rand(ndist, count)
+    ys = zeros(count)
+    ys[1] = b1 * xs[1]
+    ys[2] = b1 * xs[2] + b2 * xs[1] - a2 * ys[1]
+    ys[3] = b1 * xs[3] + b2 * xs[2] + b3 * xs[1] - a2 * ys[2] - a3 * ys[1]
+    for i = 4:count
+        ys[i] = (b1 * xs[i] + b2 * xs[i - 1] + b3 * xs[i - 2] + b4 * xs[i - 3]
+                 - a2 * ys[i - 1] - a3 * ys[i - 2] - a4 * ys[i - 3])
     end
-    # normalize to dt_inv, this is the fft value at f=0
-    pink_noise_[1] = dt_inv / count
-    # transform to time domain
-    ifft!(pink_noise_)
-    # take real part, normalize to count
-    for i = 1:length(pink_noise_)
-        pink_noise_[i] = real(pink_noise_[i]) * count
-    end
-    pink_noise_ = Array{Float64, 1}(pink_noise_)
-
-    if plot
-        plot_file_path = generate_file_path("png", "figures", joinpath(SPIN_OUT_PATH, "figures"))
-        taxis = Array(0:plot_step_size:size(pink_noise_)[1] - 1) / dt_inv
-        fig = Plots.plot(taxis, pink_noise_[1:plot_step_size:size(pink_noise_)[1]], dpi=DPI)
-        Plots.savefig(fig, plot_file_path)
-        println("Plotted noise to $(plot_file_path)")
-    end
-
-    return pink_noise_
-end
-
-
-"""
-Generate the modulus of the noise with the exact
-spectral density Sxx(f) = |x̂(f)|^2 = 1 / |f|
-"""
-function pink_noise_from_spectrum(count, dt_inv)
-    time = count / dt_inv
-    pink_noise_ = Array{Complex{Float64}, 1}(fftfreq(count, dt_inv))
-    # square root of the spectral density is the
-    # fourier transform of the noise
-    for i in 2:length(pink_noise_)
-        pink_noise_[i] = 1 / sqrt(abs(pink_noise_[i]))
-    end
-    # normalize to dt_inv, this is the fft value at f=0
-    pink_noise_[1] = dt_inv
-    # transform to time domain
-    ifft!(pink_noise_)
-    # take real part, normalize by count
-    for i = 1:length(pink_noise_)
-        pink_noise_[i] = real(pink_noise_[i]) / count
-    end
-    pink_noise_ = Array{Float64, 1}(pink_noise_)
-
-    return pink_noise_
+    ys = ys .* dt_inv
+    
+    return ys
 end
 
 
@@ -973,7 +1035,7 @@ function run_sim_deqjl(
 
     # get noise offsets
     noise_knot_count = Int(ceil(evolution_time * noise_dt_inv)) + 1
-    noise_offsets = (namp) * pink_noise_from_white(noise_knot_count, noise_dt_inv, ndist; seed=seed)
+    noise_offsets = namp * gen_pink_noise(noise_knot_count, noise_dt_inv, ndist; seed=seed)
     
     # integrate
     dynamics = DT_DYN[dynamics_type]
@@ -1083,7 +1145,7 @@ function run_sim_fine_deqjl(
 
     # get noise offsets
     noise_knot_count = Int(ceil(evolution_time * noise_dt_inv)) + 1
-    noise_offsets = namp .* pink_noise_from_white(noise_knot_count, noise_dt_inv, ndist; seed=seed)
+    noise_offsets = namp .* gen_pink_noise(noise_knot_count, noise_dt_inv, ndist; seed=seed)
     
     # integrate
     dynamics = DT_DYN[dynamics_type]
@@ -1220,19 +1282,28 @@ end
 integrate the schroedinger equation using unitary propagators
 """
 function run_sim_prop(
-    gate_count, gate_type, save_file_path;
+    gate_count, gate_type; save_file_path=nothing,
     negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
-    noise_dt_inv=DT_NOISE_INV, seed=0, state_seed=nothing, save=false)
-    (controls, dt_inv, gate_time) = grab_controls(save_file_path)
-    dt = dt_inv^(-1)
-    control_knot_count = Int(floor(gate_time * dt_inv))
+    noise_dt_inv=DT_NOISE_INV, seed=0, state_seed=nothing, save=false,
+    dynamics_type=schroed)
+    if isnothing(save_file_path)
+        gate_time = DT_GTM[dynamics_type]
+        controls = zeros(1, 1)
+        control_knot_count = dt_inv = 0
+        integrator = DT_INT[dynamics_type]
+    else
+        (controls, dt_inv, gate_time) = grab_controls(save_file_path)
+        dt = dt_inv^(-1)
+        control_knot_count = Int(floor(gate_time * dt_inv))
+        integrator = nothing
+    end
     save_times = Array(0:1:gate_count) * gate_time
     evolution_time = gate_time * gate_count
     noise_knot_count = Int(ceil(evolution_time * noise_dt_inv)) + 1
-    noise_offsets = namp * pink_noise_from_white(noise_knot_count, noise_dt_inv, ndist; seed=seed)
+    noise_offsets = namp * gen_pink_noise(noise_knot_count, noise_dt_inv, ndist; seed=seed)
     params = SimParams(controls, control_knot_count, dt_inv, negi_h0,
                        noise_offsets, noise_dt_inv, dt_inv)
-    
+
     if isnothing(state_seed)
         state_seed = seed
     end
@@ -1241,14 +1312,30 @@ function run_sim_prop(
     states[1, :] = Array(state)
     time = 0.
     
-    for i = 1:gate_count
-        for j = 1:control_knot_count
-            hamiltonian = negi_h0 + controls[j, 1] * NEGI_H1_ISO
-            unitary = exp(hamiltonian * dt)
-            state = unitary * state
+    if !isnothing(integrator)
+        integrator(gate_count, states, state, params)
+    elseif dynamics_type == schroed
+        for i = 1:gate_count
+            for j = 1:control_knot_count
+                hamiltonian = negi_h0 + controls[j, 1] * NEGI_H1_ISO
+                unitary = exp(hamiltonian * dt)
+                state = unitary * state
+            end
+            states[i + 1, :] = state
         end
-        states[i + 1, :] = state
+    elseif dynamics_type == schroedda
+        for i = 1:gate_count
+            for j = 1:control_knot_count
+                delta_a = params.noise_offsets[Int(floor(time * params.noise_dt_inv)) + 1]
+                hamiltonian = negi_h0 + (controls[j, 1] + delta_a) * NEGI_H1_ISO
+                unitary = exp(hamiltonian * dt)
+                state = unitary * state
+                time = time + dt
+            end
+            states[i + 1, :] = state
+        end
     end
+    
 
     fidelities = compute_fidelities(gate_count, gate_type, states)
 
@@ -1320,4 +1407,100 @@ function test_ge_(;seed=0, do_ge=true, do_gej=true, do_geh=true)
             @assert isapprox(geh_z, geh_m)
         end
     end
+end
+
+
+const NEGI2_H0_ISO = 2 * NEGI_H0_ISO
+function dynamics_dfstate_deqjl(astate::SVector, params::SimParams, time::Float64)
+    state_idx = 1:4
+    dstate_idx = 5:8
+    d2state_idx = 9:12
+    controls_knot_point = (Int(floor(time * params.controls_dt_inv)) % params.control_knot_count) + 1
+    negi_h = (
+        params.negi_h0
+        + params.controls[controls_knot_point, 1] * NEGI_H1_ISO
+    )
+    
+    dstate = negi_h * astate[state_idx]
+    ddstate = negi_h * astate[dstate_idx] + NEGI_H0_ISO * astate[state_idx]
+    dd2state = negi_h * astate[d2state_idx] + NEGI2_H0_ISO * astate[dstate_idx]
+    dastate = [dstate; ddstate; dd2state]
+    
+    return dastate
+end
+
+
+function test_expdeqjl(;seed=1, negi_h0=FQ_NEGI_H0_ISO, reltol=1e-12, abstol=1e-12,
+                       adaptive=true, solver=DifferentialEquations.Vern9)
+    save_file_path = joinpath(SPIN_OUT_PATH, "spin12/00627_spin12.h5")
+    (controls, controls_dt_inv, evolution_time) = grab_controls(save_file_path)
+    dt = controls_dt_inv^(-1)
+    control_knot_count = Int(floor(evolution_time * controls_dt_inv))
+    initial_state = gen_rand_state_iso(;seed=seed)
+    initial_astate = [initial_state; @SVector zeros(2 * HDIM_ISO)]
+
+    # deqjl
+    # tspan = (0., evolution_time)
+    # save_times = [0., evolution_time]
+    # params = SimParams(controls, control_knot_count, controls_dt_inv, negi_h0,
+    #                    zeros(1), 0, 0)
+    # prob = ODEProblem(dynamics_dfstate_deqjl, initial_astate, tspan, params)
+    # result_deqjl = solve(prob, solver(), saveat=save_times, maxiters=DEQJL_MAXITERS,
+    #                      adaptive=adaptive, reltol=reltol, abstol=abstol)
+    # final_astate_deqjl = result_deqjl.u[end]
+    final_astate_deqjl = [
+        0.3297502016083930496857710107507070282439170198459780516957163426947026553848819;
+        0.8911153066503424150898098622796038253240145733901272546764101366400421501465792;
+        -0.04570436686707923806850534875355927461876076593027880863091868412801804526696696;
+        -0.3083657335729272441538341062792230805961115399686374631442072705867296065360932;
+        -1.762081244798284307668549658483409907816552049440236848997044142716682669755047;
+        -6.774290676829364446826621882987452576489399582278228041439766274786186033794044;
+       -94.29777221085506261481004895271138678686498582042056237068641281709503443245519;
+        -7.48429715886366019870079175966160929452897909028678916403918021630619572993541;
+     -2782.797334522913580692186177346094111441609178846508985051472623722131186875704;
+     -7576.02782757433488986108912497316375333435530772993752967348280813288799442085;
+     -2641.4045650586007199458644455694431946142558061399391205939738927683334249393;
+        4699.16633090618516756463787460347438315674579889839606170982251549847103430348;
+    ]
+
+    # exp
+    knot_count = Int(floor(evolution_time * controls_dt_inv))
+    state = initial_state
+    dstate = @SVector zeros(HDIM_ISO)
+    d2state = @SVector zeros(HDIM_ISO)
+    for i = 1:knot_count
+        # assume negi_h and NEGI_H0_ISO commute
+        # negi_h = negi_h0 + controls[i, 1] * NEGI_H1_ISO
+        # ez = exp(dt * negi_h)
+        # d2state = ez * d2state + dt * NEGI2_H0_ISO * dstate
+        # dstate = ez * dstate + dt * NEGI_H0_ISO * state
+        # state = ez * state
+        
+        # lawson-euler
+        # negi_h = negi_h0 + controls[i, 1] * NEGI_H1_ISO
+        # ez = exp(dt * negi_h)
+        # d2state = ez * d2state + dt * ez * NEGI2_H0_ISO * dstate
+        # dstate = ez * dstate + dt * ez * NEGI_H0_ISO * state
+        # state = ez * state
+
+        # lawson4
+        # negi_h = negi_h0 + controls[i, 1] * NEGI_H1_ISO
+        # ez = exp(dt * negi_h)
+        # ezby2 = exp(dt * 1//2 * negi_h)
+        # k1d = NEGI_H0_ISO * state
+        # k2d = NEGI_H0_ISO * (state + 1//2 * ezby2 * k1d)
+        # k3d = NEGI_H0_ISO * (state + 1//2 * k2d)
+        # k4d = NEGI_H0_ISO * (state + ezby2 * k3d)
+        # dstate = (ez * dstate + dt * 1//6 * (
+        #         ez * k1d + 2 * ezby2 * k2d + 2 * ezby2 * k3d + k4d
+        # ))
+        # state = ez * state
+    end
+    final_astate_exp = [state; dstate; d2state]
+
+    println("final_astate_deqjl")
+    show_nice(final_astate_deqjl)
+    println("\nfinal_astate_exp")
+    show_nice(final_astate_exp)
+    println("")
 end

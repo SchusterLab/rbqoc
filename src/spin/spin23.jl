@@ -109,8 +109,8 @@ function unscented_transform!(model::Model, z::AbstractKnotPoint{T,N,M}) where {
     model.s1_samples[6] = s61 ./ sqrt(s61's61)
     model.s1_samples[7] = s71 ./ sqrt(s71's71)
     model.s1_samples[8] = s81 ./ sqrt(s81's81)
-    rand!(model.fq_dist, model.fq_samples)
-    model.fq_samples .+= FQ
+    # rand!(model.fq_dist, model.fq_samples)
+    # model.fq_samples .+= FQ
 
     return nothing
 end
@@ -260,7 +260,7 @@ end
 
 
 # main
-function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
+function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
                   sqrtbp=false, integrator_type=rk3, qs=[1e0, 1e0, 1e0, 1e-1, 1e0, 1e-1],
                   dt_inv=Int64(1e1), smoke_test=false, constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true,
@@ -272,7 +272,10 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     astate_dist = Distributions.Normal(0., astate_cov)
     s1_samples = [SVector{HDIM_ISO}(zeros(HDIM_ISO)) for i = 1:SAMPLE_COUNT]
     fq_dist = Distributions.Normal(0., fq_cov)
-    fq_samples = MVector{SAMPLE_COUNT}(zeros(SAMPLE_COUNT))
+    fq_samples = MVector{SAMPLE_COUNT}([
+        fill(FQ + fq_cov, Int(SAMPLE_COUNT / 2));
+        fill(FQ - fq_cov, Int(SAMPLE_COUNT / 2));
+    ])
     model = Model(s1_samples, fq_samples, fq_dist, alpha)
     n = RD.state_dim(model)
     m = RD.control_dim(model)

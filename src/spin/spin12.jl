@@ -151,11 +151,11 @@ end
 
 
 # main
-function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
+function run_traj(;gate_type=zpiby2, evolution_time=17.5, solver_type=altro,
                   sqrtbp=false, integrator_type=rk3, qs=[1e0, 1e0, 1e0, 1e-1, 1e0, 1e-1],
                   dt_inv=Int64(1e1), smoke_test=false, constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5),
-                  fq_cov=FQ * 1e-2, analytic_guess=false)
+                  fq_cov=FQ * 1e-2)
     # model configuration
     h0_samples = Array{SMatrix{HDIM_ISO, HDIM_ISO}}(undef, SAMPLE_COUNT)
     h0_samples[1] = (FQ + fq_cov) * NEGI_H0_ISO
@@ -226,26 +226,9 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     # initial trajectory
     dt = dt_inv^(-1)
     N = Int(floor(evolution_time * dt_inv)) + 1
-    # anlaytic_guess currently only works for t_N = 56.8ns
-    if analytic_guess
-        amp = 1.25e-1
-        U0_ = zeros(N - 1)
-        U0_[1] = -amp / dt^2
-        U0_[22] = amp / dt^2
-        U0_[173] = amp / dt^2
-        U0_[195] = -amp / dt^2
-        U0_[373] = amp / dt^2
-        U0_[395] = -amp / dt^2
-        U0_[546] = -amp / dt^2
-        U0_[567] = amp / dt^2
-        U0 = [SVector{m}([
-            U0_[k]
-        ]) for k = 1:N-1]
-    else
-        U0 = [SVector{m}([
-            fill(1e-4, CONTROL_COUNT);
-        ]) for k = 1:N-1]
-    end
+    U0 = [SVector{m}([
+        fill(1e-4, CONTROL_COUNT);
+    ]) for k = 1:N-1]
     X0 = [SVector{n}([
         fill(NaN, n);
     ]) for k = 1:N]
@@ -316,7 +299,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     d2cidx_arr = Array(D2CONTROLS_IDX)
     cmax = TO.max_violation(solver)
     cmax_info = TO.findmax_violation(TO.get_constraints(solver))
-    iterations_ = iterations(solver)
+    iterations_ = Altro.iterations(solver)
 
     result = Dict(
         "acontrols" => acontrols_arr,

@@ -60,7 +60,7 @@ def generate_file_path(extension, save_file_name, save_path):
 
 ### Z/2 ###
 
-T_TOT_ZPIBY2 = 17.85714285714286
+TTOT_ZPIBY2 = 17.85714285714286
 def gen_controls_zpiby2(t, shape=Shape.SQUARE):
     c1 = 0
     return np.array([c1,])
@@ -76,7 +76,7 @@ def save_controls_zpiby2(shape=Shape.SQUARE):
 
 T_XZ_YPIBY2 = 2.1656249366575766
 T_Z_YPIBY2 = 15.142330599557274
-T_TOT_YPIBY2 = 2 * T_XZ_YPIBY2 + T_Z_YPIBY2
+TTOT_YPIBY2 = 2 * T_XZ_YPIBY2 + T_Z_YPIBY2
 T0_YPIBY2 = 0.
 T1_YPIBY2 = T_XZ_YPIBY2 / 2
 T2_YPIBY2 = T_XZ_YPIBY2
@@ -114,7 +114,7 @@ def gen_controls_ypiby2(t, shape=Shape.SQUARE):
 def save_controls_ypiby2(plot=False):
     # generate
     shape = Shape.SQUARE
-    evolution_time = T_TOT_YPIBY2
+    evolution_time = TTOT_YPIBY2
     control_eval_count = int(np.floor(evolution_time * DT_INV))
     control_eval_times = np.arange(0, control_eval_count, 1) * DT
     controls = np.vstack([gen_controls_ypiby2(t, shape=shape) for t in control_eval_times])
@@ -150,9 +150,9 @@ def save_controls_ypiby2(plot=False):
 
 ### X/2 ###
 
-T_TOT_XPIBY2 = 2 * T_TOT_YPIBY2 + T_TOT_ZPIBY2
-T1_XPIBY2 = T_TOT_YPIBY2
-T2_XPIBY2 = T1_XPIBY2 + T_TOT_ZPIBY2
+TTOT_XPIBY2 = 2 * TTOT_YPIBY2 + TTOT_ZPIBY2
+T1_XPIBY2 = TTOT_YPIBY2
+T2_XPIBY2 = T1_XPIBY2 + TTOT_ZPIBY2
 def gen_controls_xpiby2(t, shape=Shape.SQUARE):
     if t <= T1_XPIBY2:
         ret = -gen_controls_ypiby2(t, shape=shape)
@@ -169,7 +169,7 @@ def gen_controls_xpiby2(t, shape=Shape.SQUARE):
 def save_controls_xpiby2(plot=False):
     # generate
     shape = Shape.SQUARE
-    evolution_time = T_TOT_XPIBY2
+    evolution_time = TTOT_XPIBY2
     control_eval_count = int(np.floor(evolution_time * DT_INV))
     control_eval_times = np.arange(0, control_eval_count, 1) * DT
     controls = np.vstack([gen_controls_xpiby2(t, shape=shape) for t in control_eval_times])

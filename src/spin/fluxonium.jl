@@ -232,3 +232,144 @@ function plot_pink_noise_from_density(count; dt_inv=1e2, namp=NAMP_PREFACTOR, pl
     return fnoise
 end
     
+
+function plot_pink_noise_timmer(count; dt_inv=DT_NOISE_INV, namp=NAMP_PREFACTOR,
+                                plot=false, seed=0, ndist=STD_NORMAL)
+    countby2 = Int(floor(count / 2))
+    sqrt_count = sqrt(count)
+    Random.seed!(seed)
+    times = Array(0:1:count-1) / dt_inv
+    time = count / dt_inv
+    freqs = fftfreq(count, dt_inv)
+
+    noise_fft = Array{Complex{Float64}}(zeros(count))
+    for i = 2:countby2
+        noise = (rand(ndist) + 1im * rand(ndist)) / freqs[i]^(1//2)
+        noise_fft[i] = noise
+        noise_fft[end - i + 2] = conj(noise)
+    end
+    if iseven(count)
+        noise_fft[countby2 + 1] = rand(ndist) / abs(freqs[countby2 + 1])^(1//2)
+    else
+        noise = (rand(ndist) + 1im * rand(ndist)) / freqs[countby2 + 1]^(1//2)
+        noise_fft[countby2 + 1] = noise
+        noise_fft[end - (countby2 + 1) + 2] = conj(noise)
+    end
+    noise_fft_ = copy(noise_fft)
+    fft!(noise_fft)
+    pink_noise = Array{Float64}(zeros(count))
+    for i = 1:count
+        pink_noise[i] = real(noise_fft[i]) / sqrt_count
+    end
+
+    if plot
+        subfig1 = Plots.plot()
+        Plots.scatter!(subfig1, freqs, map(x -> abs(x)^2, noise_fft_), label="pink")
+        Plots.xlabel!(L"f \; \textrm{(GHz)}")
+        Plots.ylabel!(L"|\hat{x}(f)|^2 \; \textrm{(a.u.)}")
+        subfig2 = Plots.plot()
+        Plots.scatter!(subfig2, times, pink_noise, label="pink")
+        Plots.xlabel!(L"t \; \textrm{(ns)}")
+        Plots.ylabel!(L"x(t) \; \textrm{(a.u.)}")
+        layout = @layout [a; b]
+        fig = Plots.plot(subfig1, subfig2, dpi=DPI, layout=layout)
+        Plots.savefig(fig, PINK_PLOT_FILE_PATH)
+    end
+    
+    return pink_noise
+end
+
+
+function plot_pink_noise_timmer(count; dt_inv=DT_NOISE_INV, namp=NAMP_PREFACTOR,
+                                plot=false, seed=0, ndist=STD_NORMAL)
+    countby2 = Int(floor(count / 2))
+    sqrt_count = sqrt(count)
+    Random.seed!(seed)
+    times = Array(0:1:count-1) / dt_inv
+    time = count / dt_inv
+    freqs = fftfreq(count, dt_inv)
+
+    noise_fft = Array{Complex{Float64}}(zeros(count))
+    for i = 2:countby2
+        noise = (rand(ndist) + 1im * rand(ndist)) / freqs[i]^(1//2)
+        noise_fft[i] = noise
+        noise_fft[end - i + 2] = conj(noise)
+    end
+    if iseven(count)
+        noise_fft[countby2 + 1] = rand(ndist) / abs(freqs[countby2 + 1])^(1//2)
+    else
+        noise = (rand(ndist) + 1im * rand(ndist)) / freqs[countby2 + 1]^(1//2)
+        noise_fft[countby2 + 1] = noise
+        noise_fft[end - (countby2 + 1) + 2] = conj(noise)
+    end
+    noise_fft_ = copy(noise_fft)
+    fft!(noise_fft)
+    pink_noise = Array{Float64}(zeros(count))
+    for i = 1:count
+        pink_noise[i] = real(noise_fft[i]) / sqrt_count
+    end
+
+    if plot
+        subfig1 = Plots.plot()
+        Plots.scatter!(subfig1, freqs, map(x -> abs(x)^2, noise_fft_), label="pink")
+        Plots.xlabel!(L"f \; \textrm{(GHz)}")
+        Plots.ylabel!(L"|\hat{x}(f)|^2 \; \textrm{(a.u.)}")
+        subfig2 = Plots.plot()
+        Plots.scatter!(subfig2, times, pink_noise, label="pink")
+        Plots.xlabel!(L"t \; \textrm{(ns)}")
+        Plots.ylabel!(L"x(t) \; \textrm{(a.u.)}")
+        layout = @layout [a; b]
+        fig = Plots.plot(subfig1, subfig2, dpi=DPI, layout=layout)
+        Plots.savefig(fig, PINK_PLOT_FILE_PATH)
+    end
+    
+    return pink_noise
+end
+
+
+function pink_noise_filter(count; dt_inv=DT_NOISE_INV, namp=NAMP_PREFACTOR,
+                           ndist=STD_NORMAL, seed=0, plot=false)
+    b1 = 0.049922035
+    b2 = -0.095993537
+    b3 = 0.050612699
+    b4 = -0.004408786
+    a1 = 1
+    a2 = -2.494956002
+    a3 = 2.017265875
+    a4 = -0.522189400
+    Random.seed!(seed)
+    xs = rand(ndist, count)
+    ys = zeros(count)
+    ys[1] = b1 * xs[1]
+    ys[2] = b1 * xs[2] + b2 * xs[1] - a2 * ys[1]
+    ys[3] = b1 * xs[3] + b2 * xs[2] + b3 * xs[1] - a2 * ys[2] - a3 * ys[1]
+    for i = 4:count
+        ys[i] = (b1 * xs[i] + b2 * xs[i - 1] + b3 * xs[i - 2] + b4 * xs[i - 3]
+                 - a2 * ys[i - 1] - a3 * ys[i - 2] - a4 * ys[i - 3])
+    end
+    ys = ys * dt_inv
+    times = Array(0:1:count - 1) / dt_inv
+    freqs = fftfreq(count, dt_inv)
+    fmin = minimum(freqs)
+    fmax = maximum(freqs)
+    pl_freqs = range(fmin, stop=fmax, length=Int(3e2))
+    pink_lines = [freq == 0 ? 0 : count / abs(freq) for freq in pl_freqs]
+    ys_fft = fft(ys)
+    
+    if plot
+        subfig1 = Plots.plot()
+        Plots.scatter!(subfig1, freqs, map(x -> abs(x)^2, ys_fft))
+        Plots.plot!(subfig1, pl_freqs, pink_lines)
+        Plots.xlabel!(L"f \; \textrm{(GHz)}")
+        Plots.ylabel!(L"|\hat{x}(f)|^2 \; \textrm{(a.u.)}")
+        subfig2 = Plots.plot()
+        Plots.scatter!(subfig2, times, ys)
+        Plots.xlabel!(L"t \; \textrm{(ns)}")
+        Plots.ylabel!(L"x(t) \; \textrm{(a.u.)}")
+        layout = @layout [a; b]
+        fig = Plots.plot(subfig1, subfig2, dpi=DPI, layout=layout)
+        Plots.savefig(fig, PINK_PLOT_FILE_PATH)
+    end
+
+    return ys
+end
