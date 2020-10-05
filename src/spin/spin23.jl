@@ -8,6 +8,7 @@ include(joinpath(WDIR, "src", "spin", "spin.jl"))
 using Altro
 using Distributions
 using HDF5
+using Hyperopt
 using ForwardDiff
 using LinearAlgebra
 using Random
@@ -44,8 +45,9 @@ const S6STATE1_IDX = S5STATE1_IDX[end] + 1:S5STATE1_IDX[end] + HDIM_ISO
 const S7STATE1_IDX = S6STATE1_IDX[end] + 1:S6STATE1_IDX[end] + HDIM_ISO
 const S8STATE1_IDX = S7STATE1_IDX[end] + 1:S7STATE1_IDX[end] + HDIM_ISO
 const S9STATE1_IDX = S8STATE1_IDX[end] + 1:S8STATE1_IDX[end] + HDIM_ISO
-const SAMPLE_COUNT = 9
-const SAMPLE_COUNT_INV = 1//9
+const S10STATE1_IDX = S9STATE1_IDX[end] + 1:S9STATE1_IDX[end] + HDIM_ISO
+const SAMPLE_COUNT = 10
+const SAMPLE_COUNT_INV = 1//10
 const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
 const ACONTROL_SIZE = CONTROL_COUNT
 # control indices
@@ -91,11 +93,11 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::StaticVector{AS
     s7 = SVector{HDIM_ISO}(astate[S7STATE1_IDX])
     s8 = SVector{HDIM_ISO}(astate[S8STATE1_IDX])
     s9 = SVector{HDIM_ISO}(astate[S9STATE1_IDX])
+    s10 = SVector{HDIM_ISO}(astate[S10STATE1_IDX])
     # compute state mean
     sm = SAMPLE_COUNT_INV .* (
-        s1 + s2 + s3 + s4
-        + s5 + s6 + s7 + s8
-        + s9
+        s1 + s2 + s3 + s4 + s5
+        + s6 + s7 + s8 + s9 + s10
     )
     # compute state covariance
     d1 = s1 - sm
@@ -107,15 +109,18 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::StaticVector{AS
     d7 = s7 - sm
     d8 = s8 - sm
     d9 = s9 - sm
-    s_cov = 0.5 .* (
+    d10 = s10 - sm
+    s_cov = 1 / (2 * model.alpha^2) .* (
         d1 * d1' + d2 * d2' + d3 * d3' + d4 * d4'
         + d5 * d5' + d6 * d6' + d7 * d7' + d8 * d8'
-        + d9 * d9'
+        + d9 * d9' + d10 * d10'
     )
     # perform cholesky decomposition on joint covariance
-    model.cov[1:HDIM_ISO, 1:HDIM_ISO] = s_cov
-    model.cov[HDIM_ISO + 1, HDIM_ISO + 1] = model.fq_cov
-    cov_chol = cholesky(Symmetric(model.cov)).L
+    cov = @MMatrix zeros(eltype(s_cov), HDIM_ISO + 1, HDIM_ISO + 1)
+    cov[1:HDIM_ISO, 1:HDIM_ISO] .= s_cov
+    cov[HDIM_ISO + 1, HDIM_ISO + 1] = model.fq_cov
+    # TOOD: cholesky! requires writing zeros in upper triangle
+    cov_chol = model.alpha * cholesky(Symmetric(cov)).L
     s_chol1 = cov_chol[1:HDIM_ISO, 1]
     s_chol2 = cov_chol[1:HDIM_ISO, 2]
     s_chol3 = cov_chol[1:HDIM_ISO, 3]
@@ -130,11 +135,12 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::StaticVector{AS
     s2 = exp(dt * ((FQ + fq_chol2) * NEGI_H0_ISO + negi_hc)) * (sm + s_chol2)
     s3 = exp(dt * ((FQ + fq_chol3) * NEGI_H0_ISO + negi_hc)) * (sm + s_chol3)
     s4 = exp(dt * ((FQ + fq_chol4) * NEGI_H0_ISO + negi_hc)) * (sm + s_chol4)
-    s5 = exp(dt * ((FQ - fq_chol1) * NEGI_H0_ISO + negi_hc)) * (sm - s_chol1)
-    s6 = exp(dt * ((FQ - fq_chol2) * NEGI_H0_ISO + negi_hc)) * (sm - s_chol2)
-    s7 = exp(dt * ((FQ - fq_chol3) * NEGI_H0_ISO + negi_hc)) * (sm - s_chol3)
-    s8 = exp(dt * ((FQ - fq_chol4) * NEGI_H0_ISO + negi_hc)) * (sm - s_chol4)
-    s9 = exp(dt * ((FQ + fq_chol5) * NEGI_H0_ISO + negi_hc)) * sm
+    s5 = exp(dt * ((FQ + fq_chol5) * NEGI_H0_ISO + negi_hc)) * sm
+    s6 = exp(dt * ((FQ - fq_chol1) * NEGI_H0_ISO + negi_hc)) * (sm - s_chol1)
+    s7 = exp(dt * ((FQ - fq_chol2) * NEGI_H0_ISO + negi_hc)) * (sm - s_chol2)
+    s8 = exp(dt * ((FQ - fq_chol3) * NEGI_H0_ISO + negi_hc)) * (sm - s_chol3)
+    s9 = exp(dt * ((FQ - fq_chol4) * NEGI_H0_ISO + negi_hc)) * (sm - s_chol4)
+    s10 = exp(dt * ((FQ - fq_chol5) * NEGI_H0_ISO + negi_hc)) * sm
     # normalize
     s1 = s1 ./sqrt(s1's1)
     s2 = s2 ./sqrt(s2's2)
@@ -145,10 +151,11 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::StaticVector{AS
     s7 = s7 ./sqrt(s7's7)
     s8 = s8 ./sqrt(s8's8)
     s9 = s9 ./sqrt(s9's9)
+    s10 = s10 ./sqrt(s10's10)
     
     astate_ = [
         state1; state2; intcontrols; controls; dcontrols;
-        s1; s2; s3; s4; s5; s6; s7; s8; s9;
+        s1; s2; s3; s4; s5; s6; s7; s8; s9; s10
     ]
     
     return astate_
@@ -271,14 +278,18 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     t0 = 0.
 
     # initial state
-    state_dist = Distributions.Normal(0., state_cov)
     x0_ = [
         INITIAL_STATE1;
         INITIAL_STATE2;
         zeros(3 * CONTROL_COUNT);
     ]
+    state_dist = Distributions.Normal(0., state_cov)
+    sample_state = rand(HDIM) + 1im * rand(HDIM)
+    sample_state = sample_state / sqrt(real(sample_state'sample_state))
+    sample_state = SVector{HDIM_ISO}([real(sample_state); imag(sample_state)])
+    target_sample_state = GT_GATE[gate_type] * sample_state
     for i = 1:SAMPLE_COUNT
-        sample = INITIAL_STATE1 .+ rand(state_dist, HDIM_ISO)
+        sample = sample_state .+ rand(state_dist, HDIM_ISO)
         append!(x0_, sample ./ sqrt(sample'sample))
     end
     x0 = SVector{n}(x0_)
@@ -298,7 +309,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         target_state1;
         target_state2;
         zeros(3 * CONTROL_COUNT);
-        repeat(target_state1, SAMPLE_COUNT);
+        repeat(target_sample_state, SAMPLE_COUNT);
     ])
     
     # control amplitude constraint
@@ -492,4 +503,65 @@ function sample_diffs(saved)
         fds_[8, i] = fidelity_vec_iso2(x81, XPIBY2_ISO_1)
     end
     return (diffs_, fds_)
+end
+
+
+function hyperopt_me(;iterations=50, save=true)
+    save_file_path = generate_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
+    gate_type = zpiby2
+    save_file_paths = fill("", iterations)
+    weights = zeros(iterations)
+    alphas = zeros(iterations)
+    gate_errors = zeros(iterations)
+    
+    result::Dict{String, Any} = Dict(
+        "weights" => weights,
+        "alphas" => alphas,
+        "save_file_paths" => save_file_paths,
+        "gate_errors" => gate_errors,
+    )
+
+    if save
+        h5open(save_file_path, "cw") do save_file
+            for key in keys(result)
+                write(save_file, key, result[key])
+            end
+        end
+    end
+    
+    weights_space = exp10.(LinRange(-5, 5, 1000))
+    alpha_space = LinRange(1e-1, 10, 1000)
+    ho = Hyperoptimizer(iterations, GPSampler(Min); a=weights_space, b=alpha_space)
+    for (i, weight, alpha) in ho
+        # evaluate
+        res_train = run_traj(;gate_type=gate_type, qs=[1e0, 1e0, 1e0, 1e-1, weight, 1e-1],
+                             alpha=alpha, verbose=true, save=true)
+        save_file_path_ = res_train["save_file_path"]
+        res_eval = evaluate_fqdev(;save_file_path=save_file_path_, gate_type=gate_type)
+        gate_error = mean(res_eval["gate_errors"])
+        
+        # log
+        i_ = Int(i)
+        weights[i_] = weight
+        alphas[i_] = alpha
+        gate_errors[i_] = gate_error
+        save_file_paths[i_] = save_file_path
+        if save
+            h5open(save_file_path, "cw") do save_file
+                for key in keys(result)
+                    o_delete(save_file, key)
+                    write(save_file, key, result[key])
+                end
+            end
+        end
+
+        push!(ho.results, gate_error)
+        push!(ho.history, [weight, alpha])
+    end
+
+    if save
+        result["save_file_path"] = save_file_path
+    end
+
+    return result
 end

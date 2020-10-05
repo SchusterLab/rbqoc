@@ -362,14 +362,14 @@ const F2C_DATA_ZPIBY2 = Dict(
         INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
     ]],
     s2 => [joinpath(SPIN_OUT_PATH, "spin12/$(lpad(index, 5, '0'))_spin12.h5") for index in [
-        692, 706, 707, 708, 709, 710, 711, 712, 730, 731,
-        733, 734, 735, 750, 745, 751, 752, 753, 754, 755,
-        757, 756, 758, 759, 761, 760, 762, 763
+        779, 781, 782, 783, 784, 785, 786, 787, 788, 789,
+        790, 793, 791, 792, 794, 795, 796, 797, 798, 799,
+        800, 801, 802, 803, 805, 804, 806, 807,
     ]],
     sut8 => [joinpath(SPIN_OUT_PATH, "spin23/$(lpad(index, 5, '0'))_spin23.h5") for index in [
         INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
         INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
-        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, 186,
+        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
     ]],
     d1 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
         468, 471, 472, 474, 475, 476, 477, 478, 480, 539,
@@ -383,7 +383,7 @@ const F2C_DATA_ZPIBY2 = Dict(
     ]],
 )
 const F2C_PT_LIST = [analytic, s2, sut8, d1, d2]
-const F2C_AVG_COUNT = 10
+const F2C_AVG_COUNT = 1000
 const F2C_SIGMA = 1e-2
 const F2C_S1_NEGI_H0 = (FQ + FQ * F2C_SIGMA) * NEGI_H0_ISO
 const F2C_S2_NEGI_H0 = (FQ - FQ * F2C_SIGMA) * NEGI_H0_ISO
@@ -443,7 +443,6 @@ function gen_2c(;use_previous=true, gate_type=zpiby2)
                     && k <= avg_count_old)
                     gate_errors[i, j, (k - 1) * 2 + 1] = gate_errors_old[i, j, (k - 1) * 2 + 1]
                     gate_errors[i, j, (k - 1) * 2 + 2] = gate_errors_old[i, j, (k - 1) * 2 + 2]
-                    print("s")
                 else
                     res1 = run_sim_prop(
                         1, gate_type; save_file_path=save_file_path, dynamics_type=dynamics_type,
@@ -457,7 +456,6 @@ function gen_2c(;use_previous=true, gate_type=zpiby2)
                     ge2 = 1 - res2["fidelities"][end]
                     gate_errors[i, j, (k - 1) * 2 + 1] = ge1
                     gate_errors[i, j, (k - 1) * 2 + 2] = ge2
-                    print(".")
                 end
             end
             println(" $(mean(gate_errors[i, j, :]))")

@@ -925,8 +925,16 @@ end
 
 
 function gen_rand_state_iso(;seed=0)
-    if seed == 0
-        state = [1, 1] / sqrt(2)
+    if seed == -1
+        state = [1, 0]
+    elseif seed == -2
+        state = [0, 1]
+    elseif seed == -3
+        state = [1, 1im] ./ sqrt(2)
+    elseif seed == -4
+        state = [1, -1] ./ sqrt(2)
+    elseif seed == -5
+        state = [1, 1] ./ sqrt(2)
     else
         Random.seed!(seed)
         state = rand(HDIM) + 1im * rand(HDIM)
@@ -1401,150 +1409,49 @@ function run_sim_prop(
 end
 
 
-### TESTS ###
-function gen_rand_state_()
-    s = SVector{2}(rand(2) + 1im * rand(2))
-    return s / sqrt(s's)
-end
+function evaluate_fqdev(;fq_cov=FQ * 1e-2, trial_count=1000,
+                        save_file_path=nothing, dynamics_type=schroed,
+                        gate_type=zpiby2)
+    negi_hp = (FQ + fq_cov) * NEGI_H0_ISO
+    negi_hn = (FQ - fq_cov) * NEGI_H0_ISO
+    dynamics_type = schroed
+    gate_errors = zeros(2 * trial_count)
+    gate_errors_basis = zeros(2 * 4)
 
-
-function test_ge_(;seed=0, do_ge=true, do_gej=true, do_geh=true)
-    Random.seed!(seed)
-    big_ge = Int(1e4)
-    big_gej = Int(1e4)
-    big_geh = Int(1e4)
-    
-    if do_ge
-        for i = 1:big_ge
-            x1 = gen_rand_state_()
-            x2 = gen_rand_state_()
-            x1_iso = get_vec_iso(x1)
-            x2_iso = get_vec_iso(x2)
-            ge = 1 - abs(x1'x2)^2
-            ge_iso = gate_error_iso2(x1_iso, x2_iso)
-            @assert isapprox(ge, ge_iso)
-        end
+    for i = -4:-1
+        res1 = run_sim_prop(
+            1, gate_type; save_file_path=save_file_path, dynamics_type=dynamics_type,
+            negi_h0=negi_hp, save=false, seed=0, state_seed=i,
+        )
+        res2 = run_sim_prop(
+            1, gate_type; save_file_path=save_file_path, dynamics_type=dynamics_type,
+            negi_h0=negi_hn, save=false, seed=0, state_seed=i,
+        )
+        ge1 = 1 - res1["fidelities"][end]
+        ge2 = 1 - res2["fidelities"][end]
+        gate_errors_basis[2 * (i + 4) + 1] = ge1
+        gate_errors_basis[2 * (i + 4) + 2] = ge2
     end
 
-    if do_gej
-        for i = 1:big_gej
-            x1 = gen_rand_state_()
-            x2 = gen_rand_state_()
-            x1_iso = get_vec_iso(x1)
-            x2_iso = get_vec_iso(x2)
-            ge_aug(x1_iso_) = gate_error_iso2(x1_iso_, x2_iso)
-            (gej_z,) = Zygote.gradient(ge_aug, x1_iso)
-            gej_m = jacobian_gate_error_iso2(x1_iso, x2_iso)
-            @assert isapprox(gej_z, gej_m)
-        end
+    for i = 0:trial_count - 1
+        res1 = run_sim_prop(
+            1, gate_type; save_file_path=save_file_path, dynamics_type=dynamics_type,
+            negi_h0=negi_hp, save=false, seed=i
+        )
+        res2 = run_sim_prop(
+            1, gate_type; save_file_path=save_file_path, dynamics_type=dynamics_type,
+            negi_h0=negi_hn, save=false, seed=i
+        )
+        ge1 = 1 - res1["fidelities"][end]
+        ge2 = 1 - res2["fidelities"][end]
+        gate_errors[2 * i + 1] = ge1
+        gate_errors[2 * i + 2] = ge2
     end
 
-    if do_geh
-        for i = 1:big_geh
-            x1 = gen_rand_state_()
-            x2 = gen_rand_state_()
-            x1_iso = get_vec_iso(x1)
-            x2_iso = get_vec_iso(x2)
-            ge_aug(x1_iso_) = gate_error_iso2(x1_iso_, x2_iso)
-            geh_z = Zygote.hessian(ge_aug, x1_iso)
-            geh_m = hessian_gate_error_iso2(x2_iso)
-            @assert isapprox(geh_z, geh_m)
-        end
-    end
-end
-
-
-const NEGI2_H0_ISO = 2 * NEGI_H0_ISO
-function dynamics_dfstate_deqjl(astate::SVector, params::SimParams, time::Float64)
-    state_idx = 1:4
-    dstate_idx = 5:8
-    d2state_idx = 9:12
-    controls_knot_point = (Int(floor(time * params.controls_dt_inv)) % params.control_knot_count) + 1
-    negi_h = (
-        params.negi_h0
-        + params.controls[controls_knot_point, 1] * NEGI_H1_ISO
+    result = Dict(
+        "gate_errors" => gate_errors,
+        "gate_errors_basis" => gate_errors_basis,
     )
-    
-    dstate = negi_h * astate[state_idx]
-    ddstate = negi_h * astate[dstate_idx] + NEGI_H0_ISO * astate[state_idx]
-    dd2state = negi_h * astate[d2state_idx] + NEGI2_H0_ISO * astate[dstate_idx]
-    dastate = [dstate; ddstate; dd2state]
-    
-    return dastate
-end
 
-
-function test_expdeqjl(;seed=1, negi_h0=FQ_NEGI_H0_ISO, reltol=1e-12, abstol=1e-12,
-                       adaptive=true, solver=DifferentialEquations.Vern9)
-    save_file_path = joinpath(SPIN_OUT_PATH, "spin12/00627_spin12.h5")
-    (controls, controls_dt_inv, evolution_time) = grab_controls(save_file_path)
-    dt = controls_dt_inv^(-1)
-    control_knot_count = Int(floor(evolution_time * controls_dt_inv))
-    initial_state = gen_rand_state_iso(;seed=seed)
-    initial_astate = [initial_state; @SVector zeros(2 * HDIM_ISO)]
-
-    # deqjl
-    # tspan = (0., evolution_time)
-    # save_times = [0., evolution_time]
-    # params = SimParams(controls, control_knot_count, controls_dt_inv, negi_h0,
-    #                    zeros(1), 0, 0)
-    # prob = ODEProblem(dynamics_dfstate_deqjl, initial_astate, tspan, params)
-    # result_deqjl = solve(prob, solver(), saveat=save_times, maxiters=DEQJL_MAXITERS,
-    #                      adaptive=adaptive, reltol=reltol, abstol=abstol)
-    # final_astate_deqjl = result_deqjl.u[end]
-    final_astate_deqjl = [
-        0.3297502016083930496857710107507070282439170198459780516957163426947026553848819;
-        0.8911153066503424150898098622796038253240145733901272546764101366400421501465792;
-        -0.04570436686707923806850534875355927461876076593027880863091868412801804526696696;
-        -0.3083657335729272441538341062792230805961115399686374631442072705867296065360932;
-        -1.762081244798284307668549658483409907816552049440236848997044142716682669755047;
-        -6.774290676829364446826621882987452576489399582278228041439766274786186033794044;
-       -94.29777221085506261481004895271138678686498582042056237068641281709503443245519;
-        -7.48429715886366019870079175966160929452897909028678916403918021630619572993541;
-     -2782.797334522913580692186177346094111441609178846508985051472623722131186875704;
-     -7576.02782757433488986108912497316375333435530772993752967348280813288799442085;
-     -2641.4045650586007199458644455694431946142558061399391205939738927683334249393;
-        4699.16633090618516756463787460347438315674579889839606170982251549847103430348;
-    ]
-
-    # exp
-    knot_count = Int(floor(evolution_time * controls_dt_inv))
-    state = initial_state
-    dstate = @SVector zeros(HDIM_ISO)
-    d2state = @SVector zeros(HDIM_ISO)
-    for i = 1:knot_count
-        # assume negi_h and NEGI_H0_ISO commute
-        # negi_h = negi_h0 + controls[i, 1] * NEGI_H1_ISO
-        # ez = exp(dt * negi_h)
-        # d2state = ez * d2state + dt * NEGI2_H0_ISO * dstate
-        # dstate = ez * dstate + dt * NEGI_H0_ISO * state
-        # state = ez * state
-        
-        # lawson-euler
-        # negi_h = negi_h0 + controls[i, 1] * NEGI_H1_ISO
-        # ez = exp(dt * negi_h)
-        # d2state = ez * d2state + dt * ez * NEGI2_H0_ISO * dstate
-        # dstate = ez * dstate + dt * ez * NEGI_H0_ISO * state
-        # state = ez * state
-
-        # lawson4
-        # negi_h = negi_h0 + controls[i, 1] * NEGI_H1_ISO
-        # ez = exp(dt * negi_h)
-        # ezby2 = exp(dt * 1//2 * negi_h)
-        # k1d = NEGI_H0_ISO * state
-        # k2d = NEGI_H0_ISO * (state + 1//2 * ezby2 * k1d)
-        # k3d = NEGI_H0_ISO * (state + 1//2 * k2d)
-        # k4d = NEGI_H0_ISO * (state + ezby2 * k3d)
-        # dstate = (ez * dstate + dt * 1//6 * (
-        #         ez * k1d + 2 * ezby2 * k2d + 2 * ezby2 * k3d + k4d
-        # ))
-        # state = ez * state
-    end
-    final_astate_exp = [state; dstate; d2state]
-
-    println("final_astate_deqjl")
-    show_nice(final_astate_deqjl)
-    println("\nfinal_astate_exp")
-    show_nice(final_astate_exp)
-    println("")
+    return result
 end
