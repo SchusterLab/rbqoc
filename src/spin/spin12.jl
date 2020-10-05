@@ -17,7 +17,7 @@ const TO = TrajectoryOptimization
 # paths
 const EXPERIMENT_META = "spin"
 const EXPERIMENT_NAME = "spin12"
-const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
+const SAVE_PATH = abspath(joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME))
 
 # problem
 const CONTROL_COUNT = 1
