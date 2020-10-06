@@ -367,8 +367,8 @@ const F2C_DATA_ZPIBY2 = Dict(
         800, 801, 802, 803, 805, 804, 806, 807,
     ]],
     sut8 => [joinpath(SPIN_OUT_PATH, "spin23/$(lpad(index, 5, '0'))_spin23.h5") for index in [
-        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
-        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
+        259, 260, 261, 262, 263, 264, 265, 266, 267, 270,
+        268, INVAL, 269, 272, 271, 273, INVAL, INVAL, INVAL, INVAL,
         INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
     ]],
     d1 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
