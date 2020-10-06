@@ -30,22 +30,24 @@ const STATE_COUNT = 2
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
 const INITIAL_STATE1 = [1., 0, 0, 0]
 const INITIAL_STATE2 = [0., 1, 0, 0]
+const INITIAL_STATE3 = [1., 0, 0, 1] ./ sqrt(2)
+const INITIAL_STATE4 = [1., -1, 0, 0] ./ sqrt(2)
 # state indices
 const STATE1_IDX = 1:HDIM_ISO
 const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
 const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
 const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
 const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
-const S1STATE1_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO
-const S2STATE1_IDX = S1STATE1_IDX[end] + 1:S1STATE1_IDX[end] + HDIM_ISO
-const S3STATE1_IDX = S2STATE1_IDX[end] + 1:S2STATE1_IDX[end] + HDIM_ISO
-const S4STATE1_IDX = S3STATE1_IDX[end] + 1:S3STATE1_IDX[end] + HDIM_ISO
-const S5STATE1_IDX = S4STATE1_IDX[end] + 1:S4STATE1_IDX[end] + HDIM_ISO
-const S6STATE1_IDX = S5STATE1_IDX[end] + 1:S5STATE1_IDX[end] + HDIM_ISO
-const S7STATE1_IDX = S6STATE1_IDX[end] + 1:S6STATE1_IDX[end] + HDIM_ISO
-const S8STATE1_IDX = S7STATE1_IDX[end] + 1:S7STATE1_IDX[end] + HDIM_ISO
-const S9STATE1_IDX = S8STATE1_IDX[end] + 1:S8STATE1_IDX[end] + HDIM_ISO
-const S10STATE1_IDX = S9STATE1_IDX[end] + 1:S9STATE1_IDX[end] + HDIM_ISO
+const S1_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO
+const S2_IDX = S1_IDX[end] + 1:S1_IDX[end] + HDIM_ISO
+const S3_IDX = S2_IDX[end] + 1:S2_IDX[end] + HDIM_ISO
+const S4_IDX = S3_IDX[end] + 1:S3_IDX[end] + HDIM_ISO
+const S5_IDX = S4_IDX[end] + 1:S4_IDX[end] + HDIM_ISO
+const S6_IDX = S5_IDX[end] + 1:S5_IDX[end] + HDIM_ISO
+const S7_IDX = S6_IDX[end] + 1:S6_IDX[end] + HDIM_ISO
+const S8_IDX = S7_IDX[end] + 1:S7_IDX[end] + HDIM_ISO
+const S9_IDX = S8_IDX[end] + 1:S8_IDX[end] + HDIM_ISO
+const S10_IDX = S9_IDX[end] + 1:S9_IDX[end] + HDIM_ISO
 const SAMPLE_COUNT = 10
 const SAMPLE_COUNT_INV = 1//10
 const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
@@ -60,9 +62,6 @@ using StaticArrays
 const RD = RobotDynamics
 const HDIM_ISO = 4
 mutable struct Model <: RD.AbstractModel
-    cov::MMatrix{HDIM_ISO + 1, HDIM_ISO + 1}
-    negi_hp::SMatrix{HDIM_ISO, HDIM_ISO}
-    negi_hn::SMatrix{HDIM_ISO, HDIM_ISO}
     fq_cov::Float64
     alpha::Float64
 end
@@ -72,8 +71,8 @@ Model = Data.Model
 @inline RD.control_dim(model::Model) = ACONTROL_SIZE
 
 # dynamics
-function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::StaticVector{ASTATE_SIZE},
-                              acontrol::StaticVector{ACONTROL_SIZE}, time::Real, dt::Real)
+function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector{ASTATE_SIZE},
+                              acontrol::SVector{ACONTROL_SIZE}, time::Real, dt::Real)
     # base dynamics
     negi_hc = astate[CONTROLS_IDX[1]] * NEGI_H1_ISO
     h_prop = exp(dt * (FQ_NEGI_H0_ISO + negi_hc))
@@ -84,16 +83,16 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::StaticVector{AS
     dcontrols = astate[DCONTROLS_IDX[1]] + dt * acontrol[D2CONTROLS_IDX[1]]
 
     # unscented transform
-    s1 = SVector{HDIM_ISO}(astate[S1STATE1_IDX])
-    s2 = SVector{HDIM_ISO}(astate[S2STATE1_IDX])
-    s3 = SVector{HDIM_ISO}(astate[S3STATE1_IDX])
-    s4 = SVector{HDIM_ISO}(astate[S4STATE1_IDX])
-    s5 = SVector{HDIM_ISO}(astate[S5STATE1_IDX])
-    s6 = SVector{HDIM_ISO}(astate[S6STATE1_IDX])
-    s7 = SVector{HDIM_ISO}(astate[S7STATE1_IDX])
-    s8 = SVector{HDIM_ISO}(astate[S8STATE1_IDX])
-    s9 = SVector{HDIM_ISO}(astate[S9STATE1_IDX])
-    s10 = SVector{HDIM_ISO}(astate[S10STATE1_IDX])
+    s1 = SVector{HDIM_ISO}(astate[S1_IDX])
+    s2 = SVector{HDIM_ISO}(astate[S2_IDX])
+    s3 = SVector{HDIM_ISO}(astate[S3_IDX])
+    s4 = SVector{HDIM_ISO}(astate[S4_IDX])
+    s5 = SVector{HDIM_ISO}(astate[S5_IDX])
+    s6 = SVector{HDIM_ISO}(astate[S6_IDX])
+    s7 = SVector{HDIM_ISO}(astate[S7_IDX])
+    s8 = SVector{HDIM_ISO}(astate[S8_IDX])
+    s9 = SVector{HDIM_ISO}(astate[S9_IDX])
+    s10 = SVector{HDIM_ISO}(astate[S10_IDX])
     # compute state mean
     sm = SAMPLE_COUNT_INV .* (
         s1 + s2 + s3 + s4 + s5
@@ -183,15 +182,16 @@ function Cost(Q::Diagonal{T,SVector{N,T}}, R::Diagonal{T,SVector{M,T}},
     # For reasons unkown to the author, throwing a -1 in front
     # of the gate error Hessian makes the cost function work.
     hess_sample = -1 * q_ss * hessian_gate_error_iso2(target_state1)
-    hess_astate[S1STATE1_IDX, S1STATE1_IDX] = hess_sample
-    hess_astate[S2STATE1_IDX, S2STATE1_IDX] = hess_sample
-    hess_astate[S3STATE1_IDX, S3STATE1_IDX] = hess_sample
-    hess_astate[S4STATE1_IDX, S4STATE1_IDX] = hess_sample
-    hess_astate[S5STATE1_IDX, S5STATE1_IDX] = hess_sample
-    hess_astate[S6STATE1_IDX, S6STATE1_IDX] = hess_sample
-    hess_astate[S7STATE1_IDX, S7STATE1_IDX] = hess_sample
-    hess_astate[S8STATE1_IDX, S8STATE1_IDX] = hess_sample
-    hess_astate[S9STATE1_IDX, S9STATE1_IDX] = hess_sample
+    hess_astate[S1_IDX, S1_IDX] = hess_sample
+    hess_astate[S2_IDX, S2_IDX] = hess_sample
+    hess_astate[S3_IDX, S3_IDX] = hess_sample
+    hess_astate[S4_IDX, S4_IDX] = hess_sample
+    hess_astate[S5_IDX, S5_IDX] = hess_sample
+    hess_astate[S6_IDX, S6_IDX] = hess_sample
+    hess_astate[S7_IDX, S7_IDX] = hess_sample
+    hess_astate[S8_IDX, S8_IDX] = hess_sample
+    hess_astate[S9_IDX, S9_IDX] = hess_sample
+    hess_astate[S10_IDX, S10_IDX] = hess_sample
     hess_astate += Q
     hess_astate = Symmetric(SMatrix{N, N}(hess_astate))
     return Cost{N,M,T}(Q, R, q, c, hess_astate, target_state1, q_ss)
@@ -207,15 +207,16 @@ end
 @inline TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N}) where {N,M,T} = (
     0.5 * astate' * cost.Q * astate + cost.q'astate + cost.c
     + cost.q_ss * (
-        gate_error_iso2(astate, cost.target_state1, S1STATE1_IDX[1] - 1)
-        + gate_error_iso2(astate, cost.target_state1, S2STATE1_IDX[1] - 1)
-        + gate_error_iso2(astate, cost.target_state1, S3STATE1_IDX[1] - 1)
-        + gate_error_iso2(astate, cost.target_state1, S4STATE1_IDX[1] - 1)
-        + gate_error_iso2(astate, cost.target_state1, S5STATE1_IDX[1] - 1)
-        + gate_error_iso2(astate, cost.target_state1, S6STATE1_IDX[1] - 1)
-        + gate_error_iso2(astate, cost.target_state1, S7STATE1_IDX[1] - 1)
-        + gate_error_iso2(astate, cost.target_state1, S8STATE1_IDX[1] - 1)
-        + gate_error_iso2(astate, cost.target_state1, S9STATE1_IDX[1] - 1)
+        gate_error_iso2(astate, cost.target_state1, S1_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S2_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S3_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S4_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S5_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S6_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S7_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S8_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S9_IDX[1] - 1)
+        + gate_error_iso2(astate, cost.target_state1, S10_IDX[1] - 1)
     )
 )
 
@@ -226,15 +227,16 @@ end
 function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T}) where {N,M,T}
     E.q = (cost.Q * astate + cost.q + [
         @SVector zeros(ASTATE_SIZE_BASE);
-        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S1STATE1_IDX[1] - 1);
-        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S2STATE1_IDX[1] - 1);
-        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S3STATE1_IDX[1] - 1);
-        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S4STATE1_IDX[1] - 1);
-        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S5STATE1_IDX[1] - 1);
-        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S6STATE1_IDX[1] - 1);
-        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S7STATE1_IDX[1] - 1);
-        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S8STATE1_IDX[1] - 1);
-        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S9STATE1_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S1_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S2_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S3_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S4_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S5_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S6_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S7_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S8_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S9_IDX[1] - 1);
+        cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S10_IDX[1] - 1);
     ])
     return false
 end
@@ -269,10 +271,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
                   fq_cov=FQ * 1e-2, max_iterations=Int64(2e5), gradient_tol_int=1,
                   dJ_counter_limit=Int(1e2), state_cov=1e-2, seed=0, alpha=1.,)
     Random.seed!(seed)
-    cov = MMatrix{HDIM_ISO + 1, HDIM_ISO + 1}(zeros(HDIM_ISO + 1, HDIM_ISO + 1))
-    negi_hp = (FQ + fq_cov) * NEGI_H0_ISO
-    negi_hn = (FQ - fq_cov) * NEGI_H0_ISO
-    model = Model(cov, negi_hp, negi_hn, fq_cov, alpha)
+    model = Model(fq_cov, alpha)
     n = RD.state_dim(model)
     m = RD.control_dim(model)
     t0 = 0.
@@ -284,9 +283,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         zeros(3 * CONTROL_COUNT);
     ]
     state_dist = Distributions.Normal(0., state_cov)
-    sample_state = rand(HDIM) + 1im * rand(HDIM)
-    sample_state = sample_state / sqrt(real(sample_state'sample_state))
-    sample_state = SVector{HDIM_ISO}([real(sample_state); imag(sample_state)])
+    sample_state = INITIAL_STATE3
     target_sample_state = GT_GATE[gate_type] * sample_state
     for i = 1:SAMPLE_COUNT
         sample = sample_state .+ rand(state_dist, HDIM_ISO)
@@ -360,17 +357,17 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         fill(qs[2], CONTROL_COUNT); # ∫a
         fill(qs[3], CONTROL_COUNT); # a
         fill(qs[4], CONTROL_COUNT); # ∂a
-        # fill(0, SAMPLE_COUNT * HDIM_ISO);
-        fill(qs[5], SAMPLE_COUNT * HDIM_ISO);
+        fill(0, SAMPLE_COUNT * HDIM_ISO);
+        # fill(qs[5], SAMPLE_COUNT * HDIM_ISO);
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([
         fill(qs[6], CONTROL_COUNT); # ∂2a
     ]))
-    objective = LQRObjective(Q, R, Qf, xf, N)
-    # cost_k = Cost(Q, R, xf, target_state1, qs[5])
-    # cost_f = Cost(Qf, R, xf, target_state1, qs[5])
-    # objective = TO.Objective(cost_k, cost_f, N)
+    # objective = LQRObjective(Q, R, Qf, xf, N)
+    cost_k = Cost(Q, R, xf, target_state1, qs[5])
+    cost_f = Cost(Qf, R, xf, target_state1, N * qs[5])
+    objective = TO.Objective(cost_k, cost_f, N)
 
     # constraints
     # must satisfy control amplitude bound
@@ -380,15 +377,17 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     # must reach target state, must have zero net flux
     target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
     # must obey unit norm
-    normalization_constraint_1 = NormConstraint(n, m, 1, TO.Equality(), STATE1_IDX)
-    normalization_constraint_2 = NormConstraint(n, m, 1, TO.Equality(), STATE2_IDX)
-    
+    norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idxs) for idxs in (
+        STATE1_IDX, STATE2_IDX, S1_IDX, S2_IDX, S3_IDX, S4_IDX, S5_IDX, S6_IDX,
+        S7_IDX, S8_IDX, S9_IDX, S10_IDX,
+    )]
     constraints = ConstraintList(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
     add_constraint!(constraints, target_astate_constraint, N:N)
-    # add_constraint!(constraints, normalization_constraint_1, 2:N-1)
-    # add_constraint!(constraints, normalization_constraint_2, 2:N-1)
+    for norm_constraint in norm_constraints
+        add_constraint!(constraints, norm_constraint, 2:N-1)
+    end
 
     # solve problem
     prob = Problem{IT_RDI[integrator_type]}(model, objective, constraints, x0, xf, Z, N, t0, evolution_time)
@@ -465,44 +464,54 @@ end
 
 
 function sample_diffs(saved)
+    gate_type = GateType(saved["gate_type"])
     knot_count = size(saved["astates"], 1)
     diffs_ = zeros(SAMPLE_COUNT, knot_count)
     fds_ = zeros(SAMPLE_COUNT, knot_count)
+    target_state = GT_GATE[gate_type] * INITIAL_STATE3
     for i = 1:knot_count
-        x11 = saved["astates"][i, S1STATE1_IDX]
-        x21 = saved["astates"][i, S2STATE1_IDX]
-        x31 = saved["astates"][i, S3STATE1_IDX]
-        x41 = saved["astates"][i, S4STATE1_IDX]
-        x51 = saved["astates"][i, S5STATE1_IDX]
-        x61 = saved["astates"][i, S6STATE1_IDX]
-        x71 = saved["astates"][i, S7STATE1_IDX]
-        x81 = saved["astates"][i, S8STATE1_IDX]
-        d11 = x11 - XPIBY2_ISO_1
-        d21 = x21 - XPIBY2_ISO_1
-        d31 = x31 - XPIBY2_ISO_1
-        d41 = x41 - XPIBY2_ISO_1
-        d51 = x51 - XPIBY2_ISO_1
-        d61 = x61 - XPIBY2_ISO_1
-        d71 = x71 - XPIBY2_ISO_1
-        d81 = x81 - XPIBY2_ISO_1
-        diffs_[1, i] = d11'd11
-        diffs_[2, i] = d21'd21
-        diffs_[3, i] = d31'd31
-        diffs_[4, i] = d41'd41
-        diffs_[5, i] = d51'd51
-        diffs_[6, i] = d61'd61
-        diffs_[7, i] = d71'd71
-        diffs_[8, i] = d81'd81
-        fds_[1, i] = fidelity_vec_iso2(x11, XPIBY2_ISO_1)
-        fds_[2, i] = fidelity_vec_iso2(x21, XPIBY2_ISO_1)
-        fds_[3, i] = fidelity_vec_iso2(x31, XPIBY2_ISO_1)
-        fds_[4, i] = fidelity_vec_iso2(x41, XPIBY2_ISO_1)
-        fds_[5, i] = fidelity_vec_iso2(x51, XPIBY2_ISO_1)
-        fds_[6, i] = fidelity_vec_iso2(x61, XPIBY2_ISO_1)
-        fds_[7, i] = fidelity_vec_iso2(x71, XPIBY2_ISO_1)
-        fds_[8, i] = fidelity_vec_iso2(x81, XPIBY2_ISO_1)
+        s1 = saved["astates"][i, S1_IDX]
+        s2 = saved["astates"][i, S2_IDX]
+        s3 = saved["astates"][i, S3_IDX]
+        s4 = saved["astates"][i, S4_IDX]
+        s5 = saved["astates"][i, S5_IDX]
+        s6 = saved["astates"][i, S6_IDX]
+        s7 = saved["astates"][i, S7_IDX]
+        s8 = saved["astates"][i, S8_IDX]
+        s9 = saved["astates"][i, S9_IDX]
+        s10 = saved["astates"][i, S10_IDX]
+        d1 = s1 - target_state
+        d2 = s2 - target_state
+        d3 = s3 - target_state
+        d4 = s4 - target_state
+        d5 = s5 - target_state
+        d6 = s6 - target_state
+        d7 = s7 - target_state
+        d8 = s8 - target_state
+        d9 = s9 - target_state
+        d10 = s10 - target_state
+        diffs_[1, i] = d1'd1
+        diffs_[2, i] = d2'd2
+        diffs_[3, i] = d3'd3
+        diffs_[4, i] = d4'd4
+        diffs_[5, i] = d5'd5
+        diffs_[6, i] = d6'd6
+        diffs_[7, i] = d7'd7
+        diffs_[8, i] = d8'd8
+        diffs_[9, i] = d9'd9
+        diffs_[10, i] = d10'd10
+        fds_[1, i] = fidelity_vec_iso2(s1, target_state)
+        fds_[2, i] = fidelity_vec_iso2(s2, target_state)
+        fds_[3, i] = fidelity_vec_iso2(s3, target_state)
+        fds_[4, i] = fidelity_vec_iso2(s4, target_state)
+        fds_[5, i] = fidelity_vec_iso2(s5, target_state)
+        fds_[6, i] = fidelity_vec_iso2(s6, target_state)
+        fds_[7, i] = fidelity_vec_iso2(s7, target_state)
+        fds_[8, i] = fidelity_vec_iso2(s8, target_state)
+        fds_[8, i] = fidelity_vec_iso2(s9, target_state)
+        fds_[8, i] = fidelity_vec_iso2(s10, target_state)
     end
-    return (diffs_, fds_)
+    return (fds_, diffs_)
 end
 
 

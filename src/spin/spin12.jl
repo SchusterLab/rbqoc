@@ -219,7 +219,6 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
     target_states[2] = gate_unitary * INITIAL_STATE2
     target_states[3] = gate_unitary * INITIAL_STATE3
     target_states[4] = gate_unitary * INITIAL_STATE4
-
     xf = SVector{n}([
         target_states[1];
         target_states[2];
