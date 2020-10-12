@@ -1,5 +1,5 @@
 """
-spin24.jl - debug spin23.jl
+spin24.jl - multiple sampling robustness for the δ
 """
 
 WDIR = joinpath(@__DIR__, "../../")

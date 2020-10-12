@@ -34,6 +34,7 @@ const F3D_DATA_FILE_PATH = joinpath(SAVE_PATH, "f3d.h5")
     d1b = 14
     sut8b = 15
     d1bb = 16
+    d1bbb = 17
 end
 
 const GT_LIST = [zpiby2, ypiby2, xpiby2]
@@ -220,41 +221,53 @@ end
 
 
 ### FIGURE 2 ###
-const F2_DATA = Dict(
-    analytic => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
-    s2 => joinpath(SPIN_OUT_PATH, "spin12/00627_spin12.h5"),
-    sut8 => joinpath(SPIN_OUT_PATH, "spin23/00094_spin23.h5"),
-    d1 => joinpath(SPIN_OUT_PATH, "spin11/00504_spin11.h5"),
-    d2 => joinpath(SPIN_OUT_PATH, "spin11/00528_spin11.h5"),
-    d1b => joinpath(SPIN_OUT_PATH, "spin11/00514_spin11.h5"),
-    d1bb => joinpath(SPIN_OUT_PATH, "spin11/00524_spin11.h5"),
+const F2A_DATA_ZPIBY2 = Dict(
+    analytic => joinpath(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
+    s2 => joinpath(SPIN_OUT_PATH, "spin12/00731_spin12.h5"), #"spin12/00692_spin12.h5"),
+    sut8 => "", #joinpath(SPIN_OUT_PATH, "spin23/00094_spin23.h5"),
+    d1 => joinpath(SPIN_OUT_PATH, "spin11/00539_spin11.h5"), #"spin11/00468_spin11.h5"),
+    d2 => joinpath(SPIN_OUT_PATH, "spin11/00547_spin11.h5"), #"spin11/00487_spin11.h5"),
 )
-
 const F2A_PT_LIST = [analytic, s2, sut8, d1, d2]
-function gen_2a()
+function gen_2a(;gate_type=zpiby2)
+    if gate_type == zpiby2
+        data = F2A_DATA_ZPIBY2
+    end
     pulse_types_integer = [Integer(pulse_type) for pulse_type in F2A_PT_LIST]
     pulse_type_count = size(F2A_PT_LIST)[1]
     save_file_paths = Array{String, 1}(undef, pulse_type_count)
     for (i, pulse_type) in enumerate(F2A_PT_LIST)
-        save_file_paths[i] = F2_DATA[pulse_type]
+        save_file_paths[i] = data[pulse_type]
     end
 
     data_file_path = generate_file_path("h5", "f2a", SAVE_PATH)
     h5open(data_file_path, "w") do data_file
         write(data_file, "save_file_paths", save_file_paths)
         write(data_file, "pulse_types", pulse_types_integer)
+        write(data_file, "gate_type", Integer(gate_type))
     end
     println("Saved f2a data to $(data_file_path)")
 end
 
 
+
+const F2B_DATA_ZPIBY2 = Dict(
+    analytic => joinpath(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
+    d1 => joinpath(SPIN_OUT_PATH, "spin11/00468_spin11.h5"),
+    d1b => joinpath(SPIN_OUT_PATH, "spin11/00539_spin11.h5"),
+    d1bb => joinpath(SPIN_OUT_PATH, "spin11/00556_spin11.h5"),
+    d1bbb => joinpath(SPIN_OUT_PATH, "spin11/00585_spin11.h5"),
+)
 const F2B_TRIAL_COUNT = Integer(1e2)
 const F2B_FQ_DEV = 3e-2
-const F2B_PT_LIST = [analytic, d1, d1b, d1bb]
+const F2B_PT_LIST = [analytic, d1, d1b, d1bb, d1bbb]
 const F2B_AVG_COUNT = 10
-function gen_2b(;use_previous=true)
+function gen_2b(;use_previous=true, gate_type=zpiby2)
     @assert iseven(F2B_TRIAL_COUNT)
-    gate_type = xpiby2
+    if gate_type == zpiby2
+        data = F2B_DATA_ZPIBY2
+        dynamics_type_analytic = zpiby2nodis
+    end
     pulse_types_integer = [Integer(pt) for pt in F2B_PT_LIST]
     pulse_type_count = size(F2B_PT_LIST)[1]
     fq_devs = Array(range(-F2B_FQ_DEV, stop=F2B_FQ_DEV, length=2 * F2B_TRIAL_COUNT))
@@ -288,10 +301,11 @@ function gen_2b(;use_previous=true)
 
     for (i, pulse_type) in enumerate(F2B_PT_LIST)
         println("pt[$(i)]: $(pulse_type)")
-        save_file_path = F2_DATA[pulse_type]
+        save_file_path = data[pulse_type]
         save_file_paths[i] = save_file_path
         save_file_path_old = ((isnothing(save_file_paths_old) || i > pulse_type_count_old)
                               ? nothing : save_file_paths_old[i])
+        dynamics_type = pulse_type == analytic ? dynamics_type_analytic : schroed
         for j = 1:2 * F2B_TRIAL_COUNT + 1
             negi_h0 = negi_h0s[j]
             for k = 1:F2B_AVG_COUNT
@@ -300,17 +314,10 @@ function gen_2b(;use_previous=true)
                     && k <= avg_count_old)
                     gate_errors[i, j, k] = gate_errors_old[i, j, k]
                 else
-                    if pulse_type == analytic
-                        res = run_sim_deqjl(
-                            1, gate_type; dynamics_type=xpiby2nodis,
-                            save=false, negi_h0=negi_h0, seed=k
-                        )
-                    else
-                        res = run_sim_prop(
-                            1, gate_type, save_file_path;
-                            save=false, negi_h0=negi_h0, seed=k
-                        )
-                    end
+                    res = run_sim_prop(
+                        1, gate_type; save_file_path=save_file_path,
+                        dynamics_type=dynamics_type, save=false, negi_h0=negi_h0, seed=k
+                    )
                     gate_errors[i, j, k] = 1 - res["fidelities"][end]
                 end
             end
@@ -329,13 +336,13 @@ function gen_2b(;use_previous=true)
 end
 
 
-const F2C_GATE_TIMES = [50, 56.8, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160] # 13
-const F2C_DATA = Dict(
+const F2C_GATE_TIMES_XPIBY2 = [50., 56.8, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160] # 13
+const F2C_DATA_XPIBY2 = Dict(
     analytic => [joinpath(SPIN_OUT_PATH, "spin14/$(lpad(index, 5, '0'))_spin14.h5") for index in [
         INVAL, 4, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
     ]],
     s2 => [joinpath(SPIN_OUT_PATH, "spin12/$(lpad(index, 5, '0'))_spin12.h5") for index in [
-         629, 627, 638, 655, 654, 666, 658, 665, 661, 667, 668, 681, 685
+        629, 627, 638, 655, 654, 666, 658, 665, 661, 667, 668, 681, 685
     ]],
     sut8 => [joinpath(SPIN_OUT_PATH, "spin23/$(lpad(index, 5, '0'))_spin23.h5") for index in [
         38, 94, 103, 113, 132, 135, 125, 140, 143, 145, 158, 154, 162
@@ -347,16 +354,52 @@ const F2C_DATA = Dict(
         520, 528, 522, 523, 525, 526, 527, 530, 531, 533, 535, 536, 537
     ]],
 )
+const F2C_GATE_TIMES_ZPIBY2 = Array(18:2:72) # 28
+const F2C_DATA_ZPIBY2 = Dict(
+    analytic => [joinpath(SPIN_OUT_PATH, "spin14/$(lpad(index, 5, '0'))_spin14.h5") for index in [
+        0, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
+        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
+        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
+    ]],
+    s2 => [joinpath(SPIN_OUT_PATH, "spin12/$(lpad(index, 5, '0'))_spin12.h5") for index in [
+        779, 781, 782, 783, 784, 785, 786, 787, 788, 789,
+        790, 793, 791, 792, 794, 795, 796, 797, 798, 799,
+        800, 801, 802, 803, 805, 804, 806, 807,
+    ]],
+    sut8 => [joinpath(SPIN_OUT_PATH, "spin23/$(lpad(index, 5, '0'))_spin23.h5") for index in [
+        281, 283, 284, 286, 285, INVAL, INVAL, INVAL, INVAL, INVAL,
+        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
+        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
+    ]],
+    d1 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
+        468, 471, 472, 474, 475, 476, 477, 478, 480, 539,
+        541, 542, 543, 544, 545, 551, 553, 554, 556, 569,
+        570, 571, 572, 573, 574, 576, 567, 585,
+    ]],
+    d2 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
+        487, 488, 489, 491, 492, 493, 494, 498, 499, 547,
+        549, 552, 558, 560, 561, 562, 563, 564, 565, 575,
+        577, 588, 597, 590, 591, 592, 600, 598
+    ]],
+)
 const F2C_PT_LIST = [analytic, s2, sut8, d1, d2]
-const F2C_AVG_COUNT = 10
+const F2C_AVG_COUNT = 1000
 const F2C_SIGMA = 1e-2
 const F2C_S1_NEGI_H0 = (FQ + FQ * F2C_SIGMA) * NEGI_H0_ISO
 const F2C_S2_NEGI_H0 = (FQ - FQ * F2C_SIGMA) * NEGI_H0_ISO
-function gen_2c(;use_previous=true)
-    gate_type = xpiby2
+function gen_2c(;use_previous=true, gate_type=zpiby2)
+    if gate_type == zpiby2
+        gate_times = F2C_GATE_TIMES_ZPIBY2
+        data = F2C_DATA_ZPIBY2
+        dynamics_type_analytic = zpiby2nodis
+    elseif gate_type == xpiby2
+        gate_times = F2C_GATE_TIMES_XPIBY2
+        data = F2C_DATA_XPIBY2
+        dynamics_type_analytic = xpiby2nodis
+    end
     pulse_type_count = size(F2C_PT_LIST)[1]
     pulse_types_integer = [Integer(pulse_type) for pulse_type in F2C_PT_LIST]
-    gate_time_count = size(F2C_GATE_TIMES)[1]
+    gate_time_count = size(gate_times)[1]
     gate_errors = ones(pulse_type_count, gate_time_count, 2 * F2C_AVG_COUNT)
     save_file_paths = Array{String, 2}(undef, pulse_type_count, gate_time_count)
 
@@ -382,13 +425,14 @@ function gen_2c(;use_previous=true)
 
     for (i, pulse_type) in enumerate(F2C_PT_LIST)
         println("pt[$(i)]: $(pulse_type)")
-        for (j, gate_time) in enumerate(F2C_GATE_TIMES)
+        for (j, gate_time) in enumerate(gate_times)
             print("gt[$(j)]: $(gate_time) ")
-            save_file_path = F2C_DATA[pulse_type][j]
+            save_file_path = data[pulse_type][j]
             save_file_paths[i, j] = save_file_path
             save_file_path_old = ((isnothing(save_file_paths_old) ||
                                    i > pulse_type_count_old || j > gate_time_count_old)
                                   ? nothing : save_file_paths_old[i, j])
+            dynamics_type = pulse_type == analytic ? dynamics_type_analytic : schroed
             if !isnothing(findfirst("$(INVAL)", save_file_path))
                 println("INVAL")
                 continue
@@ -399,32 +443,19 @@ function gen_2c(;use_previous=true)
                     && k <= avg_count_old)
                     gate_errors[i, j, (k - 1) * 2 + 1] = gate_errors_old[i, j, (k - 1) * 2 + 1]
                     gate_errors[i, j, (k - 1) * 2 + 2] = gate_errors_old[i, j, (k - 1) * 2 + 2]
-                    print("s")
                 else
-                    if pulse_type == analytic
-                        res1 = run_sim_deqjl(
-                            1, gate_type; dynamics_type=xpiby2nodis,
-                            negi_h0=F2C_S1_NEGI_H0, save=false, seed=k
-                        )
-                        res2 = run_sim_deqjl(
-                            1, gate_type; dynamics_type=xpiby2nodis,
-                            negi_h0=F2C_S2_NEGI_H0, save=false, seed=k
-                        )
-                    else
-                        res1 = run_sim_prop(
-                            1, gate_type, save_file_path;
-                            negi_h0=F2C_S1_NEGI_H0, save=false, seed=k,
-                        )
-                        res2 = run_sim_prop(
-                            1, gate_type, save_file_path;
-                            negi_h0=F2C_S2_NEGI_H0, save=false, seed=k,
-                        )
-                    end
+                    res1 = run_sim_prop(
+                        1, gate_type; save_file_path=save_file_path, dynamics_type=dynamics_type,
+                        negi_h0=F2C_S1_NEGI_H0, save=false, seed=k
+                    )
+                    res2 = run_sim_prop(
+                        1, gate_type; save_file_path=save_file_path, dynamics_type=dynamics_type,
+                        negi_h0=F2C_S2_NEGI_H0, save=false, seed=k
+                    )
                     ge1 = 1 - res1["fidelities"][end]
                     ge2 = 1 - res2["fidelities"][end]
                     gate_errors[i, j, (k - 1) * 2 + 1] = ge1
                     gate_errors[i, j, (k - 1) * 2 + 2] = ge2
-                    print(".")
                 end
             end
             println(" $(mean(gate_errors[i, j, :]))")
@@ -434,7 +465,7 @@ function gen_2c(;use_previous=true)
     data_file_path = generate_file_path("h5", "f2c", SAVE_PATH)
     h5open(data_file_path, "w") do data_file
         write(data_file, "gate_errors", gate_errors)
-        write(data_file, "gate_times", F2C_GATE_TIMES)
+        write(data_file, "gate_times", gate_times)
         write(data_file, "pulse_types", pulse_types_integer)
         write(data_file, "save_file_paths", save_file_paths)
         write(data_file, "avg_count", F2C_AVG_COUNT)
@@ -446,13 +477,13 @@ end
 ### FIGURE 3 ###
 const F3_DATA = Dict(
     analytic => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
-    s2 => joinpath(SPIN_OUT_PATH, "spin18/00003_spin18.h5"),
+    s2 => joinpath(SPIN_OUT_PATH, "spin18/00057_spin18.h5"),
     sut8 => "", #joinpath(SPIN_OUT_PATH, "$(INVAL)"),
     d1 => joinpath(SPIN_OUT_PATH, "spin17/00063_spin17.h5"),
-    d2 => "", #joinpath(SPIN_OUT_PATH, "$(INVAL)"),
+    d2 => joinpath(SPIN_OUT_PATH, "spin17/00069_spin17.h5"),
 )
 
-const F3A_PT_LIST = [analytic, s2, s4, d2, d3]
+const F3A_PT_LIST = [analytic, s2, sut8, d1, d2]
 function gen_3a()
     pulse_types_integer = [Integer(pulse_type) for pulse_type in F3A_PT_LIST]
     pulse_type_count = size(F3A_PT_LIST)[1]
@@ -470,7 +501,7 @@ function gen_3a()
 end
 
 
-const F3B_PT_LIST = [analytic, s2, sut8, d1, d2] #, s2, sut8, d1, d2]
+const F3B_PT_LIST = [analytic, s2, sut8, d1, d2]
 const F3B_AVG_COUNT = 10
 const F3B_GATE_COUNT = 500
 function gen_3b(;use_previous=true)

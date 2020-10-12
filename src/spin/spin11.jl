@@ -1,5 +1,5 @@
 """
-spin11.jl - derivative robustness
+spin11.jl - derivative robustness for the δf problem
 """
 
 WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
@@ -92,7 +92,8 @@ end
 function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
                   sqrtbp=false, derivative_order=0, integrator_type=rk3, qs=ones(7),
                   smoke_test=false, dt_inv=Int64(1e1), constraint_tol=1e-8, al_tol=1e-4,
-                  pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5))
+                  pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5),
+                  max_cost_value=1e8)
     # model configuration
     model = Model{derivative_order}()
     n = state_dim(model)
@@ -214,7 +215,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
                  projected_newton_tolerance=al_tol, n_steps=n_steps,
                  penalty_max=max_penalty, verbose_pn=verbose_pn, verbose=verbose_,
                  projected_newton=projected_newton, iterations_inner=iterations_inner,
-                 iterations_outer=iterations_outer, iterations=max_iterations)
+                 iterations_outer=iterations_outer, iterations=max_iterations,
+                 max_cost_value=max_cost_value)
     Altro.solve!(solver)
 
     # post-process
@@ -258,6 +260,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         "iterations" => iterations_,
         "max_iterations" => max_iterations,
         "pn_steps" => pn_steps,
+        "max_cost_value" => max_cost_value,
     )
     
     # save
