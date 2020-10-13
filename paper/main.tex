@@ -446,7 +446,17 @@ over $10^{3}$ gate applications. Their single gate errors are sufficient for
 quantum error correction, requisite for fault-tolerant quantum computing,
 and their low gate errors for extend computations are critical for noisy, intermediate-scale
 quantum (NISQ) applications.
-The $T_{1}$ optimized $X/2$ gate achieves a single gate error...
+
+The $T_{1}$ optimized $X/2$ gate achieves a factor of 3.5 reduction in
+its single gate probability of longitudinal relaxation over its analytic
+counterpart, commensurate with its
+reduction in single gate error $1 \cdot 10^{-4} \rightarrow 3.5 \cdot 10^{-5}$.
+The analytic $X/2$ gate is composed of the analytic $Z/2$ and $Y/2$ gates $-Y/2 \cdot Z/2 \cdot Y/2$.
+In principle the $T_{1}$ optimized $X/2$ gate should be able to perform at least as well
+as the analogous composite of the $T_{1}$ optimized $Z/2$ and $Y/2$ gates, achieving a factor
+of 5 reduction in its single gate probability and single gate errors.
+For all of the gates optimized here, the longitudinal relaxation probability is an effective
+metric in predicting performance in simulated relaxation and in decreasing the erro.
 
 %% F2
 \begin{figure*}[ht]
@@ -732,9 +742,9 @@ $L_{2} = (I - \sigma_{z})/2$.
     Gate & $P_{1}\ (10^{-5})$ & $P_{1}\ (10^{-5})$ & $P_{1\textrm{A}} / P_{1\textrm{Q}}$
     & GE $(10^{-5})$ & GE $(10^{-5})$ & GE$_{\textrm{A}}$ / GE$_{\textrm{Q}}$\\
     \hline
-    Z/2 & 5.745  & 1.149 & 5.000 & 3.568  & 0.727 & 4.905\\
-    Y/2 & 5.253  & 1.157 & 4.540 & 3.107  & 0.763 & 4.072\\
-    X/2 & 16.251 & 4.488 & 3.621 & 10.542 & 3.563 & 3.449\\
+    Z/2 & 5.745  & 1.149 & 5.000 & 1.776 & 0.371 & 4.787\\
+    Y/2 & 5.253  & 1.157 & 4.540 & 1.539 & 0.370 & 4.159\\
+    X/2 & 16.251 & 2.660 & 6.109 & 5.347 & 0.863 & 6.196\\
   \end{tabular}
   \caption{Probability of longitudinal relaxation for each gate
     evaluated at the gate's duration.}
