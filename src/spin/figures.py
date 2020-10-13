@@ -409,16 +409,19 @@ def make_figure1c():
 
     fig = plt.figure(figsize=(PAPER_TW * 0.4, PAPER_TW * 0.315))
     ax = plt.gca()
-    inax = fig.add_axes((0.71, 0.4, 0.25, 0.25))
+    inax = fig.add_axes((0.7, 0.69, 0.25, 0.25))
     for (i, gate_type) in enumerate(gate_types):
         for (j, pulse_type) in enumerate(pulse_types):
             color = PT_COLOR[pulse_type]
             linestyle = F1C_GT_LS[gate_type]
             gate_errors_ = gate_errors[i, j, :]
+            gate_errors_trans_ = [1e-8 if np.allclose(gate_errors_[k], 0) else gate_errors_[k]
+                                  for k in range(gate_errors_.shape[0])]
+            log_gate_errors_ = log_transform(gate_errors_trans_)
             alpha = F1C_ALPHA[i, j]
             ax.plot(gate_count_axis[inds], gate_errors_[inds],
                      color=color, linestyle=linestyle, linewidth=LW, alpha=alpha)
-            inax.plot(gate_count_axis[inds], log_transform(gate_errors_[inds]),
+            inax.plot(gate_count_axis[inds], log_gate_errors_[inds],
                       color=color, linestyle=linestyle, linewidth=LW, alpha=alpha)
         #ENDFOR
     #ENDFOR
@@ -427,28 +430,33 @@ def make_figure1c():
     ax.set_ylabel("Gate Error", fontsize=LABEL_FS)
     ax.set_xlabel("Gate Count", fontsize=LABEL_FS)
     ax.set_xlim(0, gate_count)
-    ax.set_xticks([0, 500, 1000, 1500])
-    ax.set_xticklabels(["0", "500", "1000", "1500"])
-    # ax.set_ylim(0, 1e-3)
+    xticks_ = [0, 500, 1000, 1500, 2000]
+    ax.set_xticks(xticks_)
+    ax.set_xticklabels([str(xtick) for xtick in xticks_])
+    ax.set_ylim(0, 5e-2)
     ax.tick_params(direction="in", labelsize=TICK_FS)
     ax.plot([], [], label="Z/2", linestyle=F1C_GT_LS[GateType.zpiby2], color="black")
     ax.plot([], [], label="Y/2", linestyle=F1C_GT_LS[GateType.ypiby2], color="black")
     ax.plot([], [], label="X/2", linestyle=F1C_GT_LS[GateType.xpiby2], color="black")
     ax.legend(frameon=False, fontsize=LEGEND_FS, loc="lower left",
-               bbox_to_anchor=(-0.02, 0.67), handletextpad=0.4, handlelength=1.7)
+               bbox_to_anchor=(0, 0.67), handletextpad=0.4, handlelength=1.7)
 
     # configure inset
     inax.set_xlim(0, 50)
     inax.set_xticks([0, 20, 40])
     inax.set_xticklabels(["0", "20", "40"])
-    inax.set_ylim(log_transform(1e-5), log_transform(1e-2))
-    inax.set_yticks(log_transform(np.array([1e-5, 1e-4, 1e-3, 1e-2])))
-    inax.set_yticklabels(["$10^{-5}$", "$10^{-4}$", "$10^{-3}$", ""])
+    inax_yticks_ = np.arange(-6., -2 + 1, 1)
+    inax_yticks = 10 ** inax_yticks_
+    inax_ytick_labels = ["$10^{{{0}}}$".format(int(ytick)) for ytick in inax_yticks_]
+    inax_ytick_labels[-1] = ""
+    inax.set_ylim(log_transform(inax_yticks[0]), log_transform(inax_yticks[-1]))
+    inax.set_yticks(log_transform(inax_yticks))
+    inax.set_yticklabels(inax_ytick_labels)
     inax.tick_params(direction="in", labelsize=6)
 
     # configure all
     fig.text(0, 0.955, "(c)", fontsize=TEXT_FS)
-    plt.subplots_adjust(left=0.17, right=0.96, bottom=0.15, top=0.94, wspace=None, hspace=None)
+    plt.subplots_adjust(left=0.17, right=0.95, bottom=0.15, top=0.94, wspace=None, hspace=None)
     plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     plt.savefig(plot_file_path, dpi=DPI_FINAL)
     print("Plotted Figure1c to {}"

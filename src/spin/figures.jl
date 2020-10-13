@@ -54,20 +54,16 @@ const INVAL = 99999
 
 const F1_DATA = Dict(
     zpiby2 => Dict(
-        qoc => "",# qoc => joinpath(SPIN_OUT_PATH, "spin15/00209_spin15.h5"),
+        qoc => joinpath(SPIN_OUT_PATH, "spin15/00209_spin15.h5"),
         analytic => joinpath(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
     ),
     ypiby2 => Dict(
-        qoc => "",
-        analytic => "",
-        # qoc => joinpath(SPIN_OUT_PATH, "spin15/00205_spin15.h5"),
-        # analytic => joinpath(SPIN_OUT_PATH, "spin14/00003_spin14.h5"),
+        qoc => joinpath(SPIN_OUT_PATH, "spin15/00205_spin15.h5"),
+        analytic => joinpath(SPIN_OUT_PATH, "spin14/00003_spin14.h5"),
     ),
     xpiby2 => Dict(
-        qoc => "",
-        analytic => "",
-        # qoc => joinpath(SPIN_OUT_PATH, "spin15/00262_spin15.h5"),
-        # analytic => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
+        qoc => joinpath(SPIN_OUT_PATH, "spin15/00262_spin15.h5"),
+        analytic => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
     ),
 )
 const F1_PT_LIST = [analytic, qoc]
@@ -135,8 +131,8 @@ function gen_1b()
 end
 
 
-const F1C_GATE_COUNT = Integer(1e3)
-const F1C_AVG_COUNT = 10
+const F1C_GATE_COUNT = Integer(2e3)
+const F1C_AVG_COUNT = Integer(1e3)
 function gen_1c(;use_previous=true)
     gate_types_integer = [Integer(gt) for gt in GT_LIST]
     gate_type_count = size(GT_LIST)[1]
@@ -201,9 +197,9 @@ function gen_1c(;use_previous=true)
                     && k <= avg_count_old)
                     gate_errors[i, j, k, :] = gate_errors_old[i, j, k, :]
                 else
-                    res = run_sim_deqjl(
+                    res = run_sim_prop(
                         F1C_GATE_COUNT, gate_type; dynamics_type=dynamics_type,
-                        save_file_path=save_file_path, save=false, seed=k, dt_inv=Int(1e3)
+                        save_file_path=save_file_path, save=false, seed=k
                     )
                     gate_errors[i, j, k, :] = 1 .- res["fidelities"]
                 end

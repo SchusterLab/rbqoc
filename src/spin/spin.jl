@@ -127,7 +127,7 @@ struct SimParams
     controls :: Array{Float64, 2}
     control_knot_count :: Int64
     controls_dt_inv :: Int64
-    negi_h0 :: StaticMatrix{HDIM_ISO, HDIM_ISO}
+    negi_h0 :: SMatrix
     noise_offsets :: Array{Float64, 1}
     noise_dt_inv :: Int64
     sim_dt_inv :: Int64
@@ -237,20 +237,14 @@ const NEGI_H1_ISO = pi * NEGI * SIGMAX_ISO
 const NEGI_H1_ISO_BIG = pi * NEGI * SMatrix{HDIM_ISO, HDIM_ISO, BigFloat}(SIGMAX_ISO)
 const FQ_NEGI_H0_ISO = FQ * NEGI_H0_ISO
 const AYPIBY2_NEGI_H1_ISO = AYPIBY2 * NEGI_H1_ISO
-const FQ_NEGI_H0 = FQ * -1im * pi * SIGMAZ
-const FQ_NEGI_H0_VISO = SMatrix{HDIM_VISO, HDIM_VISO}(
-    kron(I(HDIM), FQ_NEGI_H0)
-    - kron(transpose(FQ_NEGI_H0), I(HDIM))
-)
-const FQ_NEGI_H0_VISO_ISO = SMatrix{HDIM_VISO_ISO, HDIM_VISO_ISO}(
-    get_mat_iso(kron(I(HDIM), FQ_NEGI_H0)
-                - kron(transpose(FQ_NEGI_H0), I(HDIM)))
-)
-const NEGI_H1 = -1im * pi * SIGMAX
-const NEGI_H1_VISO_ISO = SMatrix{HDIM_VISO_ISO, HDIM_VISO_ISO}(
-    get_mat_iso(kron(I(HDIM), NEGI_H1)
-                - kron(transpose(NEGI_H1), I(HDIM)))
-)
+const FQ_NEGI_H0_ = FQ * -1im * pi * SIGMAZ
+const FQ_NEGI_H0 = SMatrix{HDIM, HDIM}(FQ_NEGI_H0_)
+const FQ_NEGI_H0_VISO_ = kron(I(HDIM), FQ_NEGI_H0) - kron(transpose(FQ_NEGI_H0), I(HDIM))
+const FQ_NEGI_H0_VISO = SMatrix{HDIM_VISO, HDIM_VISO}(FQ_NEGI_H0_VISO_)
+const NEGI_H1_ = -1im * pi * SIGMAX
+const NEGI_H1 = SMatrix{HDIM, HDIM}(NEGI_H1_)
+const NEGI_H1_VISO_ = kron(I(HDIM), NEGI_H1_) - kron(transpose(NEGI_H1_), I(HDIM))
+const NEGI_H1_VISO = SMatrix{HDIM_VISO, HDIM_VISO}(NEGI_H1_VISO_)
 # relaxation dissipation ops
 # L_{0} = |g> <e|
 # L_{0}^{\dagger} = |e> <g|
@@ -258,29 +252,41 @@ const NEGI_H1_VISO_ISO = SMatrix{HDIM_VISO_ISO, HDIM_VISO_ISO}(
 # L_{1} = L_{0}^{\dagger} = |e> <g|
 # L_{1}^{\dagger} = L_{0} = |g> <e|
 # L_{1}^{\dagger} L_{1} = |g> <g|
-const GG = [1 0; 0 0]
-const GE = [0 1; 0 0]
-const EG = [0 0; 1 0]
-const EE = [0 0; 0 1]
+const GG_ = [1 0; 0 0]
+const GG = SMatrix{HDIM, HDIM}(GG_)
+const GE_ = [0 1; 0 0]
+const GE = SMatrix{HDIM, HDIM}(GE_)
+const EG_ = [0 0; 1 0]
+const EG = SMatrix{HDIM, HDIM}(EG_)
+const EE_ = [0 0; 0 1]
+const EE = SMatrix{HDIM, HDIM}(EE_)
+const NEG_GG_BY2_ = -1//2 * GG_
+const NEG_GG_BY2 = SMatrix{HDIM, HDIM}(NEG_GG_BY2_)
+const NEG_EE_BY2_ = -1//2 * EE_
+const NEG_EE_BY2 = SMatrix{HDIM, HDIM}(NEG_EE_BY2_)
+const LOPP_VISO_ = kron(GE_, GE_) - 1//2 * kron(I(HDIM), EE_) - 1//2 * kron(EE_, I(HDIM))
+const LOPP_VISO = SMatrix{HDIM_VISO, HDIM_VISO}(LOPP_VISO_)
 const LOPP_VISO_ISO = SMatrix{HDIM_VISO_ISO, HDIM_VISO_ISO}(get_mat_iso(
-    kron(GE, GE) - 1//2 * kron(I(HDIM), EE) - 1//2 * kron(EE, I(HDIM))
+    LOPP_VISO_
 ))
+const LOPM_VISO_ = kron(EG_, EG_) - 1//2 * kron(I(HDIM), GG_) - 1//2 * kron(GG_, I(HDIM))
+const LOPM_VISO = SMatrix{HDIM_VISO, HDIM_VISO}(LOPM_VISO_)
 const LOPM_VISO_ISO = SMatrix{HDIM_VISO_ISO, HDIM_VISO_ISO}(get_mat_iso(
-    kron(EG, EG) - 1//2 * kron(I(HDIM), GG) - 1//2 * kron(GG, I(HDIM))
+  LOPM_VISO_
 ))
-const G_E_ISO = SA_F64[0 1 0 0;
+const GE_ISO = SA_F64[0 1 0 0;
              0 0 0 0;
              0 0 0 1;
              0 0 0 0;]
-const E_G_ISO = SA_F64[0 0 0 0;
+const EG_ISO = SA_F64[0 0 0 0;
              1 0 0 0;
              0 0 0 0;
              0 0 1 0;]
-const NEG_G_G_BY2_ISO = SA_F64[1 0 0 0;
+const NEG_GG_BY2_ISO = SA_F64[1 0 0 0;
                            0 0 0 0;
                            0 0 1 0;
                            0 0 0 0] * -0.5
-const NEG_E_E_BY2_ISO = SA_F64[0 0 0 0;
+const NEG_EE_BY2_ISO = SA_F64[0 0 0 0;
                            0 1 0 0;
                            0 0 0 0;
                            0 0 0 1;] * -0.5
@@ -292,21 +298,24 @@ const NEG_DOP_ISO = -SA_F64[0 1 0 1;
 const NEG_GAMMAC_DOP_ISO = GAMMAC * NEG_DOP_ISO
 
 # gates
-const ZPIBY2 = [1-1im 0;
+const ZPIBY2_ = [1-1im 0;
                 0 1+1im] / sqrt(2)
-const ZPIBY2_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(ZPIBY2))
-const ZPIBY2_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(ZPIBY2[:,1]))
-const ZPIBY2_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(ZPIBY2[:,2]))
-const YPIBY2 = [1 -1;
-                1  1] / sqrt(2)
-const YPIBY2_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(YPIBY2))
-const YPIBY2_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(YPIBY2[:,1]))
-const YPIBY2_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(YPIBY2[:,2]))
-const XPIBY2 = [1 -1im;
+const ZPIBY2 = SMatrix{HDIM, HDIM}(ZPIBY2_)
+const ZPIBY2_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(ZPIBY2_))
+const ZPIBY2_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(ZPIBY2_[:,1]))
+const ZPIBY2_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(ZPIBY2_[:,2]))
+const YPIBY2_ = [1 -1;
+                 1  1] / sqrt(2)
+const YPIBY2 = SMatrix{HDIM, HDIM}(YPIBY2_)
+const YPIBY2_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(YPIBY2_))
+const YPIBY2_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(YPIBY2_[:,1]))
+const YPIBY2_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(YPIBY2_[:,2]))
+const XPIBY2_ = [1 -1im;
                 -1im 1] / sqrt(2)
-const XPIBY2_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(XPIBY2))
-const XPIBY2_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(XPIBY2[:,1]))
-const XPIBY2_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(XPIBY2[:,2]))
+const XPIBY2 = SMatrix{HDIM, HDIM}(XPIBY2_)
+const XPIBY2_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(XPIBY2_))
+const XPIBY2_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(XPIBY2_[:,1]))
+const XPIBY2_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(XPIBY2_[:,2]))
 const XPI = [0 -1im;
              -1im 0]
 const XPI_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(XPI))
@@ -314,6 +323,12 @@ const XPI_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(XPI[:,1]))
 const XPI_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(XPI[:,2]))
 
 const GT_GATE = Dict(
+    xpiby2 => XPIBY2,
+    ypiby2 => YPIBY2,
+    zpiby2 => ZPIBY2,
+)
+
+const GT_GATE_ISO = Dict(
     xpiby2 => XPIBY2_ISO,
     ypiby2 => YPIBY2_ISO,
     zpiby2 => ZPIBY2_ISO,
@@ -399,7 +414,7 @@ control hamiltonian subject to flux noise
 """
 Schroedinger dynamics.
 """
-function dynamics_schroed_deqjl(state::StaticVector, params::SimParams, time::Float64)
+function dynamics_schroed_deqjl(state::SVector, params::SimParams, time::Float64)
     controls_knot_point = (Int(floor(time * params.controls_dt_inv)) % params.control_knot_count) + 1
     negi_h = (
         params.negi_h0
@@ -412,20 +427,22 @@ end
 
 
 function integrate_prop_schroed!(gate_count::Int, states::Array{T, 2}, state::SVector, params::SimParams) where {T}
-    dt = params.sim_dt_inv^(-1)
     states[1, :] = state
+    dt = params.controls_dt_inv^(-1)
+    prop = I(HDIM)
+    for j = 1:params.control_knot_count
+        hamiltonian = params.negi_h0 + params.controls[j, 1] * NEGI_H1
+        prop_ = exp(hamiltonian * dt)
+        prop = prop_ * prop
+    end
     for i = 2:gate_count + 1
-        for j = 1:params.control_knot_count
-            hamiltonian = params.negi_h0 + params.controls[j, 1] * NEGI_H1_ISO
-            unitary = exp(hamiltonian * dt)
-            state = unitary * state
-        end
+        state = prop * state
         states[i, :] = state
     end
 end
 
 
-function dynamics_schroedda_deqjl(state::StaticVector, params::SimParams, time::Float64)
+function dynamics_schroedda_deqjl(state::SVector, params::SimParams, time::Float64)
     control_knot_point = (Int(floor(time * params.controls_dt_inv)) % params.control_knot_count) + 1
     noise_knot_point = Int(floor(time * params.noise_dt_inv)) + 1
     delta_a = params.noise_offsets[noise_knot_point]
@@ -440,7 +457,7 @@ end
 
 
 function integrate_prop_schroedda!(gate_count::Int, states::Array{T, 2}, state::SVector, params::SimParams) where {T}
-    dt = params.sim_dt_inv^(-1)
+    dt = params.controls_dt_inv^(-1)
     time = 0.
     states[1, :] = state
     for i = 2:gate_count + 1
@@ -457,12 +474,12 @@ end
 
 
 const maxh1 = MAX_CONTROL_NORM_0 * NEGI_H1_ISO
-@inline dynamics_empty_deqjl(state::StaticVector, params::SimParams, time::Float64) = (
+@inline dynamics_empty_deqjl(state::SVector, params::SimParams, time::Float64) = (
     (params.negi_h0 + maxh1) * state
 )
 
 
-function dynamics_lindbladnodis_deqjl(state::StaticMatrix, params::SimParams, time::Float64)
+function dynamics_lindbladnodis_deqjl(state::SMatrix, params::SimParams, time::Float64)
     knot_point = (Int(floor(time * params.dt_inv)) % params.control_knot_count) + 1
     negi_h = (
         params.negi_h0
@@ -474,7 +491,7 @@ function dynamics_lindbladnodis_deqjl(state::StaticMatrix, params::SimParams, ti
 end
 
 
-function dynamics_lindbladt1_deqjl(density::StaticMatrix, params::SimParams, time::Float64)
+function dynamics_lindbladt1_deqjl(density::SMatrix, params::SimParams, time::Float64)
     controls_knot_point = (Int(floor(time * params.controls_dt_inv)) % params.control_knot_count) + 1
     control1 = params.controls[controls_knot_point][1]
     gamma_1 = (amp_t1_spline(control1))^(-1)
@@ -484,9 +501,30 @@ function dynamics_lindbladt1_deqjl(density::StaticMatrix, params::SimParams, tim
     )
     return (
         negi_h * density - density * negi_h
-        + gamma_1 * (G_E_ISO * density * E_G_ISO + NEG_E_E_BY2_ISO * density + density * NEG_E_E_BY2_ISO)
-        + gamma_1 * (E_G_ISO * density * G_E_ISO + NEG_G_G_BY2_ISO * density + density * NEG_G_G_BY2_ISO)
+        + gamma_1 * (GE_ISO * density * EG_ISO + NEG_EE_BY2_ISO * density + density * NEG_EE_BY2_ISO)
+        + gamma_1 * (EG_ISO * density * GE_ISO + NEG_GG_BY2_ISO * density + density * NEG_GG_BY2_ISO)
     )
+end
+
+
+function integrate_prop_lindbladt1!(gate_count::Int, densities::Array{T, 3}, density::SMatrix,
+                                    params::SimParams) where {T}
+    densities[1, :, :] = density
+    density = SVector{HDIM_VISO}(get_vec_viso(density))
+    dt = params.controls_dt_inv^(-1)
+    prop = I(HDIM_VISO)
+    for j = 1:params.control_knot_count
+        control1 = params.controls[j, 1]
+        gamma1 = (amp_t1_spline(control1))^(-1)
+        lvop = (FQ_NEGI_H0_VISO + control1 * NEGI_H1_VISO
+                + gamma1 * (LOPP_VISO + LOPM_VISO))
+        prop_ = exp(lvop * dt)
+        prop = prop_ * prop
+    end
+    for i = 2:gate_count + 1
+        density = prop * density
+        densities[i, :, :] = get_vec_unviso(density)
+    end
 end
 
 
@@ -507,7 +545,7 @@ end
 
 const TTOT_ZPIBY2 = 17.857142857142858
 const GAMMA_ZPIBY2 = amp_t1_spline(0)^(-1)
-@inline dynamics_zpiby2nodis_deqjl(state::StaticVector, params::SimParams, time::Float64) = (
+@inline dynamics_zpiby2nodis_deqjl(state::SVector, params::SimParams, time::Float64) = (
     params.negi_h0 * state
 )
 
@@ -523,31 +561,29 @@ function integrate_prop_zpiby2nodis!(gate_count::Int, states::Array{T, 2},
 end
 
 
-@inline dynamics_zpiby2t1_deqjl(density::StaticMatrix, params::SimParams, time::Float64) = (
+@inline dynamics_zpiby2t1_deqjl(density::SMatrix, params::SimParams, time::Float64) = (
     FQ_NEGI_H0_ISO * density - density * FQ_NEGI_H0_ISO
-    + GAMMA_ZPIBY2 * (G_E_ISO * density * E_G_ISO + NEG_E_E_BY2_ISO * density + density * NEG_E_E_BY2_ISO
-                      + E_G_ISO * density * G_E_ISO + NEG_G_G_BY2_ISO * density + density * NEG_G_G_BY2_ISO)    
+    + GAMMA_ZPIBY2 * (GE_ISO * density * EG_ISO + NEG_EE_BY2_ISO * density + density * NEG_EE_BY2_ISO
+                      + EG_ISO * density * GE_ISO + NEG_GG_BY2_ISO * density + density * NEG_GG_BY2_ISO)
 )
 
 
 function integrate_prop_zpiby2t1!(gate_count::Int, densities::Array{T, 3},
-                                  density::SMatrix{HDIM_ISO, HDIM_ISO}, params::SimParams) where {T}
-    density = SVector{HDIM_VISO_ISO}(get_vec_iso(get_vec_viso(get_mat_uniso(density))))
-    densities_ = zeros(gate_count + 1, HDIM_VISO_ISO)
+                                  density::SMatrix{HDIM, HDIM}, params::SimParams) where {T}
+    density = SVector{HDIM_VISO}(get_vec_viso(density))
+    densities_ = zeros(Complex{Float64}, gate_count + 1, HDIM_VISO)
     densities_[1, :] = density
-    lvop = FQ_NEGI_H0_VISO_ISO + GAMMA_ZPIBY2 * (LOPP_VISO_ISO + LOPM_VISO_ISO)
-    prop = exp(TTOT_ZPIBY2 * lvop)
+    lvop = FQ_NEGI_H0_VISO + GAMMA_ZPIBY2 * (LOPP_VISO + LOPM_VISO)
     for i = 2:gate_count + 1
-        density = prop * density
-        densities_[i, :] = density
+        densities_[i, :] = exp(TTOT_ZPIBY2 * (i - 1) * lvop) * density
     end
     for i = 1:gate_count + 1
-        densities[i, :, :] = get_mat_iso(get_vec_unviso(get_vec_uniso(densities_[i, :])))
+        densities[i, :, :] = get_vec_unviso(densities_[i, :])
     end
 end
 
 
-@inline dynamics_zpiby2da_deqjl(state::StaticVector, params::SimParams, time::Float64) = (
+@inline dynamics_zpiby2da_deqjl(state::SVector, params::SimParams, time::Float64) = (
     (FQ_NEGI_H0_ISO + params.noise_offsets[Int(floor(time * params.noise_dt_inv)) + 1] * NEGI_H1_ISO) * state
 )
 
@@ -566,7 +602,7 @@ const T2_YPIBY2 = T1_YPIBY2 + TZ_YPIBY2
 # t1 noise
 const GAMMA11_YPIBY2 = amp_t1_spline(AYPIBY2)^(-1)
 const GAMMA12_YPIBY2 = amp_t1_spline(0)^(-1)
-function dynamics_ypiby2nodis_deqjl(state::StaticVector, params::SimParams, time::Float64)
+function dynamics_ypiby2nodis_deqjl(state::SVector, params::SimParams, time::Float64)
     time = rem(time, TTOT_YPIBY2)
     if time <= T1_YPIBY2
         negi_h = FQ_NEGI_H0_ISO + H11_YPIBY2
@@ -581,7 +617,7 @@ function dynamics_ypiby2nodis_deqjl(state::StaticVector, params::SimParams, time
 end
 
 
-function dynamics_ypiby2t1_deqjl(density::StaticMatrix, params::SimParams, time::Float64)
+function dynamics_ypiby2t1_deqjl(density::SMatrix, params::SimParams, time::Float64)
     time = rem(time, TTOT_YPIBY2)
     if time <= T1_YPIBY2
         negi_h = FQ_NEGI_H0_ISO + H11_YPIBY2
@@ -595,8 +631,48 @@ function dynamics_ypiby2t1_deqjl(density::StaticMatrix, params::SimParams, time:
     end
     return(
         negi_h * density - density * negi_h
-        + gamma1 * (G_E_ISO * density * E_G_ISO + NEG_E_E_BY2_ISO * density + density * NEG_E_E_BY2_ISO
-                    + E_G_ISO * density * G_E_ISO + NEG_G_G_BY2_ISO * density + density * NEG_G_G_BY2_ISO)
+        + gamma1 * (GE_ISO * density * EG_ISO + NEG_EE_BY2_ISO * density + density * NEG_EE_BY2_ISO
+                    + EG_ISO * density * GE_ISO + NEG_GG_BY2_ISO * density + density * NEG_GG_BY2_ISO)
+    )
+end
+
+
+function integrate_prop_ypiby2t1!(gate_count::Int, densities::Array{T, 3},
+                                  density::SMatrix{HDIM, HDIM}, params::SimParams) where {T}
+    density = SVector{HDIM_VISO}(get_vec_viso(density))
+    densities_ = zeros(Complex{Float64}, gate_count + 1, HDIM_VISO)
+    densities_[1, :] = density
+    lvop1 = FQ_NEGI_H0_VISO + AYPIBY2 * NEGI_H1_VISO + GAMMA11_YPIBY2 * (LOPP_VISO + LOPM_VISO)
+    prop1 = exp(lvop1 * TX_YPIBY2)
+    lvop2 = FQ_NEGI_H0_VISO + GAMMA12_YPIBY2 * (LOPP_VISO + LOPM_VISO)
+    prop2 = exp(lvop2 * TZ_YPIBY2)
+    lvop3 = FQ_NEGI_H0_VISO - AYPIBY2 * NEGI_H1_VISO + GAMMA11_YPIBY2 * (LOPP_VISO + LOPM_VISO)
+    prop3 = exp(lvop3 * TX_YPIBY2)
+    prop = prop3 * prop2 * prop1
+    for i = 2:gate_count + 1
+        density = prop * density
+        densities_[i, :] = density
+    end
+    for i = 1:gate_count + 1
+        densities[i, :, :] = get_vec_unviso(densities_[i, :])
+    end
+end
+
+
+function dynamics_ypiby2da_deqjl(state::SVector, params::SimParams, time::Float64)
+    time = rem(time, TTOT_YPIBY2)
+    noise_knot_point = Int(floor(time * params.noise_dt_inv)) + 1
+    delta_a = params.noise_offsets[noise_knot_point]
+    time = rem(time, TTOT_YPIBY2)
+    if time <= T1_YPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (AYPIBY2 + delta_a) * NEGI_H1_ISO
+    elseif time <= T2_YPIBY2
+        negi_h = FQ_NEGI_H0_ISO + (delta_a) * NEGI_H1_ISO
+    else
+        negi_h = FQ_NEGI_H0_ISO + (-AYPIBY2 + delta_a) * NEGI_H1_ISO
+    end
+    return(
+        negi_h * state
     )
 end
 
@@ -608,7 +684,7 @@ const T3_XPIBY2 = T2_XPIBY2 + TX_YPIBY2
 const T4_XPIBY2 = T3_XPIBY2 + TTOT_ZPIBY2
 const T5_XPIBY2 = T4_XPIBY2 + TX_YPIBY2
 const T6_XPIBY2 = T5_XPIBY2 + TZ_YPIBY2
-function dynamics_xpiby2nodis_deqjl(state::StaticVector, params::SimParams, time::Float64)
+function dynamics_xpiby2nodis_deqjl(state::SVector, params::SimParams, time::Float64)
     time = rem(time, TTOT_XPIBY2)
     if time <= T1_XPIBY2
         negi_h = params.negi_h0 + H13_YPIBY2
@@ -643,7 +719,7 @@ end
 """
 t1 dissipation via lindblad
 """
-function dynamics_xpiby2t1_deqjl(density::StaticMatrix, params::SimParams, time::Float64)
+function dynamics_xpiby2t1_deqjl(density::SMatrix, params::SimParams, time::Float64)
     time = rem(time, TTOT_XPIBY2)
     if time <= T1_XPIBY2
         negi_h = FQ_NEGI_H0_ISO + H13_YPIBY2
@@ -669,34 +745,39 @@ function dynamics_xpiby2t1_deqjl(density::StaticMatrix, params::SimParams, time:
     end
     return(
         negi_h * density - density * negi_h
-        + gamma1 * (G_E_ISO * density * E_G_ISO + NEG_E_E_BY2_ISO * density + density * NEG_E_E_BY2_ISO
-                    + E_G_ISO * density * G_E_ISO + NEG_G_G_BY2_ISO * density + density * NEG_G_G_BY2_ISO)
+        + gamma1 * (GE_ISO * density * EG_ISO + NEG_EE_BY2_ISO * density + density * NEG_EE_BY2_ISO
+                    + EG_ISO * density * GE_ISO + NEG_GG_BY2_ISO * density + density * NEG_GG_BY2_ISO)
     )
 end
 
 
-function dynamics_ypiby2da_deqjl(state::StaticVector, params::SimParams, time::Float64)
-    time = rem(time, TTOT_YPIBY2)
-    noise_knot_point = Int(floor(time * params.noise_dt_inv)) + 1
-    delta_a = params.noise_offsets[noise_knot_point]
-    time = rem(time, TTOT_YPIBY2)
-    if time <= T1_YPIBY2
-        negi_h = FQ_NEGI_H0_ISO + (AYPIBY2 + delta_a) * NEGI_H1_ISO
-    elseif time <= T2_YPIBY2
-        negi_h = FQ_NEGI_H0_ISO + (delta_a) * NEGI_H1_ISO
-    else
-        negi_h = FQ_NEGI_H0_ISO + (-AYPIBY2 + delta_a) * NEGI_H1_ISO
+function integrate_prop_xpiby2t1!(gate_count::Int, densities::Array{T, 3},
+                                  density::SMatrix{HDIM, HDIM}, params::SimParams) where {T}
+    density = SVector{HDIM_VISO}(get_vec_viso(density))
+    densities_ = zeros(Complex{Float64}, gate_count + 1, HDIM_VISO)
+    densities_[1, :] = density
+    lvop1 = FQ_NEGI_H0_VISO - AYPIBY2 * NEGI_H1_VISO + GAMMA11_YPIBY2 * (LOPP_VISO + LOPM_VISO)
+    prop1 = exp(lvop1 * TX_YPIBY2)
+    lvop2 = FQ_NEGI_H0_VISO + GAMMA12_YPIBY2 * (LOPP_VISO + LOPM_VISO)
+    prop2 = exp(lvop2 * TZ_YPIBY2)
+    lvop3 = FQ_NEGI_H0_VISO + AYPIBY2 * NEGI_H1_VISO + GAMMA11_YPIBY2 * (LOPP_VISO + LOPM_VISO)
+    prop3 = exp(lvop3 * TX_YPIBY2)
+    prop4 = exp(lvop2 * TTOT_ZPIBY2)
+    prop = prop1 * prop2 * prop3 * prop4 * prop3 * prop2 * prop1
+    for i = 2:gate_count + 1
+        density = prop * density
+        densities_[i, :] = density
     end
-    return(
-        negi_h * state
-    )
+    for i = 1:gate_count + 1
+        densities[i, :, :] = get_vec_unviso(densities_[i, :])
+    end
 end
 
 
 """
 flux noise via amplitude fluctuation
 """
-function dynamics_xpiby2da_deqjl(state::StaticVector, params::SimParams, time::Float64)
+function dynamics_xpiby2da_deqjl(state::SVector, params::SimParams, time::Float64)
     time = rem(time, TTOT_XPIBY2)
     noise_knot_point = Int(floor(time * params.noise_dt_inv)) + 1
     delta_a = params.noise_offsets[noise_knot_point]
@@ -816,7 +897,7 @@ const T1_XPIBY2C = 30.017250262129778
 const T2_XPIBY2C = T1_XPIBY2C + 24.8850554973045
 const H11_XPIBY2C = A_XPIBY2C * NEGI_H1_ISO
 const H12_XPIBY2C = -A_XPIBY2C * NEGI_H1_ISO
-function dynamics_xpiby2corpse_deqjl(state::StaticVector, params::SimParams, time::Float64)
+function dynamics_xpiby2corpse_deqjl(state::SVector, params::SimParams, time::Float64)
     time_ = rem(time, TTOT_XPIBY2C)
     if time_ <= T1_XPIBY2C
         negi_h = params.negi_h0 + H11_XPIBY2C
@@ -831,7 +912,7 @@ function dynamics_xpiby2corpse_deqjl(state::StaticVector, params::SimParams, tim
 end
 
 
-function dynamics_xpiby2corpserwa_deqjl(state::StaticVector, params::SimParams, time::Float64)
+function dynamics_xpiby2corpserwa_deqjl(state::SVector, params::SimParams, time::Float64)
     time_ = rem(time, TTOT_XPIBY2C)
     if time_ <= T1_XPIBY2C
         negi_h = params.negi_h0 + (ARWA_XPIBY2C * cos(WQ * time)) * NEGI_H1_ISO
@@ -852,7 +933,7 @@ const T1_XPIC = 420//78
 const T2_XPIC = 720//78
 const H11_XPIC = A_XPIC * NEGI_H1_ISO_BIG
 const H12_XPIC = -A_XPIC * NEGI_H1_ISO_BIG
-function dynamics_xpicorpse_deqjl(state::StaticVector, params::SimParams, time)
+function dynamics_xpicorpse_deqjl(state::SVector, params::SimParams, time)
     time_ = rem(time, TTOT_XPIC)
     if time_ <= T1_XPIC
         negi_h = H11_XPIC # params.negi_h0 + H11_XPIC
@@ -895,10 +976,11 @@ const DT_INT = Dict(
     xpiby2nodis => integrate_prop_xpiby2nodis!,
     xpiby2da => integrate_prop_xpiby2da!,
     zpiby2t1 => integrate_prop_zpiby2t1!,
-    # ypiby2t1 => integrate_prop_ypiby2t1!,
-    # xpiby2t1 => integrate_prop_xpiby2t1!,
+    ypiby2t1 => integrate_prop_ypiby2t1!,
+    xpiby2t1 => integrate_prop_xpiby2t1!,
     schroed => integrate_prop_schroed!,
     schroedda => integrate_prop_schroedda!,
+    lindbladt1 => integrate_prop_lindbladt1!,
 )
 
 
@@ -999,10 +1081,9 @@ See e.q. 9.71 in [0]
 [0] Nielsen, M. A., & Chuang, I. (2002).
     Quantum computation and quantum information.
 """
-function fidelity_mat(m1_, m2_)
+function fidelity_mat(m1, m2)
     sqrt_m1 = sqrt(Hermitian(m1))
-    sqrt_m2 = sqrt(Hermitian(m2))
-    return tr(sqrt_m1 * sqrt_m2)^2
+    return real(tr(sqrt(sqrt_m1 * m2 * sqrt_m1)))
 end
 
 
@@ -1013,7 +1094,8 @@ function fidelity_mat_iso(m1_, m2_)
     i2 = (nby2 + 1):n
     m1 = m1_[i1, i1] + 1im * m1_[i2, i1]
     m2 = m2_[i1, i1] + 1im * m2_[i2, i1]
-    return fidelity_mat(m1, m2)
+    sqrt_m1 = sqrt(Hermitian(m1))
+    return real(tr(sqrt(sqrt_m1 * m2 * sqrt_m1)))
 end
 
 
@@ -1058,6 +1140,15 @@ function gen_rand_density_iso(;seed=0)
 end
 
 
+function gen_rand_density(;seed=0)
+    Random.seed!(seed)
+    state = rand(HDIM) + 1im * rand(HDIM)
+    state = state / sqrt(real(state'state))
+    density = state * state'
+    return SMatrix{HDIM, HDIM}(density)
+end
+
+
 """
 Generate noise with spectral density
 Sxx(f) = |x̂(f)|^2 = f^(1/2)
@@ -1087,13 +1178,14 @@ end
 """
 compute_fidelities
 """
-function compute_fidelities(gate_count, gate_type, states)
+function compute_fidelities(gate_count, gate_type, states::Array{T, N}) where {T, N}
     # Compute the fidelities.
     # All of the gates we consider are 4-cyclic up to phase.
     state_type = length(size(states)) == 2 ? st_state : st_density
     initial_state = state_type == st_state ? states[1, :] : states[1, :, :]
     fidelities = zeros(gate_count + 1)
-    g1 = GT_GATE[gate_type]
+    is_iso = !(states[1] isa Complex)
+    g1 = is_iso ? GT_GATE_ISO[gate_type] : GT_GATE[gate_type]
     g2 = g1^2
     g3 = g1^3
     id0 = initial_state
@@ -1122,7 +1214,8 @@ function compute_fidelities(gate_count, gate_type, states)
         if state_type == st_state
             fidelities[i] = fidelity_vec_iso2(states[i, :], target)
         elseif state_type == st_density
-            fidelities[i] = abs(fidelity_mat_iso(states[i, :, :], target))
+            fidelities[i] = (is_iso ? fidelity_mat_iso(states[i, :, :], target)
+                             : fidelity_mat(states[i, :, :], target))
         end
     end
 
@@ -1418,7 +1511,7 @@ integrate with unitary propagators
 """
 function run_sim_prop(
     gate_count, gate_type; save_file_path=nothing,
-    negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
+    negi_h0=FQ_NEGI_H0, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
     noise_dt_inv=DT_NOISE_INV, seed=0, state_seed=nothing, save=false,
     dynamics_type=schroed)
     # setup
@@ -1446,8 +1539,8 @@ function run_sim_prop(
         state = gen_rand_state_iso(;seed=state_seed)
         states = zeros(BigFloat, gate_count + 1, HDIM_ISO)
     elseif state_type == st_density
-        state =  gen_rand_density_iso(;seed=state_seed)
-        states = zeros(gate_count + 1, HDIM_ISO, HDIM_ISO)
+        state =  gen_rand_density(;seed=state_seed)
+        states = zeros(Complex{Float64}, gate_count + 1, HDIM, HDIM)
     end
 
     # integrate
