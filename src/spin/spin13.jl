@@ -2,281 +2,228 @@
 spin13.jl - vanilla
 """
 
+WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
+include(joinpath(WDIR, "src", "spin", "spin.jl"))
+
+using Altro
 using HDF5
 using LinearAlgebra
-using TrajectoryOptimization
-import Plots
-using Printf
+using RobotDynamics
 using StaticArrays
+using TrajectoryOptimization
+const RD = RobotDynamics
+const TO = TrajectoryOptimization
 
-# Construct paths.
-EXPERIMENT_META = "spin"
-EXPERIMENT_NAME = "spin13"
-WDIR = ENV["ROBUST_QOC_PATH"]
-SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
+# paths
+const EXPERIMENT_META = "spin"
+const EXPERIMENT_NAME = "spin13"
+const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
-# Plotting configuration.
-ENV["GKSwstype"] = "nul"
-Plots.gr()
-DPI = 300
+# problem
+const CONTROL_COUNT = 1
+const STATE_COUNT = 2
+const ASTATE_SIZE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
+const ACONTROL_SIZE = CONTROL_COUNT
+const INITIAL_STATE1 = [1., 0, 0, 0]
+const INITIAL_STATE2 = [0., 1, 0, 0]
+# state indices
+const STATE1_IDX = 1:HDIM_ISO
+const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
+const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
+const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
+const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
+# control indices
+const D2CONTROLS_IDX = 1:CONTROL_COUNT
 
-function generate_save_file_path(save_file_name, save_path)
-    # Ensure the path exists.
-    mkpath(save_path)
-
-    # Create a save file name based on the one given; ensure it will
-    # not conflict with others in the directory.
-    max_numeric_prefix = -1
-    for (_, _, files) in walkdir(save_path)
-        for file_name in files
-            if occursin("_$save_file_name.h5", file_name)
-                max_numeric_prefix = max(parse(Int, split(file_name, "_")[1]))
-            end
-        end
-    end
-
-    save_file_name = "_$save_file_name.h5"
-    save_file_name = @sprintf("%05d%s", max_numeric_prefix + 1, save_file_name)
-
-    return joinpath(save_path, save_file_name)
-end
-
-
-function plot_controls(controls_file_path, save_file_path,
-                       title=nothing)
-    # Grab and prep data.
-    (
-        controls,
-        evolution_time,
-        states,
-    ) = h5open(controls_file_path, "r+") do save_file
-        controls = read(save_file, "controls")
-        evolution_time = read(save_file, "evolution_time")
-        states = read(save_file, "states")
-        return (
-            controls,
-            evolution_time,
-            states
-        )
-    end
-    (control_eval_count, control_count) = size(controls)
-    control_eval_times = Array(range(0., stop=evolution_time, length=control_eval_count))
-    file_name = split(basename(controls_file_path), ".h5")[1]
-    if isnothing(title)
-        title = file_name
-    end
-
-    # Plot.
-    if false
-        fig = Plots.plot(control_eval_times, controls[:, 1], show=false, dpi=DPI)
-    else
-        fig = Plots.plot(control_eval_times, states[1:end-1, CONTROLS_IDX], show=false, dpi=DPI,
-                         label="controls", title=title)
-        Plots.xlabel!("Time (ns)")
-        Plots.ylabel!("Amplitude (GHz)")
-    end
-    Plots.savefig(fig, save_file_path)
-    return
-end
-
-
-# Define experimental constants.
-OMEGA = 2 * pi * 1.4e-2
-DOMEGA = OMEGA * 5e-2
-OMEGA_PLUS = OMEGA + DOMEGA
-OMEGA_MINUS = OMEGA - DOMEGA
-MAX_CONTROL_NORM_0 = 2 * pi * 3e-1
-
-# Define the system.
-NEG_I = SA_F64[0   0  1  0 ;
-               0   0  0  1 ;
-               -1  0  0  0 ;
-               0  -1  0  0 ;]
-SIGMA_X = SA_F64[0   1   0   0;
-                 1   0   0   0;
-                 0   0   0   1;
-                 0   0   1   0]
-SIGMA_Z = SA_F64[1   0   0   0;
-                 0  -1   0   0;
-                 0   0   1   0;
-                 0   0   0  -1]
-H_S = SIGMA_Z / 2
-NEG_I_H_S = NEG_I * H_S
-OMEGA_NEG_I_H_S = OMEGA * NEG_I_H_S
-H_C1 = SIGMA_X / 2
-NEG_I_H_C1 = NEG_I * H_C1
-
-# Define the optimization.
-EVOLUTION_TIME = 40.
-COMPLEX_CONTROLS = false
-CONTROL_COUNT = 1
-DT = 1e-2
-N = Int(EVOLUTION_TIME / DT) + 1
-ITERATION_COUNT = Int(1e3)
-
-# Define the problem.
-INITIAL_STATE = SA[1., 0, 0, 0]
-STATE_SIZE, = size(INITIAL_STATE)
-INITIAL_ASTATE = [
-    INITIAL_STATE; # state
-    @SVector zeros(1); # int_control
-    @SVector zeros(1); # control
-    @SVector zeros(1); # dcontrol_dt
-]
-ASTATE_SIZE, = size(INITIAL_ASTATE)
-TARGET_STATE = SA[0, 1., 0, 0]
-TARGET_ASTATE = [
-    TARGET_STATE;
-    @SVector zeros(1); # int_control
-    @SVector zeros(1); # control
-    @SVector zeros(1); # dcontrol_dt
-]
-STATE_IDX = 1:STATE_SIZE
-INT_CONTROLS_IDX = 1 * STATE_SIZE + 1:1 * STATE_SIZE + CONTROL_COUNT
-CONTROLS_IDX = 1 * STATE_SIZE + CONTROL_COUNT + 1:1 * STATE_SIZE + 2 * CONTROL_COUNT
-DCONTROLS_DT_IDX = 1 * STATE_SIZE + 2 * CONTROL_COUNT + 1:1 * STATE_SIZE + 3 * CONTROL_COUNT
-
-
-# Generate initial controls.
-GRAB_CONTROLS = false
-INITIAL_CONTROLS = nothing
-if GRAB_CONTROLS
-    controls_file_path = joinpath(SAVE_PATH, "00000_spin12.h5")
-    INITIAL_CONTROLS = h5open(controls_file_path, "r") do save_file
-        controls = Array(save_file["controls"])
-        return [
-            SVector{CONTROL_COUNT}(controls[i]) for i = 1:N-1
-        ]
-    end
-else
-    # INIITAL_CONTROLS should be small if optimizing over derivatives.
-    INITIAL_CONTROLS = [
-        @SVector fill(1e-4, CONTROL_COUNT) for k = 1:N-1
-    ]
-end
-
-# Specify logging.
-VERBOSE = true
-SAVE = true
-
+# model
 struct Model <: AbstractModel
-    n :: Int
-    m :: Int
 end
+@inline RD.state_dim(::Model) = ASTATE_SIZE
+@inline RD.control_dim(::Model) = ACONTROL_SIZE
 
 
-function Base.size(model::Model)
-    return model.n, model.m
-end
+# dynamics
+function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector,
+                              acontrol::SVector, time::Real, dt::Real)
+    h_prop = exp(dt * (FQ_NEGI_H0_ISO + astate[CONTROLS_IDX[1]] * NEGI_H1_ISO))
+    state1 = h_prop * astate[STATE1_IDX]
+    state2 = h_prop * astate[STATE2_IDX]
+    intcontrols = astate[INTCONTROLS_IDX[1]] + astate[CONTROLS_IDX[1]] * dt
+    controls = astate[CONTROLS_IDX[1]] + astate[DCONTROLS_IDX[1]] * dt
+    dcontrols = astate[DCONTROLS_IDX[1]] + acontrol[D2CONTROLS_IDX[1]] * dt
 
-
-function TrajectoryOptimization.dynamics(model::Model, astate, d2controls_dt2, time)
-    neg_i_control_hamiltonian = astate[CONTROLS_IDX][1] * NEG_I_H_C1
-    delta_state = (OMEGA_NEG_I_H_S + neg_i_control_hamiltonian) * astate[STATE_IDX]
-    delta_int_control = astate[CONTROLS_IDX]
-    delta_control = astate[DCONTROLS_DT_IDX]
-    delta_dcontrol_dt = d2controls_dt2
-    return [
-        delta_state;
-        delta_int_control;
-        delta_control;
-        delta_dcontrol_dt;
+    astate_ = [
+        state1; state2; intcontrols; controls; dcontrols;
     ]
+
+    return astate_
 end
 
 
-function run_traj()
-    dt = DT
-    n = ASTATE_SIZE
-    m = CONTROL_COUNT
+# main
+function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
+                  sqrtbp=false, integrator_type=rk3, smoke_test=false,
+                  dt_inv=Int64(1e1), constraint_tol=1e-8, al_tol=1e-4,
+                  pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5),
+                  max_cost_value=1e8, qs=[1e0, 1e0, 1e0, 1e-1, 1e-1])
+    # model configuration
+    model = Model()
+    n = state_dim(model)
+    m = control_dim(model)
     t0 = 0.
-    tf = EVOLUTION_TIME
-    x0 = INITIAL_ASTATE
-    xf = TARGET_ASTATE
-    # control amplitude constraint
-    x_max = [
-        @SVector fill(Inf, STATE_SIZE);
-        @SVector fill(Inf, 1);
-        @SVector fill(MAX_CONTROL_NORM_0, 1); # control
-        @SVector fill(Inf, 1);
-    ]
-    x_min = [
-        @SVector fill(-Inf, STATE_SIZE);
-        @SVector fill(-Inf, 1);
-        @SVector fill(-MAX_CONTROL_NORM_0, 1); # control
-        @SVector fill(-Inf, 1);
-    ]
-    # controls start and end at 0
-    x_max_boundary = [
-        @SVector fill(Inf, STATE_SIZE);
-        @SVector fill(Inf, 1);
-        @SVector fill(0, 1); # control
-        @SVector fill(Inf, 1);
-    ]
-    x_min_boundary = [
-        @SVector fill(-Inf, STATE_SIZE);
-        @SVector fill(-Inf, 1);
-        @SVector fill(0, 1); # control
-        @SVector fill(-Inf, 1);
-    ]
 
-    model = Model(n, m)
-    U0 = INITIAL_CONTROLS
-    X0 = [
-        @SVector fill(NaN, n) for k = 1:N
-    ]
+    # initial state
+    x0 = zeros(n)
+    x0[STATE1_IDX] = INITIAL_STATE1
+    x0[STATE2_IDX] = INITIAL_STATE2
+    x0 = SVector{n}(x0)
+
+    # target state
+    if gate_type == xpiby2
+        target_state1 = Array(XPIBY2_ISO_1)
+        target_state2 = Array(XPIBY2_ISO_2)
+    elseif gate_type == ypiby2
+        target_state1 = Array(YPIBY2_ISO_1)
+        target_state2 = Array(YPIBY2_ISO_2)
+    elseif gate_type == zpiby2
+        target_state1 = Array(ZPIBY2_ISO_1)
+        target_state2 = Array(ZPIBY2_ISO_2)
+    end
+    xf = zeros(n)
+    xf[STATE1_IDX] = target_state1
+    xf[STATE2_IDX] = target_state2
+    xf = SVector{n}(xf)
+    
+    # control amplitude constraint
+    x_max = fill(Inf, n)
+    x_max[CONTROLS_IDX] .= MAX_CONTROL_NORM_0
+    x_max = SVector{n}(x_max)
+    x_min = fill(-Inf, n)
+    x_min[CONTROLS_IDX] .= -MAX_CONTROL_NORM_0
+    x_min = SVector{n}(x_min)
+    
+    # control amplitude constraint at boundary
+    x_max_boundary = fill(Inf, n)
+    x_max_boundary[CONTROLS_IDX] .= 0
+    x_max_boundary = SVector{n}(x_max_boundary)
+    x_min_boundary = fill(-Inf, n)
+    x_min_boundary[CONTROLS_IDX] .= 0
+    x_min_boundary = SVector{n}(x_min_boundary)
+
+    # initial trajectory
+    dt = dt_inv^(-1)
+    N = Int(floor(evolution_time * dt_inv)) + 1
+    U0 = [SVector{m}(
+        fill(1e-4, CONTROL_COUNT)
+    ) for k = 1:N-1]
+    X0 = [SVector{n}([
+        fill(NaN, n);
+    ]) for k = 1:N]
     Z = Traj(X0, U0, dt * ones(N))
 
-    Q = Diagonal([
-        @SVector fill(1e-1, STATE_SIZE);
-        @SVector fill(1e-1, 1); # int_control
-        @SVector fill(1e-1, 1); # control
-        @SVector fill(1e-1, 1); # dcontrol_dt
-    ])
+    # cost function
+    Q = Diagonal(SVector{n}([
+        fill(qs[1], STATE_COUNT * HDIM_ISO); # ψ1, ψ2
+        fill(qs[2], CONTROL_COUNT); # ∫a
+        fill(qs[3], CONTROL_COUNT); # a
+        fill(qs[4], CONTROL_COUNT); # ∂a
+    ]))
     Qf = Q * N
-    R = Diagonal(@SVector fill(1e-1, m))
-    obj = LQRObjective(Q, R, Qf, xf, N)
+    R = Diagonal(SVector{m}([
+        fill(qs[5], CONTROL_COUNT); # ∂2a
+    ]))
+    objective = LQRObjective(Q, R, Qf, xf, N)
 
-    # must satisfy control amplitudes
+    # constraints
+    # must satisfy control amplitude bound
     control_bnd = BoundConstraint(n, m, x_max=x_max, x_min=x_min)
-    # must statisfy conrols start and stop at 0
+    # must statisfy conrols start and end at 0
     control_bnd_boundary = BoundConstraint(n, m, x_max=x_max_boundary, x_min=x_min_boundary)
     # must reach target state, must have zero net flux
-    target_astate_constraint = GoalConstraint(xf, [STATE_IDX;INT_CONTROLS_IDX])
+    target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
+    # must obey unit norm
+    norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idx) for idx in [STATE1_IDX, STATE2_IDX]]
     
-    constraints = ConstraintSet(n, m, N)
+    constraints = ConstraintList(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)
-    add_constraint!(constraints, control_bnd_boundary, 1:1)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
-    add_constraint!(constraints, target_astate_constraint, N:N)
-    
-    prob = Problem{RK4}(model, obj, constraints, x0, xf, Z, N, t0, tf)
-    opts = SolverOptions(verbose=VERBOSE)
-    solver = ALTROSolver(prob, opts)
-    solve!(solver)
+    add_constraint!(constraints, target_astate_constraint, N:N);
+    for norm_constraint in norm_constraints
+        add_constraint!(constraints, norm_constraint, 2:N-1)
+    end
 
-    controls_raw = controls(solver)
-    controls_arr = permutedims(reduce(hcat, map(Array, controls_raw)), [2, 1])
-    states_raw = states(solver)
-    states_arr = permutedims(reduce(hcat, map(Array, states_raw)), [2, 1])
+    # solve problem
+    prob = Problem{IT_RDI[integrator_type]}(model, objective, constraints, x0, xf, Z, N, t0, evolution_time)
+    solver = ALTROSolver(prob)
+    verbose_pn = verbose ? true : false
+    verbose_ = verbose ? 2 : 0
+    projected_newton = solver_type == altro ? true : false
+    constraint_tolerance = solver_type == altro ? constraint_tol : al_tol
+    iterations_inner = smoke_test ? 1 : 300
+    iterations_outer = smoke_test ? 1 : 30
+    n_steps = smoke_test ? 1 : pn_steps
+    set_options!(solver, square_root=sqrtbp, constraint_tolerance=constraint_tolerance,
+                 projected_newton_tolerance=al_tol, n_steps=n_steps,
+                 penalty_max=max_penalty, verbose_pn=verbose_pn, verbose=verbose_,
+                 projected_newton=projected_newton, iterations_inner=iterations_inner,
+                 iterations_outer=iterations_outer, iterations=max_iterations,
+                 max_cost_value=max_cost_value)
+    Altro.solve!(solver)
+
+    # post-process
+    acontrols_raw = TO.controls(solver)
+    acontrols_arr = permutedims(reduce(hcat, map(Array, acontrols_raw)), [2, 1])
+    astates_raw = TO.states(solver)
+    astates_arr = permutedims(reduce(hcat, map(Array, astates_raw)), [2, 1])
     Q_raw = Array(Q)
     Q_arr = [Q_raw[i, i] for i in 1:size(Q_raw)[1]]
     Qf_raw = Array(Qf)
     Qf_arr = [Qf_raw[i, i] for i in 1:size(Qf_raw)[1]]
     R_raw = Array(R)
     R_arr = [R_raw[i, i] for i in 1:size(R_raw)[1]]
+    cidx_arr = Array(CONTROLS_IDX)
+    d2cidx_arr = Array(D2CONTROLS_IDX)
+    cmax = TrajectoryOptimization.max_violation(solver)
+    cmax_info = TrajectoryOptimization.findmax_violation(TO.get_constraints(solver))
+    iterations_ = Altro.iterations(solver)
+
+    result = Dict(
+        "acontrols" => acontrols_arr,
+        "controls_idx" => cidx_arr,
+        "d2controls_dt2_idx" => d2cidx_arr,
+        "evolution_time" => evolution_time,
+        "astates" => astates_arr,
+        "Q" => Q_arr,
+        "Qf" => Qf_arr,
+        "R" => R_arr,
+        "cmax" => cmax,
+        "cmax_info" => cmax_info,
+        "dt" => dt,
+        "solver_type" => Integer(solver_type),
+        "sqrtbp" => Integer(sqrtbp),
+        "max_penalty" => max_penalty,
+        "constraint_tol" => constraint_tol,
+        "al_tol" => al_tol,
+        "gate_type" => Integer(gate_type),
+        "save_type" => Integer(jl),
+        "integrator_type" => Integer(integrator_type),
+        "iterations" => iterations_,
+        "max_iterations" => max_iterations,
+        "pn_steps" => pn_steps,
+        "max_cost_value" => max_cost_value,
+    )
     
-    # Save
-    if SAVE
-        save_file_path = generate_save_file_path(EXPERIMENT_NAME, SAVE_PATH)
-        @printf("Saving this optimization to %s\n", save_file_path)
+    # save
+    if save
+        save_file_path = generate_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
+        println("Saving this optimization to $(save_file_path)")
         h5open(save_file_path, "cw") do save_file
-            write(save_file, "controls", controls_arr)
-            write(save_file, "evolution_time", tf)
-            write(save_file, "states", states_arr)
-            write(save_file, "Q", Q_arr)
-            write(save_file, "Qf", Qf_arr)
-            write(save_file, "R", R_arr)
+            for key in keys(result)
+                write(save_file, key, result[key])
+            end
         end
+        result["save_file_path"] = save_file_path
     end
+
+    return result
 end

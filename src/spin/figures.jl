@@ -54,16 +54,20 @@ const INVAL = 99999
 
 const F1_DATA = Dict(
     zpiby2 => Dict(
-        qoc => joinpath(SPIN_OUT_PATH, "spin15/00209_spin15.h5"),
+        qoc => "",# qoc => joinpath(SPIN_OUT_PATH, "spin15/00209_spin15.h5"),
         analytic => joinpath(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
     ),
     ypiby2 => Dict(
-        qoc => joinpath(SPIN_OUT_PATH, "spin15/00205_spin15.h5"),
-        analytic => joinpath(SPIN_OUT_PATH, "spin14/00003_spin14.h5"),
+        qoc => "",
+        analytic => "",
+        # qoc => joinpath(SPIN_OUT_PATH, "spin15/00205_spin15.h5"),
+        # analytic => joinpath(SPIN_OUT_PATH, "spin14/00003_spin14.h5"),
     ),
     xpiby2 => Dict(
-        qoc => joinpath(SPIN_OUT_PATH, "spin15/00239_spin15.h5"),
-        analytic => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
+        qoc => "",
+        analytic => "",
+        # qoc => joinpath(SPIN_OUT_PATH, "spin15/00262_spin15.h5"),
+        # analytic => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
     ),
 )
 const F1_PT_LIST = [analytic, qoc]
@@ -131,9 +135,8 @@ function gen_1b()
 end
 
 
-const F1C_GATE_COUNT = Integer(1.6e3)
+const F1C_GATE_COUNT = Integer(1e3)
 const F1C_AVG_COUNT = 10
-const F1C_DT = 1e-3
 function gen_1c(;use_previous=true)
     gate_types_integer = [Integer(gt) for gt in GT_LIST]
     gate_type_count = size(GT_LIST)[1]
@@ -174,10 +177,13 @@ function gen_1c(;use_previous=true)
             print("pt[$(j)]: $(pulse_type) ")
             save_file_path = F1_DATA[gate_type][pulse_type]
             save_file_paths[i, j] = save_file_path
-            save_file_path_sim = pulse_type == analytic ? nothing : save_file_path
             save_file_path_old = ((isnothing(save_file_paths_old) || i > gate_type_count_old
                                    || j > pulse_type_count_old)
                                   ? nothing : save_file_paths_old[i, j])
+            if save_file_path == ""
+                println("")
+                continue
+            end
             if pulse_type == analytic
                 if gate_type == zpiby2
                     dynamics_type = zpiby2t1
@@ -194,15 +200,12 @@ function gen_1c(;use_previous=true)
                 if (!isnothing(save_file_path_old) && save_file_path == save_file_path_old
                     && k <= avg_count_old)
                     gate_errors[i, j, k, :] = gate_errors_old[i, j, k, :]
-                    print("s")
                 else
                     res = run_sim_deqjl(
                         F1C_GATE_COUNT, gate_type; dynamics_type=dynamics_type,
-                        save_file_path=save_file_path_sim, save=false, dt=F1C_DT,
-                        seed=k
+                        save_file_path=save_file_path, save=false, seed=k, dt_inv=Int(1e3)
                     )
                     gate_errors[i, j, k, :] = 1 .- res["fidelities"]
-                    print(".")
                 end
             end
             println("")
@@ -223,10 +226,10 @@ end
 ### FIGURE 2 ###
 const F2A_DATA_ZPIBY2 = Dict(
     analytic => joinpath(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
-    s2 => joinpath(SPIN_OUT_PATH, "spin12/00731_spin12.h5"), #"spin12/00692_spin12.h5"),
-    sut8 => "", #joinpath(SPIN_OUT_PATH, "spin23/00094_spin23.h5"),
-    d1 => joinpath(SPIN_OUT_PATH, "spin11/00539_spin11.h5"), #"spin11/00468_spin11.h5"),
-    d2 => joinpath(SPIN_OUT_PATH, "spin11/00547_spin11.h5"), #"spin11/00487_spin11.h5"),
+    s2 => joinpath(SPIN_OUT_PATH, "spin12/00789_spin12.h5"),
+    sut8 => joinpath(SPIN_OUT_PATH, "spin23/00293_spin23.h5"),
+    d1 => joinpath(SPIN_OUT_PATH, "spin11/00539_spin11.h5"),
+    d2 => joinpath(SPIN_OUT_PATH, "spin11/00547_spin11.h5"),
 )
 const F2A_PT_LIST = [analytic, s2, sut8, d1, d2]
 function gen_2a(;gate_type=zpiby2)
@@ -261,7 +264,7 @@ const F2B_DATA_ZPIBY2 = Dict(
 const F2B_TRIAL_COUNT = Integer(1e2)
 const F2B_FQ_DEV = 3e-2
 const F2B_PT_LIST = [analytic, d1, d1b, d1bb, d1bbb]
-const F2B_AVG_COUNT = 10
+const F2B_AVG_COUNT = 1000
 function gen_2b(;use_previous=true, gate_type=zpiby2)
     @assert iseven(F2B_TRIAL_COUNT)
     if gate_type == zpiby2
@@ -367,9 +370,9 @@ const F2C_DATA_ZPIBY2 = Dict(
         800, 801, 802, 803, 805, 804, 806, 807,
     ]],
     sut8 => [joinpath(SPIN_OUT_PATH, "spin23/$(lpad(index, 5, '0'))_spin23.h5") for index in [
-        281, 283, 284, 286, 285, INVAL, INVAL, INVAL, INVAL, INVAL,
-        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
-        INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL
+        281, 283, 284, 286, 285, 288, 289, 287, 290, 293,
+        291, 292, 294, 295, 296, 298, 299, 297, 300, 303,
+        301, 304, 302, 305, 307, 306, 308, 309,
     ]],
     d1 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
         468, 471, 472, 474, 475, 476, 477, 478, 480, 539,
@@ -477,8 +480,8 @@ end
 ### FIGURE 3 ###
 const F3_DATA = Dict(
     analytic => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
-    s2 => joinpath(SPIN_OUT_PATH, "spin18/00057_spin18.h5"),
-    sut8 => "", #joinpath(SPIN_OUT_PATH, "$(INVAL)"),
+    s2 => joinpath(SPIN_OUT_PATH, "spin18/00059_spin18.h5"),
+    sut8 => joinpath(SPIN_OUT_PATH, "spin25/00001_spin25.h5"),
     d1 => joinpath(SPIN_OUT_PATH, "spin17/00063_spin17.h5"),
     d2 => joinpath(SPIN_OUT_PATH, "spin17/00069_spin17.h5"),
 )
@@ -503,7 +506,7 @@ end
 
 const F3B_PT_LIST = [analytic, s2, sut8, d1, d2]
 const F3B_AVG_COUNT = 10
-const F3B_GATE_COUNT = 500
+const F3B_GATE_COUNT = 200
 function gen_3b(;use_previous=true)
     gate_type = xpiby2
     pulse_types_integer = [Integer(pulse_type) for pulse_type in F3B_PT_LIST]

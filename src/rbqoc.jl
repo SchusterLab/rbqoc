@@ -208,3 +208,18 @@ function get_mat_iso(mat)
     return vcat(hcat(mat_r, -mat_i),
                 hcat(mat_i,  mat_r))
 end
+
+
+function get_mat_uniso(mat)
+    n = size(mat, 1)
+    nby2 = Integer(n/2)
+    i1 = 1:nby2
+    i2 = (nby2 + 1):n
+    return mat[i1, i1] + mat[i2, i1]
+end
+
+
+@inline get_vec_viso(mat) = reshape(mat, length(mat))
+
+
+@inline get_vec_unviso(vec) = reshape(vec, (Int(sqrt(length(vec))), Int(sqrt(length(vec)))))

@@ -22,7 +22,7 @@ const TO = TrajectoryOptimization
 # paths
 const EXPERIMENT_META = "spin"
 const EXPERIMENT_NAME = "spin23"
-const SAVE_PATH = abspath(joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME))
+const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
 # problem
 const CONTROL_COUNT = 1
@@ -49,6 +49,7 @@ const S8_IDX = S7_IDX[end] + 1:S7_IDX[end] + HDIM_ISO
 const S9_IDX = S8_IDX[end] + 1:S8_IDX[end] + HDIM_ISO
 const S10_IDX = S9_IDX[end] + 1:S9_IDX[end] + HDIM_ISO
 const SAMPLE_COUNT = 10
+const SAMPLE_COUNT_INV = 1//10
 const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
 const ACONTROL_SIZE = CONTROL_COUNT
 # control indices
@@ -68,7 +69,6 @@ end
 Model = Data.Model
 @inline RD.state_dim(model::Model) = ASTATE_SIZE
 @inline RD.control_dim(model::Model) = ACONTROL_SIZE
-
 
 # dynamics
 function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector{ASTATE_SIZE},
@@ -94,8 +94,9 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector{ASTATE_
     s9 = SVector{HDIM_ISO}(astate[S9_IDX])
     s10 = SVector{HDIM_ISO}(astate[S10_IDX])
     # compute state mean
-    sm = 1//10 .* (
-        s1 + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10
+    sm = SAMPLE_COUNT_INV .* (
+        s1 + s2 + s3 + s4 + s5
+        + s6 + s7 + s8 + s9 + s10
     )
     # compute state covariance
     d1 = s1 - sm
@@ -109,8 +110,9 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector{ASTATE_
     d9 = s9 - sm
     d10 = s10 - sm
     s_cov = 1 / (2 * model.alpha^2) .* (
-        d1 * d1' + d2 * d2' + d3 * d3' + d4 * d4' + d5 * d5' +
-        d6 * d6' + d7 * d7' + d8 * d8' + d9 * d9' + d10 * d10'
+        d1 * d1' + d2 * d2' + d3 * d3' + d4 * d4'
+        + d5 * d5' + d6 * d6' + d7 * d7' + d8 * d8'
+        + d9 * d9' + d10 * d10'
     )
     # perform cholesky decomposition on joint covariance
     cov = @MMatrix zeros(eltype(s_cov), HDIM_ISO + 1, HDIM_ISO + 1)
@@ -149,38 +151,35 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector{ASTATE_
     s8 = s8 ./sqrt(s8's8)
     s9 = s9 ./sqrt(s9's9)
     s10 = s10 ./sqrt(s10's10)
-
-    return (s1, s2, s3, s4, s5, s6, s7, s8, s9, s10)
+    
+    astate_ = [
+        state1; state2; intcontrols; controls; dcontrols;
+        s1; s2; s3; s4; s5; s6; s7; s8; s9; s10
+    ]
+    
+    return astate_
 end
 
 
 # This cost puts a gate error cost on
 # the sample states and a LQR cost on the other terms.
 # The hessian w.r.t the state and controls is constant.
-module Data2
-using LinearAlgebra
-using StaticArrays
-using TrajectoryOptimization
-const TO = TrajectoryOptimization
-const HDIM_ISO = 4
 struct Cost{N,M,T} <: TO.CostFunction
-    Q::Diagonal{T,SVector{N,T}}
-    R::Diagonal{T,SVector{M,T}}
-    q::SizedVector{N}
+    Q::Diagonal{T, SVector{N,T}}
+    R::Diagonal{T, SVector{M,T}}
+    q::SVector{N, T}
     c::T
-    hess_astate::Symmetric{T,SMatrix{N,N,T}}
-    target_states::Array{SVector{HDIM_ISO, T},1}
-    q_ss1::T
-end
+    hess_astate::Symmetric{T, SMatrix{N,N,T}}
+    target_state1::SVector{HDIM_ISO, T}
+    q_ss::T
 end
 
 function Cost(Q::Diagonal{T,SVector{N,T}}, R::Diagonal{T,SVector{M,T}},
-              xf::SVector{N,T}, target_states::Array{SVector{HDIM_ISO}, 1},
-              q_ss1::T) where {N,M,T}
+              xf::SVector{N,T}, target_state1::SVector{HDIM_ISO,T}, q_ss::T) where {N,M,T}
     q = -Q * xf
     c = 0.5 * xf' * Q * xf
     hess_astate = zeros(N, N)
-    # For reasons unknown to the author, throwing a -1 in front
+    # For reasons unkown to the author, throwing a -1 in front
     # of the gate error Hessian makes the cost function work.
     hess_sample = -1 * q_ss * hessian_gate_error_iso2(target_state1)
     hess_astate[S1_IDX, S1_IDX] = hess_sample
@@ -195,17 +194,17 @@ function Cost(Q::Diagonal{T,SVector{N,T}}, R::Diagonal{T,SVector{M,T}},
     hess_astate[S10_IDX, S10_IDX] = hess_sample
     hess_astate += Q
     hess_astate = Symmetric(SMatrix{N, N}(hess_astate))
-    return Data2.Cost{N,M,T}(Q, R, q, c, hess_astate, target_states, q_ss1)
+    return Cost{N,M,T}(Q, R, q, c, hess_astate, target_state1, q_ss)
 end
 
-@inline TO.state_dim(cost::Data2.Cost{N,M,T}) where {N,M,T} = N
-@inline TO.control_dim(cost::Data2.Cost{N,M,T}) where {N,M,T} = M
-@inline Base.copy(cost::Data2.Cost{N,M,T}) where {N,M,T} = Data2.Cost{N,M,T}(
+@inline TO.state_dim(cost::Cost{N,M,T}) where {N,M,T} = N
+@inline TO.control_dim(cost::Cost{N,M,T}) where {N,M,T} = M
+@inline Base.copy(cost::Cost{N,M,T}) where {N,M,T} = Cost{N,M,T}(
     cost.Q, cost.R, cost.q, cost.c, cost.hess_astate,
-    cost.target_states, cost.q_ss1
+    cost.target_state1, cost.q_ss
 )
 
-@inline TO.stage_cost(cost::Data2.Cost{N,M,T}, astate::SVector{N}) where {N,M,T} = (
+@inline TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N}) where {N,M,T} = (
     0.5 * astate' * cost.Q * astate + cost.q'astate + cost.c
     + cost.q_ss * (
         gate_error_iso2(astate, cost.target_state1, S1_IDX[1] - 1)
@@ -221,11 +220,11 @@ end
     )
 )
 
-@inline TO.stage_cost(cost::Data2.Cost{N,M,T}, astate::SVector{N}, acontrol::SVector{M}) where {N,M,T} = (
+@inline TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N}, acontrol::SVector{M}) where {N,M,T} = (
     TO.stage_cost(cost, astate) + 0.5 * acontrol' * cost.R * acontrol
 )
 
-function TO.gradient!(E::TO.QuadraticCostFunction, cost::Data2.Cost{N,M,T}, astate::SVector{N,T}) where {N,M,T}
+function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T}) where {N,M,T}
     E.q = (cost.Q * astate + cost.q + [
         @SVector zeros(ASTATE_SIZE_BASE);
         cost.q_ss * jacobian_gate_error_iso2(astate, cost.target_state1, S1_IDX[1] - 1);
@@ -242,7 +241,7 @@ function TO.gradient!(E::TO.QuadraticCostFunction, cost::Data2.Cost{N,M,T}, asta
     return false
 end
 
-function TO.gradient!(E::TO.QuadraticCostFunction, cost::Data2.Cost{N,M,T}, astate::SVector{N,T},
+function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T},
                       acontrol::SVector{M,T}) where {N,M,T}
     TO.gradient!(E, cost, astate)
     E.r = cost.R * acontrol
@@ -250,12 +249,12 @@ function TO.gradient!(E::TO.QuadraticCostFunction, cost::Data2.Cost{N,M,T}, asta
     return false
 end
 
-function TO.hessian!(E::TO.QuadraticCostFunction, cost::Data2.Cost{N,M,T}, astate::SVector{N,T}) where {N,M,T}
+function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T}) where {N,M,T}
     E.Q = cost.hess_astate
     return true
 end
 
-function TO.hessian!(E::TO.QuadraticCostFunction, cost::Data2.Cost{N,M,T}, astate::SVector{N,T},
+function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T},
                      acontrol::SVector{M,T}) where {N,M,T}
     TO.hessian!(E, cost, astate)
     E.R = cost.R
@@ -278,27 +277,36 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     t0 = 0.
 
     # initial state
-    state_dist = Distributions.Normal(0., state_cov)
     x0_ = [
         INITIAL_STATE1;
         INITIAL_STATE2;
         zeros(3 * CONTROL_COUNT);
     ]
     state_dist = Distributions.Normal(0., state_cov)
-    sample_state = INITIAL_STATE3
+    sample_state = INITIAL_STATE4
     target_sample_state = GT_GATE[gate_type] * sample_state
     for i = 1:SAMPLE_COUNT
         sample = sample_state .+ rand(state_dist, HDIM_ISO)
         append!(x0_, sample ./ sqrt(sample'sample))
     end
     x0 = SVector{n}(x0_)
-    target_states = Array{SVector{HDIM_ISO}, 1}(undef, 1)
-    target_states[1] = GT_GATE[gate_type] * INITIAL_STATE3
+
+    # target state
+    if gate_type == xpiby2
+        target_state1 = XPIBY2_ISO_1
+        target_state2 = XPIBY2_ISO_2
+    elseif gate_type == ypiby2
+        target_state1 = YPIBY2_ISO_1
+        target_state2 = YPIBY2_ISO_2
+    elseif gate_type == zpiby2
+        target_state1 = ZPIBY2_ISO_1
+        target_state2 = ZPIBY2_ISO_2
+    end
     xf = SVector{n}([
-        GT_GATE[gate_type] * INITIAL_STATE1;
-        GT_GATE[gate_type] * INITIAL_STATE2;
+        target_state1;
+        target_state2;
         zeros(3 * CONTROL_COUNT);
-        repeat(target_states[1], SAMPLE_COUNT);
+        repeat(target_sample_state, SAMPLE_COUNT);
     ])
     
     # control amplitude constraint

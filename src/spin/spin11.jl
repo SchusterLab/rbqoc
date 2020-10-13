@@ -300,7 +300,7 @@ function forward_pass(save_file_path; derivative_order=0, integrator_type=rk3)
     rdi = IT_RDI[integrator_type]
     knot_count = Integer(floor(evolution_time / dt))
     
-    model = Model(derivative_order)
+    model = Model{derivative_order}()
     n = state_dim(model)
     m = control_dim(model)
     time = 0.

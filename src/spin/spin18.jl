@@ -22,12 +22,14 @@ const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 # problem
 const CONTROL_COUNT = 1
 const STATE_COUNT = 2
-const SAMPLE_COUNT = 2
+const SAMPLE_COUNT = 8
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
 const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
 const ACONTROL_SIZE = CONTROL_COUNT
 const INITIAL_STATE1 = [1., 0, 0, 0]
 const INITIAL_STATE2 = [0., 1, 0, 0]
+const INITIAL_STATE3 = [1., 0, 0, 1] ./ sqrt(2)
+const INITIAL_STATE4 = [1., -1, 0, 0] ./ sqrt(2)
 # state indices
 const STATE1_IDX = 1:HDIM_ISO
 const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
@@ -168,8 +170,8 @@ function RD.discrete_dynamics(::Type{RD.RK3}, model::Model, astate::StaticVector
     controls = astate[CONTROLS_IDX[1]] + dt * astate[DCONTROLS_IDX[1]]
     dcontrols = astate[DCONTROLS_IDX[1]] + dt * acontrols[D2CONTROLS_IDX[1]]
 
-    hp_prop = exp(FQ_NEGI_H0_ISO + (camp + model.namp) * NEGI_H1_ISO) * dt)
-    hn_prop = exp(FQ_NEGI_H0_ISO + (camp - model.namp) * NEGI_H1_ISO) * dt)
+    hp_prop = exp((FQ_NEGI_H0_ISO + (camp + model.namp) * NEGI_H1_ISO) * dt)
+    hn_prop = exp((FQ_NEGI_H0_ISO + (camp - model.namp) * NEGI_H1_ISO) * dt)
     s1 = hp_prop * astate[S1_IDX]
     s2 = hp_prop * astate[S2_IDX]
     s3 = hp_prop * astate[S3_IDX]

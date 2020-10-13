@@ -121,6 +121,8 @@ const GT_STR = Dict(
 
 const HDIM = 2
 const HDIM_ISO = HDIM * 2
+const HDIM_VISO = HDIM^2
+const HDIM_VISO_ISO = HDIM_VISO * 2
 struct SimParams
     controls :: Array{Float64, 2}
     control_knot_count :: Int64
@@ -161,6 +163,14 @@ const GAMMAC = 1 / 3e5 #GHz(T_c = 300 us)
 const SQRTLNIR = 4
 const NAMP_PREFACTOR = FBFQ_NAMP / FBFQ_A
 const GAMMAF_PREFACTOR = FBFQ_NAMP * SQRTLNIR * 2 * pi
+const PFIR_B1 = 0.049922035
+const PFIR_B2 = -0.095993537
+const PFIR_B3 = 0.050612699
+const PFIR_B4 = -0.004408786
+const PFIR_A1 = 1
+const PFIR_A2 = -2.494956002
+const PFIR_A3 = 2.017265875
+const PFIR_A4 = -0.522189400
 # coefficients are listed in descending order
 # raw coefficients are in units of seconds
 const FBFQ_T1_COEFFS = [
@@ -205,6 +215,7 @@ const FBFQ_T1_REDUCED_SPLINE_ITP = extrapolate(interpolate(
 
 # Define the system.
 # ISO indicates the object is defined in the complex to real isomorphism.
+# VISO indicates the object is defined in the vector and complex to real isomorphism.
 # NEGI is the negative complex unit.
 const NEGI = SA_F64[0   0  1  0 ;
                     0   0  0  1 ;
@@ -226,6 +237,20 @@ const NEGI_H1_ISO = pi * NEGI * SIGMAX_ISO
 const NEGI_H1_ISO_BIG = pi * NEGI * SMatrix{HDIM_ISO, HDIM_ISO, BigFloat}(SIGMAX_ISO)
 const FQ_NEGI_H0_ISO = FQ * NEGI_H0_ISO
 const AYPIBY2_NEGI_H1_ISO = AYPIBY2 * NEGI_H1_ISO
+const FQ_NEGI_H0 = FQ * -1im * pi * SIGMAZ
+const FQ_NEGI_H0_VISO = SMatrix{HDIM_VISO, HDIM_VISO}(
+    kron(I(HDIM), FQ_NEGI_H0)
+    - kron(transpose(FQ_NEGI_H0), I(HDIM))
+)
+const FQ_NEGI_H0_VISO_ISO = SMatrix{HDIM_VISO_ISO, HDIM_VISO_ISO}(
+    get_mat_iso(kron(I(HDIM), FQ_NEGI_H0)
+                - kron(transpose(FQ_NEGI_H0), I(HDIM)))
+)
+const NEGI_H1 = -1im * pi * SIGMAX
+const NEGI_H1_VISO_ISO = SMatrix{HDIM_VISO_ISO, HDIM_VISO_ISO}(
+    get_mat_iso(kron(I(HDIM), NEGI_H1)
+                - kron(transpose(NEGI_H1), I(HDIM)))
+)
 # relaxation dissipation ops
 # L_{0} = |g> <e|
 # L_{0}^{\dagger} = |e> <g|
@@ -233,19 +258,29 @@ const AYPIBY2_NEGI_H1_ISO = AYPIBY2 * NEGI_H1_ISO
 # L_{1} = L_{0}^{\dagger} = |e> <g|
 # L_{1}^{\dagger} = L_{0} = |g> <e|
 # L_{1}^{\dagger} L_{1} = |g> <g|
-const G_E = SA_F64[0 1 0 0;
+const GG = [1 0; 0 0]
+const GE = [0 1; 0 0]
+const EG = [0 0; 1 0]
+const EE = [0 0; 0 1]
+const LOPP_VISO_ISO = SMatrix{HDIM_VISO_ISO, HDIM_VISO_ISO}(get_mat_iso(
+    kron(GE, GE) - 1//2 * kron(I(HDIM), EE) - 1//2 * kron(EE, I(HDIM))
+))
+const LOPM_VISO_ISO = SMatrix{HDIM_VISO_ISO, HDIM_VISO_ISO}(get_mat_iso(
+    kron(EG, EG) - 1//2 * kron(I(HDIM), GG) - 1//2 * kron(GG, I(HDIM))
+))
+const G_E_ISO = SA_F64[0 1 0 0;
              0 0 0 0;
              0 0 0 1;
              0 0 0 0;]
-const E_G = SA_F64[0 0 0 0;
+const E_G_ISO = SA_F64[0 0 0 0;
              1 0 0 0;
              0 0 0 0;
              0 0 1 0;]
-const NEG_G_G_BY2 = SA_F64[1 0 0 0;
+const NEG_G_G_BY2_ISO = SA_F64[1 0 0 0;
                            0 0 0 0;
                            0 0 1 0;
                            0 0 0 0] * -0.5
-const NEG_E_E_BY2 = SA_F64[0 0 0 0;
+const NEG_E_E_BY2_ISO = SA_F64[0 0 0 0;
                            0 1 0 0;
                            0 0 0 0;
                            0 0 0 1;] * -0.5
@@ -376,6 +411,20 @@ function dynamics_schroed_deqjl(state::StaticVector, params::SimParams, time::Fl
 end
 
 
+function integrate_prop_schroed!(gate_count::Int, states::Array{T, 2}, state::SVector, params::SimParams) where {T}
+    dt = params.sim_dt_inv^(-1)
+    states[1, :] = state
+    for i = 2:gate_count + 1
+        for j = 1:params.control_knot_count
+            hamiltonian = params.negi_h0 + params.controls[j, 1] * NEGI_H1_ISO
+            unitary = exp(hamiltonian * dt)
+            state = unitary * state
+        end
+        states[i, :] = state
+    end
+end
+
+
 function dynamics_schroedda_deqjl(state::StaticVector, params::SimParams, time::Float64)
     control_knot_point = (Int(floor(time * params.controls_dt_inv)) % params.control_knot_count) + 1
     noise_knot_point = Int(floor(time * params.noise_dt_inv)) + 1
@@ -387,6 +436,23 @@ function dynamics_schroedda_deqjl(state::StaticVector, params::SimParams, time::
     return (
         negi_h * state
     )
+end
+
+
+function integrate_prop_schroedda!(gate_count::Int, states::Array{T, 2}, state::SVector, params::SimParams) where {T}
+    dt = params.sim_dt_inv^(-1)
+    time = 0.
+    states[1, :] = state
+    for i = 2:gate_count + 1
+        for j = 1:control_knot_count
+            delta_a = params.noise_offsets[Int(floor(time * params.noise_dt_inv)) + 1]
+            hamiltonian = params.negi_h0 + (params.controls[j, 1] + delta_a) * NEGI_H1_ISO
+            unitary = exp(hamiltonian * dt)
+            state = unitary * state
+            time = time + dt
+        end
+        states[i, :] = state
+    end
 end
 
 
@@ -418,8 +484,8 @@ function dynamics_lindbladt1_deqjl(density::StaticMatrix, params::SimParams, tim
     )
     return (
         negi_h * density - density * negi_h
-        + gamma_1 * (G_E * density * E_G + NEG_E_E_BY2 * density + density * NEG_E_E_BY2)
-        + gamma_1 * (E_G * density * G_E + NEG_G_G_BY2 * density + density * NEG_G_G_BY2)
+        + gamma_1 * (G_E_ISO * density * E_G_ISO + NEG_E_E_BY2_ISO * density + density * NEG_E_E_BY2_ISO)
+        + gamma_1 * (E_G_ISO * density * G_E_ISO + NEG_G_G_BY2_ISO * density + density * NEG_G_G_BY2_ISO)
     )
 end
 
@@ -449,8 +515,8 @@ const GAMMA_ZPIBY2 = amp_t1_spline(0)^(-1)
 function integrate_prop_zpiby2nodis!(gate_count::Int, states::Array{T, 2},
                                      state::SVector, params::SimParams) where {T}
     states[1, :] = state
+    prop = exp(TTOT_ZPIBY2 * params.negi_h0)
     for i = 2:gate_count + 1
-        prop = exp(TTOT_ZPIBY2 * params.negi_h0)
         state = prop * state
         states[i, :] = state
     end
@@ -459,9 +525,26 @@ end
 
 @inline dynamics_zpiby2t1_deqjl(density::StaticMatrix, params::SimParams, time::Float64) = (
     FQ_NEGI_H0_ISO * density - density * FQ_NEGI_H0_ISO
-    + GAMMA_ZPIBY2 * (G_E * density * E_G + NEG_E_E_BY2 * density + density * NEG_E_E_BY2
-                      + E_G * density * G_E + NEG_G_G_BY2 * density + density * NEG_G_G_BY2)    
+    + GAMMA_ZPIBY2 * (G_E_ISO * density * E_G_ISO + NEG_E_E_BY2_ISO * density + density * NEG_E_E_BY2_ISO
+                      + E_G_ISO * density * G_E_ISO + NEG_G_G_BY2_ISO * density + density * NEG_G_G_BY2_ISO)    
 )
+
+
+function integrate_prop_zpiby2t1!(gate_count::Int, densities::Array{T, 3},
+                                  density::SMatrix{HDIM_ISO, HDIM_ISO}, params::SimParams) where {T}
+    density = SVector{HDIM_VISO_ISO}(get_vec_iso(get_vec_viso(get_mat_uniso(density))))
+    densities_ = zeros(gate_count + 1, HDIM_VISO_ISO)
+    densities_[1, :] = density
+    lvop = FQ_NEGI_H0_VISO_ISO + GAMMA_ZPIBY2 * (LOPP_VISO_ISO + LOPM_VISO_ISO)
+    prop = exp(TTOT_ZPIBY2 * lvop)
+    for i = 2:gate_count + 1
+        density = prop * density
+        densities_[i, :] = density
+    end
+    for i = 1:gate_count + 1
+        densities[i, :, :] = get_mat_iso(get_vec_unviso(get_vec_uniso(densities_[i, :])))
+    end
+end
 
 
 @inline dynamics_zpiby2da_deqjl(state::StaticVector, params::SimParams, time::Float64) = (
@@ -512,8 +595,8 @@ function dynamics_ypiby2t1_deqjl(density::StaticMatrix, params::SimParams, time:
     end
     return(
         negi_h * density - density * negi_h
-        + gamma1 * (G_E * density * E_G + NEG_E_E_BY2 * density + density * NEG_E_E_BY2
-                    + E_G * density * G_E + NEG_G_G_BY2 * density + density * NEG_G_G_BY2)
+        + gamma1 * (G_E_ISO * density * E_G_ISO + NEG_E_E_BY2_ISO * density + density * NEG_E_E_BY2_ISO
+                    + E_G_ISO * density * G_E_ISO + NEG_G_G_BY2_ISO * density + density * NEG_G_G_BY2_ISO)
     )
 end
 
@@ -586,8 +669,8 @@ function dynamics_xpiby2t1_deqjl(density::StaticMatrix, params::SimParams, time:
     end
     return(
         negi_h * density - density * negi_h
-        + gamma1 * (G_E * density * E_G + NEG_E_E_BY2 * density + density * NEG_E_E_BY2
-                    + E_G * density * G_E + NEG_G_G_BY2 * density + density * NEG_G_G_BY2)
+        + gamma1 * (G_E_ISO * density * E_G_ISO + NEG_E_E_BY2_ISO * density + density * NEG_E_E_BY2_ISO
+                    + E_G_ISO * density * G_E_ISO + NEG_G_G_BY2_ISO * density + density * NEG_G_G_BY2_ISO)
     )
 end
 
@@ -811,6 +894,11 @@ const DT_INT = Dict(
     zpiby2nodis => integrate_prop_zpiby2nodis!,
     xpiby2nodis => integrate_prop_xpiby2nodis!,
     xpiby2da => integrate_prop_xpiby2da!,
+    zpiby2t1 => integrate_prop_zpiby2t1!,
+    # ypiby2t1 => integrate_prop_ypiby2t1!,
+    # xpiby2t1 => integrate_prop_xpiby2t1!,
+    schroed => integrate_prop_schroed!,
+    schroedda => integrate_prop_schroedda!,
 )
 
 
@@ -911,6 +999,13 @@ See e.q. 9.71 in [0]
 [0] Nielsen, M. A., & Chuang, I. (2002).
     Quantum computation and quantum information.
 """
+function fidelity_mat(m1_, m2_)
+    sqrt_m1 = sqrt(Hermitian(m1))
+    sqrt_m2 = sqrt(Hermitian(m2))
+    return tr(sqrt_m1 * sqrt_m2)^2
+end
+
+
 function fidelity_mat_iso(m1_, m2_)
     n = size(m1_)[1]
     nby2 = Integer(n/2)
@@ -918,9 +1013,7 @@ function fidelity_mat_iso(m1_, m2_)
     i2 = (nby2 + 1):n
     m1 = m1_[i1, i1] + 1im * m1_[i2, i1]
     m2 = m2_[i1, i1] + 1im * m2_[i2, i1]
-    sqrt_m1 = sqrt(Hermitian(m1))
-    sqrt_m2 = sqrt(Hermitian(m2))
-    return tr(sqrt_m1 * sqrt_m2)^2
+    return fidelity_mat(m1, m2)
 end
 
 
@@ -975,23 +1068,15 @@ References:
 [2] https://ccrma.stanford.edu/~jos/filters/
 """
 function gen_pink_noise(count, dt_inv, ndist; seed=0)
-    b1 = 0.049922035
-    b2 = -0.095993537
-    b3 = 0.050612699
-    b4 = -0.004408786
-    a1 = 1
-    a2 = -2.494956002
-    a3 = 2.017265875
-    a4 = -0.522189400
     Random.seed!(seed)
     xs = rand(ndist, count)
     ys = zeros(count)
-    ys[1] = b1 * xs[1]
-    ys[2] = b1 * xs[2] + b2 * xs[1] - a2 * ys[1]
-    ys[3] = b1 * xs[3] + b2 * xs[2] + b3 * xs[1] - a2 * ys[2] - a3 * ys[1]
+    ys[1] = PFIR_B1 * xs[1]
+    ys[2] = PFIR_B1 * xs[2] + PFIR_B2 * xs[1] - PFIR_A2 * ys[1]
+    ys[3] = PFIR_B1 * xs[3] + PFIR_B2 * xs[2] + PFIR_B3 * xs[1] - PFIR_A2 * ys[2] - PFIR_A3 * ys[1]
     for i = 4:count
-        ys[i] = (b1 * xs[i] + b2 * xs[i - 1] + b3 * xs[i - 2] + b4 * xs[i - 3]
-                 - a2 * ys[i - 1] - a3 * ys[i - 2] - a4 * ys[i - 3])
+        ys[i] = (PFIR_B1 * xs[i] + PFIR_B2 * xs[i - 1] + PFIR_B3 * xs[i - 2] + PFIR_B4 * xs[i - 3]
+                 - PFIR_A2 * ys[i - 1] - PFIR_A3 * ys[i - 2] - PFIR_A4 * ys[i - 3])
     end
     ys = ys .* dt_inv
     
@@ -1007,7 +1092,7 @@ function compute_fidelities(gate_count, gate_type, states)
     # All of the gates we consider are 4-cyclic up to phase.
     state_type = length(size(states)) == 2 ? st_state : st_density
     initial_state = state_type == st_state ? states[1, :] : states[1, :, :]
-    fidelities = zeros(BigFloat, gate_count + 1)
+    fidelities = zeros(gate_count + 1)
     g1 = GT_GATE[gate_type]
     g2 = g1^2
     g3 = g1^3
@@ -1037,7 +1122,7 @@ function compute_fidelities(gate_count, gate_type, states)
         if state_type == st_state
             fidelities[i] = fidelity_vec_iso2(states[i, :], target)
         elseif state_type == st_density
-            fidelities[i] = fidelity_mat_iso(states[i, :, :], target)
+            fidelities[i] = abs(fidelity_mat_iso(states[i, :, :], target))
         end
     end
 
@@ -1064,19 +1149,17 @@ function run_sim_deqjl(
     solver=DifferentialEquations.Vern9, print_seq=false, print_final=false,
     negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
     noise_dt_inv=DT_NOISE_INV, state_seed=nothing, reltol=1e-12, abstol=1e-12)
-    dt = BigFloat(dt_inv^(-1))
+    dt = dt_inv^(-1)
     start_time = Dates.now()
     if isnothing(state_seed)
         state_seed = seed
     end
     # grab
-    analytic = false
-    if isnothing(save_file_path)
+    if DT_AN[dynamics_type]
         controls = Array{Float64, 2}([0 0])
         controls_dt_inv = 0
         control_knot_count = 0
         gate_time = DT_GTM[dynamics_type]
-        analytic = true
     else
         (controls, controls_dt_inv, gate_time) = grab_controls(save_file_path)
         control_knot_count = Int(floor(gate_time * controls_dt_inv))
@@ -1115,7 +1198,7 @@ function run_sim_deqjl(
         states = zeros(gate_count + 1, HDIM_ISO, HDIM_ISO)
         states[1, :, :] = initial_state
         for i = 2:gate_count + 1
-            states[i, :, :] = Array(result.u[i])
+            states[i, :, :] = Array(result_deqjl.u[i])
         end
     end
     fidelities = compute_fidelities(gate_count, gate_type, states)
@@ -1331,66 +1414,48 @@ end
 
 
 """
-integrate the schroedinger equation using unitary propagators
+integrate with unitary propagators
 """
 function run_sim_prop(
     gate_count, gate_type; save_file_path=nothing,
     negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
     noise_dt_inv=DT_NOISE_INV, seed=0, state_seed=nothing, save=false,
     dynamics_type=schroed)
+    # setup
+    integrator = DT_INT[dynamics_type]
     if DT_AN[dynamics_type]
         gate_time = DT_GTM[dynamics_type]
         controls = zeros(1, 1)
         control_knot_count = dt_inv = 0
-        integrator = DT_INT[dynamics_type]
     else
         (controls, dt_inv, gate_time) = grab_controls(save_file_path)
         dt = dt_inv^(-1)
         control_knot_count = Int(floor(gate_time * dt_inv))
-        integrator = nothing
     end
-    save_times = Array(0:1:gate_count) * gate_time
     evolution_time = gate_time * gate_count
     noise_knot_count = Int(ceil(evolution_time * noise_dt_inv)) + 1
     noise_offsets = namp * gen_pink_noise(noise_knot_count, noise_dt_inv, ndist; seed=seed)
     params = SimParams(controls, control_knot_count, dt_inv, negi_h0,
                        noise_offsets, noise_dt_inv, dt_inv)
-
+    # gen state
     if isnothing(state_seed)
         state_seed = seed
     end
-    initial_state = state = gen_rand_state_iso(;seed=state_seed)
-    states = zeros(BigFloat, gate_count + 1, HDIM_ISO)
-    states[1, :] = Array(state)
-    time = 0.
-    
-    if !isnothing(integrator)
-        integrator(gate_count, states, state, params)
-    elseif dynamics_type == schroed
-        for i = 1:gate_count
-            for j = 1:control_knot_count
-                hamiltonian = negi_h0 + controls[j, 1] * NEGI_H1_ISO
-                unitary = exp(hamiltonian * dt)
-                state = unitary * state
-            end
-            states[i + 1, :] = state
-        end
-    elseif dynamics_type == schroedda
-        for i = 1:gate_count
-            for j = 1:control_knot_count
-                delta_a = params.noise_offsets[Int(floor(time * params.noise_dt_inv)) + 1]
-                hamiltonian = negi_h0 + (controls[j, 1] + delta_a) * NEGI_H1_ISO
-                unitary = exp(hamiltonian * dt)
-                state = unitary * state
-                time = time + dt
-            end
-            states[i + 1, :] = state
-        end
+    state_type = DT_ST[dynamics_type]
+    if state_type == st_state
+        state = gen_rand_state_iso(;seed=state_seed)
+        states = zeros(BigFloat, gate_count + 1, HDIM_ISO)
+    elseif state_type == st_density
+        state =  gen_rand_density_iso(;seed=state_seed)
+        states = zeros(gate_count + 1, HDIM_ISO, HDIM_ISO)
     end
-    
 
+    # integrate
+    integrator(gate_count, states, state, params)
+    # compute fidelities
     fidelities = compute_fidelities(gate_count, gate_type, states)
 
+    # report
     result = Dict(
         "gate_count" => gate_count,
         "gate_type" => Integer(gate_type),

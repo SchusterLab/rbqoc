@@ -95,7 +95,7 @@ class PulseType(Enum):
 PT_STR = {
     PulseType.analytic: "Anl.",
     PulseType.qoc: "QOC",
-    PulseType.s2: "S-2",
+    PulseType.s2: "S-8",
     PulseType.s4: "S-4",
     PulseType.d1: "D-1",
     PulseType.d2: "D-2",
@@ -105,7 +105,7 @@ PT_STR = {
     PulseType.d2b: "D-2",
     PulseType.d3b: "D-2",
     PulseType.corpse: "C-2",
-    PulseType.sut8: "SU-8",
+    PulseType.sut8: "SU-10",
 }
 
 PT_COLOR = {
@@ -429,7 +429,7 @@ def make_figure1c():
     ax.set_xlim(0, gate_count)
     ax.set_xticks([0, 500, 1000, 1500])
     ax.set_xticklabels(["0", "500", "1000", "1500"])
-    ax.set_ylim(0, 0.05)
+    # ax.set_ylim(0, 1e-3)
     ax.tick_params(direction="in", labelsize=TICK_FS)
     ax.plot([], [], label="Z/2", linestyle=F1C_GT_LS[GateType.zpiby2], color="black")
     ax.plot([], [], label="Y/2", linestyle=F1C_GT_LS[GateType.ypiby2], color="black")
@@ -489,8 +489,8 @@ def make_figure2a():
         axs[i].set_xticks([])
     #ENDFOR
     fig.text(0.27, 0.91, "Anl.", fontsize=TEXT_FS)
-    fig.text(0.27, 0.75, "S-2", fontsize=TEXT_FS)
-    fig.text(0.27, 0.59, "SU-8", fontsize=TEXT_FS)
+    fig.text(0.27, 0.75, "S-8", fontsize=TEXT_FS)
+    fig.text(0.27, 0.59, "SU-10", fontsize=TEXT_FS)
     fig.text(0.27, 0.425, "D-1", fontsize=TEXT_FS)
     fig.text(0.27, 0.265, "D-2", fontsize=TEXT_FS)
     axs[2].set_ylabel("$a$ (GHz)", fontsize=LABEL_FS)
@@ -673,8 +673,8 @@ def make_figure3a():
         axs[i].set_xticks([])
     #ENDFOR
     axs[0].text(3, 0.07, "Anl.", fontsize=TEXT_FS)
-    axs[1].text(2, 0.3, "S-2", fontsize=TEXT_FS)
-    axs[2].text(2, 0.3, "SU-8", fontsize=TEXT_FS)
+    axs[1].text(2, 0.3, "S-8", fontsize=TEXT_FS)
+    axs[2].text(2, 0.3, "SU-10", fontsize=TEXT_FS)
     axs[3].text(2, 0.3, "D-1", fontsize=TEXT_FS)
     axs[4].text(2, 0.3, "D-2", fontsize=TEXT_FS)
     axs[2].set_ylabel("$a$ (GHz)", fontsize=LABEL_FS)
