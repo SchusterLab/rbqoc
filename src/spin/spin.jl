@@ -429,9 +429,9 @@ end
 function integrate_prop_schroed!(gate_count::Int, states::Array{T, 2}, state::SVector, params::SimParams) where {T}
     states[1, :] = state
     dt = params.controls_dt_inv^(-1)
-    prop = I(HDIM)
+    prop = I(HDIM_ISO)
     for j = 1:params.control_knot_count
-        hamiltonian = params.negi_h0 + params.controls[j, 1] * NEGI_H1
+        hamiltonian = params.negi_h0 + params.controls[j, 1] * NEGI_H1_ISO
         prop_ = exp(hamiltonian * dt)
         prop = prop_ * prop
     end
