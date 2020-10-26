@@ -155,7 +155,6 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     x_min = fill(-Inf, n)
     x_min[CONTROLS_IDX] .= -MAX_CONTROL_NORM_0
     x_min = SVector{n}(x_min)
-    x_max = fill(Inf, n)
     
     # control amplitude constraint at boundary
     x_max_boundary = fill(Inf, n)

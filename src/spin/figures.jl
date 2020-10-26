@@ -222,10 +222,10 @@ end
 ### FIGURE 2 ###
 const F2A_DATA_ZPIBY2 = Dict(
     analytic => joinpath(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
-    s2 => joinpath(SPIN_OUT_PATH, "spin12/00789_spin12.h5"),
+    s2 => joinpath(SPIN_OUT_PATH, "spin12/00808_spin12.h5"),
     sut8 => joinpath(SPIN_OUT_PATH, "spin23/00293_spin23.h5"),
-    d1 => joinpath(SPIN_OUT_PATH, "spin11/00539_spin11.h5"),
-    d2 => joinpath(SPIN_OUT_PATH, "spin11/00547_spin11.h5"),
+    d1 => joinpath(SPIN_OUT_PATH, "spin11/00683_spin11.h5"),
+    d2 => joinpath(SPIN_OUT_PATH, "spin11/00685_spin11.h5"),
 )
 const F2A_PT_LIST = [analytic, s2, sut8, d1, d2]
 function gen_2a(;gate_type=zpiby2)
@@ -252,9 +252,9 @@ end
 
 const F2B_DATA_ZPIBY2 = Dict(
     analytic => joinpath(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
-    d1 => joinpath(SPIN_OUT_PATH, "spin11/00468_spin11.h5"),
-    d1b => joinpath(SPIN_OUT_PATH, "spin11/00539_spin11.h5"),
-    d1bb => joinpath(SPIN_OUT_PATH, "spin11/00556_spin11.h5"),
+    d1 => joinpath(SPIN_OUT_PATH, "spin11/00612_spin11.h5"),
+    d1b => joinpath(SPIN_OUT_PATH, "spin11/00683_spin11.h5"),
+    d1bb => joinpath(SPIN_OUT_PATH, "spin11/00632_spin11.h5"),
     d1bbb => joinpath(SPIN_OUT_PATH, "spin11/00585_spin11.h5"),
 )
 const F2B_TRIAL_COUNT = Integer(1e2)
@@ -361,7 +361,7 @@ const F2C_DATA_ZPIBY2 = Dict(
         INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL, INVAL,
     ]],
     s2 => [joinpath(SPIN_OUT_PATH, "spin12/$(lpad(index, 5, '0'))_spin12.h5") for index in [
-        779, 781, 782, 783, 784, 785, 786, 787, 788, 789,
+        779, 781, 782, 783, 784, 785, 786, 787, 788, 808,
         790, 793, 791, 792, 794, 795, 796, 797, 798, 799,
         800, 801, 802, 803, 805, 804, 806, 807,
     ]],
@@ -371,14 +371,14 @@ const F2C_DATA_ZPIBY2 = Dict(
         301, 304, 302, 305, 307, 306, 308, 309,
     ]],
     d1 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
-        468, 471, 472, 474, 475, 476, 477, 478, 480, 539,
-        541, 542, 543, 544, 545, 551, 553, 554, 556, 569,
-        570, 571, 572, 573, 574, 576, 567, 585,
+        612, 614, 617, 616, 618, 619, 620, 621, 622, 683,
+        628, 624, 625, 627, 629, 630, 609, 631, 632, 633,
+        634, 635, 636, 637, 638, 639, 610, 585,
     ]],
     d2 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
-        487, 488, 489, 491, 492, 493, 494, 498, 499, 547,
-        549, 552, 558, 560, 561, 562, 563, 564, 565, 575,
-        577, 588, 597, 590, 591, 592, 600, 598
+        647, 643, 644, 645, 648, 649, 650, 651, 653, 685,
+        654, 659, 656, 657, 658, 660, 671, 662, 675, 673,
+        670, 676, 677, 678, 679, 680, 681, 682,
     ]],
 )
 const F2C_PT_LIST = [analytic, s2, sut8, d1, d2]
@@ -478,7 +478,7 @@ const F3_DATA = Dict(
     analytic => joinpath(SPIN_OUT_PATH, "spin14/00004_spin14.h5"),
     s2 => joinpath(SPIN_OUT_PATH, "spin18/00059_spin18.h5"),
     sut8 => joinpath(SPIN_OUT_PATH, "spin25/00001_spin25.h5"),
-    d1 => joinpath(SPIN_OUT_PATH, "spin17/00063_spin17.h5"),
+    d1 => joinpath(SPIN_OUT_PATH, "spin17/00078_spin17.h5"),
     d2 => joinpath(SPIN_OUT_PATH, "spin17/00069_spin17.h5"),
 )
 
