@@ -655,7 +655,7 @@ def make_figure3a():
     #ENDWITH
     pulse_type_count = len(pulse_types)
     
-    (fig, axs) = plt.subplots(pulse_type_count, figsize=(PAPER_LW, PAPER_LW * 0.8))
+    (fig, axs) = plt.subplots(pulse_type_count, figsize=(PAPER_TW * 0.35, PAPER_TW * 0.25))
     for (i, pulse_type) in enumerate(pulse_types):
         color = PT_COLOR[pulse_type]
         label = "{}".format(PT_STR[pulse_type])
@@ -680,17 +680,17 @@ def make_figure3a():
         axs[i].tick_params(direction="in", labelsize=TICK_FS)
         axs[i].set_xticks([])
     #ENDFOR
-    axs[0].text(3, 0.07, "Anl.", fontsize=TEXT_FS)
-    axs[1].text(2, 0.3, "S-8", fontsize=TEXT_FS)
-    axs[2].text(2, 0.3, "SU-10", fontsize=TEXT_FS)
-    axs[3].text(2, 0.3, "D-1", fontsize=TEXT_FS)
-    axs[4].text(2, 0.3, "D-2", fontsize=TEXT_FS)
+    fig.text(0.3, 0.895, "Anl.", fontsize=TEXT_FS)
+    fig.text(0.3, 0.735, "S-8", fontsize=TEXT_FS)
+    fig.text(0.3, 0.56, "SU-10", fontsize=TEXT_FS)
+    fig.text(0.3, 0.39, "D-1", fontsize=TEXT_FS)
+    fig.text(0.3, 0.22, "D-2", fontsize=TEXT_FS)
     axs[2].set_ylabel("$a$ (GHz)", fontsize=LABEL_FS)
     axs[4].set_xlabel("$t$ (ns)", fontsize=LABEL_FS)
     axs[4].set_xticks([0 - F3A_XEPS[i], 10, 20, 30, 40, 50])
     axs[4].set_xticklabels(["0", "10", "20", "30", "40", "50"])
-    fig.text(0, 0.955, "(a)", fontsize=TEXT_FS)
-    plt.subplots_adjust(left=0.15, right=0.997, top=0.96, bottom=0.116, hspace=0., wspace=None)
+    fig.text(0, 0.945, "(a)", fontsize=TEXT_FS)
+    plt.subplots_adjust(left=0.21, right=0.997, top=0.96, bottom=0.116, hspace=0., wspace=None)
     plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     plt.savefig(plot_file_path, dpi=DPI_FINAL)
     print("Saved Figure3a to {}"
@@ -712,20 +712,22 @@ def make_figure3b():
     gate_count_axis = np.arange(0, gate_count + 1)
     gate_errors = np.mean(gate_errors, axis=2)
 
-    fig = plt.figure(figsize=(PAPER_LW, PAPER_LW * 0.8))
+    fig = plt.figure(figsize=(PAPER_TW * 0.35, PAPER_TW * 0.25))
     ax = plt.gca()
     for (i, pulse_type) in enumerate(pulse_types):
         color = PT_COLOR[pulse_type]
         linestyle = "solid"
+        label = PT_STR[pulse_type]
         ax.plot(gate_count_axis, log_transform(gate_errors[i, :]),
-                color=color, linestyle=linestyle)
+                color=color, linestyle=linestyle, label=label)
     #ENDFOR
 
     ax.set_ylabel("Gate Error", fontsize=LABEL_FS)
     ax.set_xlabel("Gate Count", fontsize=LABEL_FS)
-    ax_xticks = np.arange(0, gate_count + 1, 100)
+    ax_xticks = np.arange(0, gate_count + 1, 20)
+    ax_xtick_labels = ["0"] + [""] * 4 + ["100"] + [""] * 4 + ["200"]
     ax.set_xticks(ax_xticks)
-    ax.set_xticklabels(["{}".format(ax_xtick) for ax_xtick in ax_xticks])
+    ax.set_xticklabels(ax_xtick_labels)
     ax.set_xlim(0, gate_count)
     ax_yticks_ = np.arange(-6., -2. + 1, 1.)
     ax_yticks = log_transform(10 ** ax_yticks_)
@@ -734,8 +736,10 @@ def make_figure3b():
     ax.set_ylim(ax_yticks[0], ax_yticks[-1])
     ax.tick_params(direction="in", labelsize=TICK_FS)
 
-    fig.text(0, 0.96, "(b)", fontsize=TEXT_FS)
-    plt.subplots_adjust(left=0.14, right=0.96, top=0.96, bottom=0.11, hspace=0., wspace=None)
+    plt.legend(frameon=False, loc="lower right", bbox_to_anchor=(1., 0.05),
+               fontsize=8, handlelength=1.85, handletextpad=0.4, ncol=2, columnspacing=0.)
+    fig.text(0, 0.945, "(b)", fontsize=TEXT_FS)
+    plt.subplots_adjust(left=0.2, right=0.96, top=0.96, bottom=0.11, hspace=0., wspace=None)
     plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     plt.savefig(plot_file_path, dpi=DPI_FINAL)
     print("Plotted Figure3b to {}"

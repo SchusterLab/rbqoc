@@ -26,15 +26,25 @@ const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
 const ACONTROL_SIZE = CONTROL_COUNT
 const INITIAL_STATE1 = [1., 0, 0, 0]
 const INITIAL_STATE2 = [0., 1, 0, 0]
+const INITIAL_STATE3 = [1., 0, 0, 1] ./ sqrt(2)
+const INITIAL_STATE4 = [1., -1, 0, 0] ./ sqrt(2)
+const SAMPLE_COUNT = 4
 # state indices
 const STATE1_IDX = 1:HDIM_ISO
 const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
 const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
 const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
 const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
-const DSTATE1_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO
-const D2STATE1_IDX = DSTATE1_IDX[end] + 1:DSTATE1_IDX[end] + HDIM_ISO
-const D3STATE1_IDX = D2STATE1_IDX[end] + 1:D2STATE1_IDX[end] + HDIM_ISO
+const STATE3_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO
+const STATE4_IDX = STATE3_IDX[end] + 1:STATE3_IDX[end] + HDIM_ISO
+const DSTATE1_IDX = STATE4_IDX[end] + 1:STATE4_IDX[end] + HDIM_ISO
+const DSTATE2_IDX = DSTATE1_IDX[end] + 1:DSTATE1_IDX[end] + HDIM_ISO
+const DSTATE3_IDX = DSTATE2_IDX[end] + 1:DSTATE2_IDX[end] + HDIM_ISO
+const DSTATE4_IDX = DSTATE3_IDX[end] + 1:DSTATE3_IDX[end] + HDIM_ISO
+const D2STATE1_IDX = DSTATE4_IDX[end] + 1:DSTATE4_IDX[end] + HDIM_ISO
+const D2STATE2_IDX = D2STATE1_IDX[end] + 1:D2STATE1_IDX[end] + HDIM_ISO
+const D2STATE3_IDX = D2STATE2_IDX[end] + 1:D2STATE2_IDX[end] + HDIM_ISO
+const D2STATE4_IDX = D2STATE3_IDX[end] + 1:D2STATE3_IDX[end] + HDIM_ISO
 # control indices
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
 
@@ -42,7 +52,7 @@ const D2CONTROLS_IDX = 1:CONTROL_COUNT
 struct Model{DO} <: AbstractModel
 end
 @inline RD.state_dim(::Model{DO}) where {DO} = (
-    ASTATE_SIZE_BASE + DO * HDIM_ISO
+    ASTATE_SIZE_BASE + (SAMPLE_COUNT - STATE_COUNT) * HDIM_ISO + DO * SAMPLE_COUNT * HDIM_ISO
 )
 @inline RD.control_dim(::Model) = ACONTROL_SIZE
 
@@ -69,19 +79,30 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model{DO}, astate::SVector,
     ]
 
     if DO >= 1
+        state3_ = astate[STATE3_IDX]
+        state3 = h_prop * state3_
+        state4_ = astate[STATE4_IDX]
+        state4 = h_prop * state4_
         dstate1_ = astate[DSTATE1_IDX]
         dstate1 = h_prop * (dstate1_ + dt * NEGI_H0_ISO * state1_)
-        append!(astate_, dstate1)
+        dstate2_ = astate[DSTATE2_IDX]
+        dstate2 = h_prop * (dstate2_ + dt * NEGI_H0_ISO * state2_)
+        dstate3_ = astate[DSTATE3_IDX]
+        dstate3 = h_prop * (dstate3_ + dt * NEGI_H0_ISO * state3_)
+        dstate4_ = astate[DSTATE4_IDX]
+        dstate4 = h_prop * (dstate4_ + dt * NEGI_H0_ISO * state4_)
+        append!(astate_, [state3; state4; dstate1; dstate2; dstate3; dstate4])
     end
     if DO >= 2
         d2state1_ = astate[D2STATE1_IDX]
         d2state1 = h_prop * (d2state1_ + dt * NEGI2_H0_ISO * dstate1_)
-        append!(astate_, d2state1)
-    end
-    if DO >= 3
-        d3state1_ = astate[D3STATE1_IDX]
-        d3state1 = h_prop * (d3state1_ + dt * NEGI3_H0_ISO * d2state1_)
-        append!(astate_, d3state1)
+        d2state2_ = astate[D2STATE2_IDX]
+        d2state2 = h_prop * (d2state2_ + dt * NEGI2_H0_ISO * dstate2_)
+        d2state3_ = astate[D2STATE3_IDX]
+        d2state3 = h_prop * (d2state3_ + dt * NEGI2_H0_ISO * dstate3_)
+        d2state4_ = astate[D2STATE4_IDX]
+        d2state4 = h_prop * (d2state4_ + dt * NEGI2_H0_ISO * dstate4_)
+        append!(astate_, [d2state1; d2state2; d2state3; d2state4])
     end
 
     return astate_
@@ -101,14 +122,15 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     t0 = 0.
 
     # initial state
-    x0 = SVector{n}([
-        INITIAL_STATE1;
-        INITIAL_STATE2;
-        zeros(3 * CONTROL_COUNT);
-        zeros(derivative_order * HDIM_ISO);
-    ])
+    x0_ = zeros(n)
+    x0_[STATE1_IDX] = INITIAL_STATE1
+    x0_[STATE2_IDX] = INITIAL_STATE2
+    x0_[STATE3_IDX] = INITIAL_STATE3
+    x0_[STATE4_IDX] = INITIAL_STATE4
+    x0 = SVector{n}(x0_)
 
     # target state
+    gate = GT_GATE_ISO[gate_type]
     if gate_type == xpiby2
         target_state1 = Array(XPIBY2_ISO_1)
         target_state2 = Array(XPIBY2_ISO_2)
@@ -119,43 +141,28 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         target_state1 = Array(ZPIBY2_ISO_1)
         target_state2 = Array(ZPIBY2_ISO_2)
     end
-    xf = SVector{n}([
-        target_state1;
-        target_state2;
-        zeros(3 * CONTROL_COUNT);
-        zeros(derivative_order * HDIM_ISO);
-    ])
+    xf_ = zeros(n)
+    xf_[STATE1_IDX] = target_state1
+    xf_[STATE2_IDX] = target_state2
+    xf_[STATE3_IDX] = gate * INITIAL_STATE3
+    xf_[STATE4_IDX] = gate * INITIAL_STATE4
+    xf = SVector{n}(xf_)
     
     # control amplitude constraint
-    x_max = SVector{n}([
-        fill(Inf, STATE_COUNT * HDIM_ISO);
-        fill(Inf, CONTROL_COUNT);
-        fill(MAX_CONTROL_NORM_0, 1); # control
-        fill(Inf, CONTROL_COUNT);
-        fill(Inf, derivative_order * HDIM_ISO)
-    ])
-    x_min = SVector{n}([
-        fill(-Inf, STATE_COUNT * HDIM_ISO);
-        fill(-Inf, CONTROL_COUNT);
-        fill(-MAX_CONTROL_NORM_0, 1); # control
-        fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, derivative_order * HDIM_ISO)
-    ])
+    x_max = fill(Inf, n)
+    x_max[CONTROLS_IDX] .= MAX_CONTROL_NORM_0
+    x_max = SVector{n}(x_max)
+    x_min = fill(-Inf, n)
+    x_min[CONTROLS_IDX] .= -MAX_CONTROL_NORM_0
+    x_min = SVector{n}(x_min)
+    
     # control amplitude constraint at boundary
-    x_max_boundary = [
-        fill(Inf, STATE_COUNT * HDIM_ISO);
-        fill(Inf, CONTROL_COUNT);
-        fill(0, 1); # control
-        fill(Inf, CONTROL_COUNT);
-        fill(Inf, derivative_order * HDIM_ISO)
-    ]
-    x_min_boundary = [
-        fill(-Inf, STATE_COUNT * HDIM_ISO);
-        fill(-Inf, CONTROL_COUNT);
-        fill(0, 1); # control
-        fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, derivative_order * HDIM_ISO)
-    ]
+    x_max_boundary = fill(Inf, n)
+    x_max_boundary[CONTROLS_IDX] .= 0
+    x_max_boundary = SVector{n}(x_max_boundary)
+    x_min_boundary = fill(-Inf, n)
+    x_min_boundary[CONTROLS_IDX] .= 0
+    x_min_boundary = SVector{n}(x_min_boundary)
 
     # initial trajectory
     dt = dt_inv^(-1)
@@ -170,17 +177,17 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
 
     # cost function
     Q = Diagonal(SVector{n}([
-        fill(qs[1], STATE_COUNT * HDIM_ISO); # state1, state2
-        fill(qs[2], 1); # int_control
-        fill(qs[3], 1); # control
-        fill(qs[4], 1); # dcontrol_dt
-        fill(qs[5], eval(:($derivative_order >= 1 ? $HDIM_ISO : 0))); # dstate<1,2>
-        fill(qs[6], eval(:($derivative_order >= 2 ? $HDIM_ISO : 0))); # d2state<1,2>
-        fill(qs[7], eval(:($derivative_order >= 3 ? $HDIM_ISO : 0))); # d3state<1,2>
+        fill(qs[1], STATE_COUNT * HDIM_ISO); # ψ1, ψ2
+        fill(qs[2], 1); # ∫a
+        fill(qs[3], 1); # a
+        fill(qs[4], 1); # ∂a
+        fill(0, eval(:($derivative_order >= 1 ? ($SAMPLE_COUNT - $STATE_COUNT) * $HDIM_ISO : 0))) # ψ3, ψ4
+        fill(qs[5], eval(:($derivative_order >= 1 ? $SAMPLE_COUNT * $HDIM_ISO : 0))); # ∂ψ
+        fill(qs[6], eval(:($derivative_order >= 2 ? $SAMPLE_COUNT * $HDIM_ISO : 0))); # ∂2ψ
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([
-        fill(qs[8], CONTROL_COUNT);
+        fill(qs[7], CONTROL_COUNT);
     ]))
     objective = LQRObjective(Q, R, Qf, xf, N)
 

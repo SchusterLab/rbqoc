@@ -322,6 +322,11 @@ const XPI_ISO = SMatrix{HDIM_ISO, HDIM_ISO}(get_mat_iso(XPI))
 const XPI_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(XPI[:,1]))
 const XPI_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(XPI[:,2]))
 
+const IS1_ISO_ = [1., 0, 0, 0]
+const IS2_ISO_ = [0., 1, 0, 0]
+const IS3_ISO_ = [1., 0, 0, 1] ./ sqrt(2)
+const IS4_ISO_ = [1., -1, 0, 0] ./ sqrt(2)
+
 const GT_GATE = Dict(
     xpiby2 => XPIBY2,
     ypiby2 => YPIBY2,
@@ -429,9 +434,9 @@ end
 function integrate_prop_schroed!(gate_count::Int, states::Array{T, 2}, state::SVector, params::SimParams) where {T}
     states[1, :] = state
     dt = params.controls_dt_inv^(-1)
-    prop = I(HDIM)
+    prop = I(HDIM_ISO)
     for j = 1:params.control_knot_count
-        hamiltonian = params.negi_h0 + params.controls[j, 1] * NEGI_H1
+        hamiltonian = params.negi_h0 + params.controls[j, 1] * NEGI_H1_ISO
         prop_ = exp(hamiltonian * dt)
         prop = prop_ * prop
     end
@@ -461,7 +466,7 @@ function integrate_prop_schroedda!(gate_count::Int, states::Array{T, 2}, state::
     time = 0.
     states[1, :] = state
     for i = 2:gate_count + 1
-        for j = 1:control_knot_count
+        for j = 1:params.control_knot_count
             delta_a = params.noise_offsets[Int(floor(time * params.noise_dt_inv)) + 1]
             hamiltonian = params.negi_h0 + (params.controls[j, 1] + delta_a) * NEGI_H1_ISO
             unitary = exp(hamiltonian * dt)
@@ -1025,47 +1030,50 @@ const DT_EN = Dict(
 )
 
 
-@inline gate_error_iso2a(s1::SVector, s2::SVector{HDIM_ISO}, s1o::Int64) = (
-    s1[1 + s1o] * s2[1] + s1[2 + s1o] * s2[2] + s1[3 + s1o] * s2[3] + s1[4 + s1o] * s2[4]
+@inline gate_error_iso2a(s1::Array{T,1}, s2::Array{T,1};
+                         s1o::Int64=0, s2o::Int64=0) where {T} = (
+    s1[1 + s1o] * s2[1 + s20] + s1[2 + s1o] * s2[2 + s2o]
+    + s1[3 + s1o] * s2[3 + s2o] + s1[4 + s1o] * s2[4 + s2o]
 )
 
 
-@inline gate_error_iso2b(s1::SVector, s2::SVector{HDIM_ISO}, s1o::Int64) = (
-    -s1[3 + s1o] * s2[1] - s1[4 + s1o] * s2[2] + s1[1 + s1o] * s2[3] + s1[2 + s1o] * s2[4]
+@inline gate_error_iso2b(s1::Array{T,1}, s2::Array{T,1};
+                         s1o::Int64=0, s2o::Int64=0) where {T} = (
+    -s1[3 + s1o] * s2[1 + s2o] - s1[4 + s1o] * s2[2 + s2o]
+    + s1[1 + s1o] * s2[3 + s2o] + s1[2 + s1o] * s2[4 + s2o]
 )
 
 
-@inline gate_error_iso2(s1::SVector, s2::SVector{HDIM_ISO}, s1o::Int64=0) = (
-    1 - gate_error_iso2a(s1, s2, s1o)^2 - gate_error_iso2b(s1, s2, s1o)^2
+@inline gate_error_iso2(s1::Array{T,1}, s2::Array{T,1}; s1o::Int64=0, s2o::Int64=0) where {T} = (
+    1 - gate_error_iso2a(s1, s2; s1o=s1o, s2o=s2o)^2 - gate_error_iso2b(s1, s2; s1o=s1o, s2o=s2o)^2
 )
 
 
-function jacobian_gate_error_iso2(s1::SVector, s2::SVector{HDIM_ISO},
-                                  s1o::Int64=0) :: SVector{HDIM_ISO}
-    a = 2 * gate_error_iso2a(s1, s2, s1o)
-    b = 2 * gate_error_iso2b(s1, s2, s1o)
-    jac = @SVector [
-        -a * s2[1] - b * s2[3],
-        -a * s2[2] - b * s2[4],
-        -a * s2[3] + b * s2[1],
-        -a * s2[4] + b * s2[2],
+function jacobian_gate_error_iso2(s1::Array{T,1}, s2::Array{T,1}; s1o::Int64=0, s2o::Int64=0) where {T}
+    a = 2 * gate_error_iso2a(s1, s2; s1o=s1o, s2o=s2o)
+    b = 2 * gate_error_iso2b(s1, s2; s1o=s1o, s2o=s2o)
+    jac = [
+        -a * s2[1 + s2o] - b * s2[3 + s2o],
+        -a * s2[2 + s2o] - b * s2[4 + s2o],
+        -a * s2[3 + s2o] + b * s2[1 + s2o],
+        -a * s2[4 + s2o] + b * s2[2 + s2o],
     ]
     return jac
 end
 
 
-function hessian_gate_error_iso2(s2::SVector{HDIM_ISO}) :: SMatrix{4, 4}
-    d11 = -2 * s2[1]^2 - 2 * s2[3]^2
-    d12 = -2 * s2[1] * s2[2] -2 * s2[3] * s2[4]
+function hessian_gate_error_iso2(s2::Array{T,1}; s2o::Int64=0) where {T}
+    d11 = -2 * s2[1+s2o]^2 - 2 * s2[3+s2o]^2
+    d12 = -2 * s2[1+s2o] * s2[2+s2o] -2 * s2[3+s2o] * s2[4+s2o]
     d13 = 0
-    d14 = 2 * s2[2] * s2[3] - 2 * s2[1] * s2[4]
-    d22 = -2 * s2[2]^2 - 2 * s2[4]^2
-    d23 = -2 * s2[2] * s2[3] + 2 * s2[1] * s2[4]
+    d14 = 2 * s2[2+s2o] * s2[3+s2o] - 2 * s2[1+s2o] * s2[4+s2o]
+    d22 = -2 * s2[2+s2o]^2 - 2 * s2[4+s2o]^2
+    d23 = -2 * s2[2+s2o] * s2[3+s2o] + 2 * s2[1+s2o] * s2[4+s2o]
     d24 = 0
-    d33 = -2 * s2[1]^2 - 2 * s2[3]^2
-    d34 = -2 * s2[1] * s2[2] - 2 * s2[3] * s2[4]
-    d44 = -2 * s2[2]^2 - 2 * s2[4]^2
-    hes = @SMatrix [
+    d33 = -2 * s2[1+s2o]^2 - 2 * s2[3+s2o]^2
+    d34 = -2 * s2[1+s2o] * s2[2+s2o] - 2 * s2[3+s2o] * s2[4+s2o]
+    d44 = -2 * s2[2+s2o]^2 - 2 * s2[4+s2o]^2
+    hes = [
         d11 d12 d13 d14;
         d12 d22 d23 d24;
         d13 d23 d33 d34;
@@ -1076,7 +1084,7 @@ end
 
 
 """
-See e.q. 9.71 in [0]
+See eq. 9.71 in [0]
 
 [0] Nielsen, M. A., & Chuang, I. (2002).
     Quantum computation and quantum information.
@@ -1511,7 +1519,7 @@ integrate with unitary propagators
 """
 function run_sim_prop(
     gate_count, gate_type; save_file_path=nothing,
-    negi_h0=FQ_NEGI_H0, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
+    negi_h0=FQ_NEGI_H0_ISO, namp=NAMP_PREFACTOR, ndist=STD_NORMAL,
     noise_dt_inv=DT_NOISE_INV, seed=0, state_seed=nothing, save=false,
     dynamics_type=schroed)
     # setup

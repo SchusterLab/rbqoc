@@ -213,7 +213,7 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
         repeat([INITIAL_STATE1; INITIAL_STATE2; INITIAL_STATE3; INITIAL_STATE4], 2);
     ])
     # target state
-    gate_unitary = GT_GATE[gate_type]
+    gate_unitary = GT_GATE_ISO[gate_type]
     target_states = Array{SVector{HDIM_ISO}, 1}(undef, 4)
     target_states[1] = gate_unitary * INITIAL_STATE1
     target_states[2] = gate_unitary * INITIAL_STATE2
