@@ -55,16 +55,21 @@
   Quantum optimal control (QOC) techniques have proven effective in realizing high fidelity operations,
   but they require exquisite calibration to be performant.
   In this work we employ robust trajectory optimization techniques
-  to achieve high fidelity gates for parameter spreads on the order of $1\%$. We propose a method that
-  takes advantage of deviant parameter derivative information while maintaining
-  computational efficiency by transforming
-  higher-order differential equations into a set of coupled first-order equations.
+  to achieve high fidelity gates for parameter spreads on the order of $1\%$.
+  We propose a method that takes advantage of deviant parameter derivative information while maintaining
+  computational efficiency by utilizing mixed-mode differentation.
   Additionally, current QOC techniques mitigate decoherence effects due to longitudinal relaxation by integrating
   the Lindblad master equation, which increases the computational complexity
-  of the optimization algorithm.
-  In this work we achieve a factor of $5$ increase in longitudinal relaxation times
-  for the gate set of a fluxonium qubit
-  using a computationally efficient metric in optimization and time-optimal control.
+  of the optimization algorithm. We propose a computationally efficient metric
+  and utilize time-optimal control to achieve high fidelity gates in the presence of longitudinal relaxation.
+  We apply these techniques to a fluxonium qubit with realisitc experimental constraints
+  and noise values. We are able to reduce gate errors by orders of magnitudes in the presence
+  of deviant parameters, achieving super-linear scaling for gate robustness as a function of the gate duration.
+  We use the same techniques to mitigate coherent errors due to time-varying magnetic flux noise
+  by two orders of magnitude. Additionally, we mitigate the gate error arising from longitudinal
+  relaxation by a factor of $5$. Further, we find that the numerical techniques we employ
+  are able to perform phase gates in arbitrary times, which is critical for operating multi-qubit
+  experiments in the lab frame.
 \end{abstract}
 
 \maketitle
@@ -83,86 +88,106 @@ The field of quantum optimal control (QOC) is concerned
 with efficiently and accurately manipulating quantum systems.
 Early QOC techniques were proposed for nuclear magnetic resonance experiments
 \cite{khaneja2005optimal}, and applications now include superconducting
-qubits \cite{heeres2017implementing,
+circuits \cite{heeres2017implementing,
   leng2019robust, leung2017speedup, xu2020nonadiabatic},
 neutral and ionized atoms \cite{van2016optimal}, nitrogen-vacancy centers in
 diamond \cite{rembold2020introduction}, and Bose-Einstien condensates
-\cite{sorensen2018quantum}.
-In quantum control theory, as in classical control theory,
-optimization is performed
-to minimize an objective function. Relevant for the field
-of quantum computation is the task of achieving high fidelity quantum gates.
-In this application, the objective function includes contributions from the
-gate error associated with the state transfer of the system as well as contributions
-due to experimental constraints, such as the control amplitude.
+\cite{sorensen2018quantum}. QOC techniques are used to
+control a system such that a set of optimization objectives are maximally fulfilled.
+For quantum computation, relevant objectives include achieving high fidelity
+gates and adhering to experimental constraints.
 The decision variables of the optimization problem are the time-dependent control
 parameters, particular to the quantum system, that govern its evolution.
+It is desirable to make the optimization aware of experimental errors
+such as noise, system model errors, and control errors, to
+improve experimental performance on the optimization objectives.
+The field of robust control, deriving from classical control theory, has developed
+techniques to account for these errors in optimization (citations appreciated).
+In this work we employ robust control techniques to mitigate
+releastic decoherence and systematic errors that arise when controlling
+a superconducting fluxonium qubit.
 
-Many analytic and numerical techniques have been developed to control
-quantum systems. Analytic methods rely on solving the time-dependent
-Schroedinger equation analytically or deriving equations of motion
-from a suitable Lagrangian \cite{zhang2020universal, huang2020engineering, han2020experimental,
-  xu2020nonadiabatic, carlini2005quantum}. Analytic methods
-have been presented to address decoherence in quantum systems.
-Considering the dynamical and geometric phases of state
-evolution has led to methods for achieving
+Numerical techniques for QOC have been remarkably successful in
+state preparation, designing high fidelity gates, and determining
+optimized pulse sequences (citations needed). Many popular numerical techniques
+are iterative, indirect shooting
+methods \cite{leung2017speedup, goer2019krotov, abdelhafez2019gradient,
+  machnes2015gradient}.
+An initial guess for the control parameters is used to forward-simulate
+the quantum state trajectory under the time-dependent Schroedinger equation. Then, gradients
+with respect to the controls are computed for an objective evaluated on
+the evolved quantum state. The gradients are used to update
+the control parameters and the procedure is repeated iteratively.
+A convenient way to enforce constraints in this framework is
+to employ control filtering or project gradients onto the constraint manifold.
+In this work we perform optimization using ALTRO, which combines
+an iterative indirect shooting method with the augmented Lagrangian
+method \cite{howell2019altro}. The augmented Lagrangian method
+allows us to enforce arbitrary, simultaneous constraints and achieve
+fast convergence without being restricted to the constraint
+manifold.
+
+QOC techniques have been effective in mitigating the effects
+of systematic errors. Typically, the model used in optimization
+differs from the experimental system due to parameter drift, the inability
+to realize control parameters exactly, and noise.
+These systematic errors cause the trajectory of the quantum system
+in the experiment to deviate from that predicted by the optimization.
+A set of controls is said to be robust if the experimental state trajectory
+it produces is insensitive to systematic errors.
+Considering the dynamical and geometric phases of quantum state
+evolution has led to analytic methods for achieving
 robustness to dynamical errors and mitigating pure dephasing
-\cite{xu2020nonadiabatic, han2020experimental, merrill2014progress}.
-Additionally, suitable choices of bases have been proposed that
-allow the experimentalist to infer tradeoffs in longitudinal relaxation
-and pure dephasing coherence times \cite{huang2020engineering}.
-To date, however, no analytical method has been presented
-to construct a gate while satisfying arbitrary experimental
-constraints. Furthermore, most analytic methods have only
-been demonstrated in the two-level approximation and become
-cumbersome to solve for larger Hilbert space sizes.
+\cite{han2020experimental, merrill2014progress, xu2020nonadiabatic, zhang2020universal}.
+We mitigate systematic errors numerically by employing
+open loop optimization. We draw on robust trajectory optimization
+techniques to encode systematic errors in optimization objectives.
+We consider three
+techniques. The first is the sampling method, which has been applied
+previously in the context of QOC
+\cite{carvalho2020error, reinhold2019controlling, rembold2020introduction}.
+The second is the unscented sampling
+method, which derives from the unscented transformation used
+for non-linear Kalman filtering
+\cite{julier2004unscented, lee2013sigma, manchester2016derivative}.
+We propose a third method, which we call the derivative method.
+This method takes advantage of derivative information of systematic
+errors with respect to the state evolution. We make this method efficient
+by employing mixed-mode differentiation.
 
+Further, many analytic and numerical techniques have been developed to mitigate decoherence.
+Floquet techniques have been experimentally demonstrated to simultaneously mitigate
+decoherence due to longitudinal relaxation and pure dephasing
+\cite{huang2020engineering, mundada2020floquet}.
+Numerical techniques have mitigated decoherence by evolving the
+system using master equations \cite{rembold2020introduction} and employing
+Monte Carlo style quantum trajectories \cite{abdelhafez2019gradient}.
+In this work we take advantage of the known dependence of the
+quantum system's controls on longitudinal relaxation. We encode
+the decoherence in an efficient optimization objective that does
+not pay the increased computational cost of integrating a master equation.
 
-Numerical quantum control techniques have developed in parallel
-with analytic frameworks.
-Most numerical techniques proposed for QOC are indirect shooting
-methods where an initial guess for the control trajectory is forward-simulated,
-e.g. under the time-dependent Schroedinger equation,
-and first-order gradients are computed for a functional evaluated
-on the state of the evolved system \cite{leung2017speedup,  goerz2019krotov, doria2011optimal,
-  abdelhafez2019gradient, machnes2015gradient, leng2019robust}.
-Most techniques formulate the
-problem as unconstrained or use
-projective gradient methods to enforce constraints
-\cite{machnes2015gradient}.
-The latter approach relies on constructing
-bases for constraint spaces--which is not always feasible--and
-may hinder convergence.
-Methods for mitigating decoherence using numerical
-techniques have employed master equation dynamics (citation needed),
-Monte Carlo style trajectories \cite{abdelhafez2019gradient},
-and proposals have been made to simulate multiple trajectories
-\cite{reinhold2019controlling, rembold2020introduction}.
-
-In this work, we employ state of the art
-trajectory optimization methods
-to formulate the quantum
-optimal control problem as a constrained optimization problem, allowing
-us to enforce arbitrary experimental constraints.
-Additionally,
-we introduce methods for constructing gates that mitigate longitudinal
-relaxation and are robust to experimental errors, and therefore
-pure dephasing, the dominant barriers to experimentally
-realizing practical quantum computing.
-
-As an example, we study the quantum optimal control problem on
-the fluxonium qubit presented in \cite{zhang2020universal}.
-%%TODO: Fluxonium qubit is exciting and computationally feasible,
-%%but our methods extend to arbitrary platforms.
-We describe experimentally realistic constraints and map them to
-the trajectory optimization framework. Next, we
-outline a method for making the optimization longitudinal
-relaxation aware. We achieve a factor of 5 increase in longitudinal relaxation times
-over the baseline gate set.
-We present two methods for achieving robustness to pure dephasing
-and compare them to existing dynamic decoupling methods. We find that
-the methods we employ are able to produce high fidelity gates when
-subject to parameter spreads of $1\%$.
+We compare our techniques using the heavy fluxonium qubit presented in
+in \cite{zhang2020universal}. This quantum system is an exciting
+platform for quantum computation due to its long longitudinal relaxation
+and pure dephasing times at the flux frustation point. This system is also
+efficient to simulate due to its accurate two-level approximation.
+We emphasize that the numerical techniques we employ extend to arbitrary quantum systems,
+not only the one we study here. We describe experimentally realistic constraints for this system
+and map them to the ALTRO framework. Next, we
+outline a method for making the optimization aware of longitudinal
+relaxation. We achieve a factor of 5 increase in longitudinal relaxation times
+over the baseline gate set. Then we present three methods for achieving
+robustness to systematic errors. We find that we are able to
+decrease the gate error arising from systematic errors super-linearly
+in the gate duration, achieving orders of magntidue reduction in gate errors.
+We also find that the numerical techniques we employ are able to produce
+fixed phase gates in arbitrary times, a method that could be used
+to control multi-qubit systems in the lab frame. Finally,
+we employ the robust control techniques to mitigate time-varying
+magnetic flux noise. We achieve a two order of magnitude improvement
+in gate errors for extended computations, an improvement critical
+for noisy, intermediate-scale quantum (NISQ) applications.
 
 
 %% S2
@@ -358,6 +383,8 @@ to maximize the longitudinal relaxation time directly
 via the flux amplitude and employ robust control techniques to mitigate
 pure dephasing.
 
+%% TODO: talk about quadratic cost vs. infidelity
+
 %% F1
 \begin{figure*}[ht]
   \begin{subfigure}{.315\textwidth}
@@ -374,8 +401,9 @@ pure dephasing.
     (b) $T_{1}$ interpolation function used in optimization. Markers
     denote the time-averaged, absolute amplitude of each gate.
     (c) Lindblad master equation simulation with $T_{1}$ dissipation
-    for successive gate applications. The reported gate error is computed after
-    each gate appliaction. The $T_{1}$ optimized $Z/2$ and $Y/2$ gate errors are indistinguishable
+    for successive gate applications. The reported gate error is the cumulative
+    gate error after each gate application.
+    The $T_{1}$ optimized $Z/2$ and $Y/2$ gate errors are indistinguishable
     in the figure.
   }
 \end{figure*}
@@ -383,19 +411,21 @@ pure dephasing.
 %% S4
 \section{Longitudinal Relaxation Awareness}
 The longitudinal relaxation time $T_{1}$ varies with
-control parameters in a range of superconducting circuit platforms,
-and it is advantageous to maximize it by tuning the controls.
-In the fluxonium, the longitudinal relaxation time varies with
-the amplitude $a$. To completely simulate
-the effect of longitudinal relaxation on the gate error requires
-propagating density matrices of size $n \times n$ under Master equation
-dynamics rather than state vectors of size $n$ under the TDSE dynamics.
+control parameters in a range of superconducting circuit platforms.
+It is advantageous to tune the controls to extend the longitudinal
+relaxation time.
+To calculate the gate error due to longitudinal relaxation
+requires propagating density matrices of size $n \times n$ under Master equation
+dynamics, rather than state vectors of size $n$ under the TDSE dynamics.
 We avoid this increase in computational complexity by
-penalizing the probability that the qubit decays as a result of
-longitudinal relaxation. This modification only
-increases the size of the augmented state vector by a single real number
-and allows us to effectively mitigate the error arising from longitudinal
-relaxation. Additionally, for a constant $T_{1}$ time, a shorter gate duration
+penalizing the integrated rate of longitudinal relaxation,
+i.e. the probability of longitudinal relaxation.
+Using this probability as proxy for the gate error incurred
+is reasonable because losses due to longitudinal relaxation
+increase monotonically in time.
+This technique can be extended to
+error channels which share the monotonically increasing property.
+Additionally, for a constant $T_{1}$ time, a shorter gate duration
 would favor a lower longitudinal relaxation probability. We allow
 the optimizer to tune the gate duration in order to minimize the
 longitudinal relaxation probability. Our scheme for time-optimal
@@ -410,14 +440,11 @@ $P_{1}$ is penalized using a quadratic cost at each knot point
 ${\lvert P_{1}(t_{k}) \rvert}^{2}$.
 $T_{1}(a_{k})$ is obtained at each knot point by evaluating
 a spline fit to experimental data of the form $\{(a, T_{1})\}$.
-Calculating $T_{1}$ directly from theoretical
-considerations requires many high-rank
-eigendecompositions, which
-is computationally expensive. Additionally,
-$T_{1}$ values are known to fluctuate greatly
+It is also possible to use a spline fit to theoretically obtained data.
+However, $T_{1}$ values are known to fluctuate greatly
 with laboratory temperatures \cite{klimov2018fluctuations}.
-Interpolating $T_{1}$ from experimental data increases
-the fridge truth of the simulation.
+Interpolating $T_{1}$ from experimental data
+increases the fridge truth of the simulation.
 
 We allow the optimizer to tune the gate duration by
 making the time step between each knot point $\Delta t_{k}$
@@ -435,14 +462,18 @@ so we add the square root of the time step $\sqrt{\Delta t_{k}}$
 to the augmented control vector and use the squared root
 of the time step $\lvert \Delta t_{k} \rvert$ in optimization.
 
-The $T_{1}$ optimized gates converge on similar solutions, a periodic
+We compare the numerical method we have developed to the analytic gates
+on the task of achieving low gate errors in the presence of longitudinal relaxation
+for the $Z/2$, $Y/2$, and $X/2$ gates.
+The numerically optimized gates converge on similar solutions, a periodic
 waveform with amplitude $\sim 0.2 \textrm{GHz}$, see Figure 1.
 They extend their gate times
 beyond their analytic counterparts, trading longer gate times for access
 to higher amplitudes and therefore higher $T_{1}$ times. All optimized gates reduce
-their single gate probability of longitudinal relaxation by a factor of $5$ over
-their analytic counterparts and achieve a commensurate reduction in their single gate error,
-see Appendix. The gate error reported in this text is the infidelity
+their single gate errors by a factor of $5$ over
+their analytic counterparts which is commensurate to their
+probability of longitudinal relaxation reductions, see Appendix.
+The gate error reported in this text is the infidelity
 of the evolved state and the target state averaged over 1000 pseudo-randomly
 generated initial states. The optimized $Z/2$ and $Y/2$ gates perform simlarly in
 the concatenated gate application comparision, suppressing accumulated gate errors to $8 \cdot 10^{-3}$
@@ -452,8 +483,8 @@ Both the analytic and optimized gates attain single gate errors sufficient for
 quantum error correction $< 10^{-4}$, requisite for fault-tolerant quantum computing.
 The low gate errors achieved by the optimized gates for extend computations
 are critical for noisy, intermediate-scale quantum (NISQ) applications.
-These improvements are significant for the realistic constraints we have put on the
-device, and do not represent a fundamental limit to the optimization methods we have
+These improvements are significant for the realistic constraints we have imposed
+on the gates, and do not represent a fundamental limit to the optimization methods we have
 employed.
 
 %% F2
@@ -470,17 +501,19 @@ employed.
   
   \caption{
     (a) $Z/2$ gates robust to qubit frequency detunings constructed with the
-    analytic, 8-point sampling, 10-point unscented sampling, and the 1\textsuperscript{st}-
+    analytic, sampling, unscented sampling, and the 1\textsuperscript{st}-
     and 2\textsuperscript{nd}-order derivative methods. The gates
     shown for the numerical methods are the solutions at twice the analytic
     gate time.
     (b) Single gate error as
     a function of the gate duration at a one-percent
     detuning from the nominal qubit frequency for all methods. Missing
-    points represent solutions with a gate error above $5 \cdot 10^{-5}$.
+    data points represent solutions with a gate error above $5 \cdot 10^{-5}$.
     (c) Single gate error as a function of the detuning from the nominal
-    qubit frequency at multiples of the analytic gate duration for the analytic
-    and 1\textsuperscript{st}-order derivative methods.
+    qubit frequency. The solutions for the analytic and
+    1\textsuperscript{st}-order derivative methods are shown at multiples
+    of the analytic gate time. The performance of the two methods is
+    indistinguishable at the analytic gate time $18$ns.
   }
 \end{figure*}
 
@@ -489,49 +522,48 @@ employed.
 We have formulated the quantum optimal control
 problem as an open loop optimization problem, i.e.
 feedback from the experiment is not incorporated in optimization.
-However, the device typically deviates from the model we use in optimization,
-the Hamiltonian, leading to poor experimental performance. To mitigate
+However, the device typically deviates from the Hamiltonian we use in optimization,
+leading to poor experimental performance. To mitigate
 these errors we employ robust control techniques
 to make the state evolution insensitive to Hamiltonian
 parameter deviations. As an example
-we study mitigating errors arising from the finite measurement
-precision of the qubit frequency $f_{q} = \bar{f_{q}} \pm \sigma_{f_{q}}$.
-We consider three flavors of robust control
-techniques. The first is the sampling method, which has
+we mitigate errors arising from the drift and finite measurement
+precision of the qubit frequency $\tilde{f_{q}} = f_{q} \pm \sigma_{f_{q}}$.
+We consider three robust control techniques.
+The first is the sampling method, which has
 been preposed previously in the context of QOC
-\cite{rembold2020introduction, reinhold2019controlling}. In the
-sampling method, multiple trajectories are evolved under distinct deviant dynamics
+\cite{rembold2020introduction, reinhold2019controlling, carvalho2020error}. In the
+sampling method, multiple states are evolved under distinct deviant dynamics
 to capture the effect of parameter deviations. We also
 study the unscented sampling method which uses the unscented
 transformation to accurately propagate a distribution
-representing the evolving state as a result of a parameter deviation.
+representing the uncertainty in an evolving state
+due to a parameter deviation.
 The unscented transformation was designed for nonlinear Kalman
 filtering and is frequently utilized in robust control
 \cite{julier2004unscented, lee2013sigma, manchester2016derivative}.
-Finally, we propose the derivative method. This scheme
-uses derivative information about how the state
-evolution is affected by the deviant parameter to
-mitigate trajectory deviations.
+Finally, we propose the derivative method. Derivative
+information encoding the sensitivity of the
+state trajectory with respect to the deviant parameter
+is used to penalize state trajectory deviations.
 
-In the sampling method we propagate additional sample states
-in the augmented state vector that follow deviant dynamics
-and penalize their differences from the target state.
-The states evolve under the deviant
-Hamiltonian where the parameter of interest is replaced by
+In the sampling method, sample states evolve under a
+Hamiltonian where a parameter is replaced by
 a deviant value. We propagate the additional states $\ket{\psi^{\pm}}$ with
-deviant parameters $\lambda^{\pm} = \lambda \pm \sigma_{\lambda}$.
-The infidelities of the samples and the target
-state are penalized at each knot point
+deviant values $\lambda^{\pm} = \lambda \pm \sigma_{\lambda}$.
+The gate error of each sample state is 
+penalized at each knot point
 $1 - {\lvert \braket{\psi^{\pm}_{k} | \psi_{f}} \rvert}^{2}$.
-We sample two trajectories ($\ket{\psi^{\pm}}$) for each of four initial states,
-resulting in eight additional states added to the augmented state vector.
-The four initial states are chosen so
+Each initial state is used to initialize two
+sample states $\ket{\psi^{\pm}}$.
+The initial states are chosen so
 that their outer products span the operators on the
 Hilbert space $\{\ket{0}, \ket{1}, (\ket{0} + i\ket{1}) / \sqrt{2},
 (\ket{0} - \ket{1}) / \sqrt{2}\}$ \cite{chow2009randomized}.
-This results in $O(n^{2})$ states added to the augmented
-state vector where $n$ is both the dimension of the Hilbert space
-and the size of the state vector.
+For this method the number of states in the augmented state vector
+scales as $O(dn^{2})$ because each of $n^{2}$ initial
+states is represented by $2d$ samples. $n$ is both the dimension of the Hilbert space
+and the size of the state vector. $d$ is the number of deviant parameters.
 
 %% F3
 \begin{figure*}[ht]
@@ -544,21 +576,21 @@ and the size of the state vector.
 
   \caption{
     (a) $X/2$ gates robust to flux offsets constructed with the analytic,
-    8-point sampling, 10-point unscented sampling, and the 1\textsuperscript{st}-
+    sampling, unscented sampling, and the 1\textsuperscript{st}-
     and 2\textsuperscript{nd}-order derivative methods. The gates shown
     are the solutions at the analytic gate time.
     (b) Simulation of stochastic 1/$f$ flux noise for
-    successive gate applications. The reported gate error is computed
-    after each gate application.
+    successive gate applications. The reported gate error is the cumulative
+    gate error after each gate application.
   }
 \end{figure*}
 
 The strategy of the unscented sampling method is to
 propagate an ensemble of sample states (sigma points) which represent a distribution
-over every element of $\ket{\psi}$. The distribution
+over every element of the initial state. The distribution
 models the uncertainty in each state element arising from the
-parameter deviation. The ensemble consists of $2 (n + d)$ states
-where $d$ is the number of deviant parameters. Each state in the
+parameter deviation. The ensemble consists of $2 (n + d)$ states.
+Each state in the
 ensemble is propagated to the next
 knot point using separate deviant dynamics. Then, the mean and covariance of
 the propagated ensemble is calculated. New states are sampled from the distribution
@@ -568,10 +600,9 @@ first and second moments of the distribution and ensures the points
 lie on the $\sqrt{n}$\textsuperscript{th}
 covariance contour at each knot point. A detailed update procedure is given
 in the appendix. Each initial state from the operator basis
-is represented with a distribution of $2 (n + d)$ samples. This results
-in $O(n^{3})$ states added to the augmented state vector.
-The costs at each knot point are the infidelities between the samples
-and the target state, as in the sampling method.
+is represented with a distribution of $2 (n + d)$ samples. Hence,
+the number of states in the augmented state vector scales as $O(n^{3} + dn^{2})$.
+The gate error of each sample state is penalized as in the sampling method.
 
 The derivative method draws on the intuition that
 the sensitivity of the state evolution to a parameter
@@ -586,13 +617,11 @@ The state derivatives could be obtained with backwards mode differentiation.
 Naive automatic differentiation would compute
 the state derivative at all $1, \dots, k - 1$ knot points
 to obtain the state derivative at knot point $k$.
-For $d$ sensitivity parameters and $N$ knot points
-this requires $O(d N^2)$ matrix multiplications. Instead,
-we forward propagate the state derivatives in the
-augmented state vector under coupled dynamics, resulting
-in $O(d N)$ matrix multiplications. For the piece-wise constant control
-scheme we employ here, $N$ is the number of control parameters. Typically
-$d \ll N$ so this is a good tradeoff. As an example, the dynamics
+For a single state derivative and $N$ knot points this
+requires $O(N^2)$ matrix multiplications.
+Instead, we forward propagate the state derivatives in the
+augmented state vector under coupled dynamics, resulting in
+$O(N)$ matrix multiplications. For example, the dynamics
 for the 1\textsuperscript{st}-order derivative method are
 \begin{align}
   i \hbar \frac{d}{dt} \ket{\psi} &= H \ket{\psi}\\
@@ -603,6 +632,10 @@ for the 1\textsuperscript{st}-order derivative method are
 Exponential integrators that account for the non-linear
 term may be used to efficiently integrate the coupled dynamics
 \cite{berland2005solving, einkemmer2017performance}.
+For this method $m$ state derivatives are associated with each
+initial state from the operator basis.
+So, the number of states in the augmented state vector scales as
+$O(dmn^{2})$.
 
 To demonstrate the applicability of these techniques
 to mitigate system parameter deviations,
@@ -612,21 +645,28 @@ $f_{q} \gets f_{q} + \delta f_{q}$.
 We take $\sigma_{f_{q}} / f_{q} = 1\%$ to be one standard devation, and equip
 the sampling methods accordingly. For each method we compute the gate error for
 one simulated gate application subject to the deviant dynamics given by the
-stated qubit frequency detuning $\delta f_{q}$. We compare the numerical methods
-to an analytically derived $Z/2$ gate which corresponds to
+stated qubit frequency detuning $\delta f_{q}$.
+
+We compare the numerical methods
+to an analytically derived $Z/2$ gate. This gate corresponds to
 idling at the flux frustration point $a = 0$. The analytic gate
 is at the device's speed limit for a $Z/2$ gate $t_{Z/2} = 1 / 4 f_{q}$ and
-is simple to derive. It is linearly sensitive to qubit frequency detunings,
-the erroneous rotation given by $2 \pi t_{Z/2} \delta f_{q}$. At a one-percent
-qubit frequency detuning, it achieves a gate error $\sim 4.5 \cdot 10^{-5}$,
-sufficient for quantum error correction.
-
+is simple to derive. Its erroneous rotation angle $2 \pi t_{Z/2} \delta f_{q}$ is linearly sensitive to
+the qubit frequency detuning, resulting in a gate error that is quadratically sensitive
+to the qubit frequency detutning.
+At a one-percent
+qubit frequency detuning the analytic gate achieves a gate error $\sim 4.5 \cdot 10^{-5}$,
+which is sufficient for quantum error correction, see Figure 2b.
+Although the analytic $Z/2$ gate performs well, it works
+only at the gate time $t_{Z/2}$. The ability to perform $Z$ rotations in arbitrary times is critical
+for operating multi-qubit experiments in the lab frame.
 Each numerical method is able to find solutions at
-all gate times above $t_{Z/2}$, but is unable to find solutions at shorter times.
-The ability to perform $Z$ rotations in arbitrary times
-is critical for operating multi-qubit experiments in the lab frame.
-These numerical methods offer an effective scheme for synchronizing
+all gate times above $t_{Z/2}$, but is unable to find solutions at shorter times,
+see Figure 2b. These numerical methods offer an effective scheme for synchronizing
 qubits operating at different frequencies $f_{q, i} \neq f_{q, j}$.
+
+%% TOOD: intro sentence
+%% TODO: comment on unscented when it is redone
 The sampling and unscented sampling methods
 converge on qualitatively similar solutions which combine idling periods
 with fast ramps to the maximum amplitude. The gate error at a one-percent
@@ -636,17 +676,17 @@ range of gate durations. The unscented sampling method
 achieves linear decreases in its gate error with longer gate durations
 until half the larmor period $1 / 2 f_{q}$ after which it achieves a consistent
 gate error $\sim 3.5 \cdot 10^{-5}$.
-
-The derivative methods also converge on qualitatively similar solutions that
+The derivative methods converge on qualitatively similar solutions that
 use fast traingle pulses at the boundaries and balance time
 on either side of the flux-frustration point symmetrically at low amplitudes.
-They achieve super-linear scaling in their gate error as
-a function of the gate duration which approaches zero at the larmor
-period $1 / f_{q}$. We observe that on a range of problems with small parameter detunings,
-the 1\textsuperscript{st}-order derivative method tends to outperform the 2\textsuperscript{nd}-order
-derivative method. We believe this is due to the low contribution of second-order
+Both methods achieve a super-linear scaling in their gate error as
+a function of the gate duration. The gate error for the 1\textsuperscript{st}-order
+derivative method approaches zero at the larmor period $1 / f_{q}$.
+We believe the 1\textsuperscript{st}-order method outperforms the \textsuperscript{nd}-order
+method due to the low contribution of second-order
 terms to the gate error in this deviation regime, see Table 2.
 
+%% TODO: comment on the fact that we can reduce the number of sample states
 %% TODO: how do I tie this in?
 Multiple analytic methods have also been presented to construct gates
 that mitigate the error arising from parameter deviations
