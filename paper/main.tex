@@ -50,26 +50,21 @@
   %% - 1 + 2 topic importance
   %% - 1 what I have done
   %% - few sentences about primary results
-  The ability to engineer high fidelity operations on quantum processors in the presence of
+  The ability to engineer high fidelity gates on quantum processors in the presence of
   systematic errors and decoherence remains the primary challenge requisite to achieving quantum advantage.
-  Quantum optimal control (QOC) techniques have proven effective in realizing high fidelity operations,
-  but they require exquisite calibration to be performant.
-  In this work we employ robust trajectory optimization techniques
-  to achieve high fidelity gates for parameter spreads on the order of $1\%$.
+  Quantum optimal control (QOC) techniques have proven effective in experimentally
+  realizing high fidelity gates, but they require exquisite calibration to be performant.
+  We apply robust trajectory optimization techniques to suppress gate errors arising from system
+  model deviations and noise.
   We propose a method that takes advantage of deviant parameter derivative information while maintaining
   computational efficiency by utilizing mixed-mode differentation.
-  Additionally, current QOC techniques mitigate decoherence effects due to longitudinal relaxation by integrating
-  the Lindblad master equation, which increases the computational complexity
-  of the optimization algorithm. We propose a computationally efficient metric
+  Additionally, completely modeling decoherence effects due to longitudinal relaxation requires
+  integrating the Lindblad master equation, which is computationally expensive.
+  We propose a computationally efficient metric
   and utilize time-optimal control to achieve high fidelity gates in the presence of longitudinal relaxation.
-  We apply these techniques to a fluxonium qubit with realisitc experimental constraints
-  and noise values. We are able to reduce gate errors by orders of magnitudes in the presence
-  of deviant parameters, achieving super-linear scaling for gate robustness as a function of the gate duration.
-  We use the same techniques to mitigate coherent errors due to time-varying magnetic flux noise
-  by two orders of magnitude. Additionally, we mitigate the gate error arising from longitudinal
-  relaxation by a factor of $5$. Further, we find that the numerical techniques we employ
-  are able to perform phase gates in arbitrary times, which is critical for operating multi-qubit
-  experiments in the lab frame.
+  We demonstrate these techniques numerically on a fluxonium qubit with realisitc experimental parameters and constraints,
+  achieving orders of magnitude gate error reductions from our baseline gate set.
+  %% TODO: maybe add arbitrary phase bit
 \end{abstract}
 
 \maketitle
@@ -84,91 +79,84 @@
 %% P3 - what we do is. maybe add a rant about how
 %% QOC is classical control theory but we've ignored that field
 %% P4 - outline
-The field of quantum optimal control (QOC) is concerned
-with efficiently and accurately manipulating quantum systems.
-Early QOC techniques were proposed for nuclear magnetic resonance experiments
+Quantum optimal control (QOC) techniques are a class of optimization
+algorithms for accurately and efficiently manipulating quantum systems.
+Early techniques were proposed for nuclear magnetic resonance experiments
 \cite{khaneja2005optimal}, and applications now include superconducting
 circuits \cite{heeres2017implementing,
-  leng2019robust, leung2017speedup, xu2020nonadiabatic},
+  huang2020engineering, leng2019robust, leung2017speedup, xu2020nonadiabatic},
 neutral and ionized atoms \cite{van2016optimal}, nitrogen-vacancy centers in
 diamond \cite{rembold2020introduction}, and Bose-Einstien condensates
-\cite{sorensen2018quantum}. QOC techniques are used to
-control a system such that a set of optimization objectives are maximally fulfilled.
-For quantum computation, relevant objectives include achieving high fidelity
+\cite{sorensen2018quantum}. QOC techniques aim to control the system
+such that a set of objectives are optimally satisfied.
+For quantum computation relevant objectives include achieving high fidelity
 gates and adhering to experimental constraints.
 The decision variables of the optimization problem are the time-dependent control
 parameters, particular to the quantum system, that govern its evolution.
-It is desirable to make the optimization aware of experimental errors
-such as noise, system model errors, and control errors, to
-improve experimental performance on the optimization objectives.
-The field of robust control, deriving from classical control theory, has developed
-techniques to account for these errors in optimization (citations appreciated).
+Experimental errors may cause the system evolution to deviate from that predicted in
+optimization, hampering performance.
+The field of classical control theory has developed robust control techniques
+to encode experimental errors in optimization objectives, improving
+performance on the experiment (citations appreciated).
 In this work we employ robust control techniques to mitigate
 releastic decoherence and systematic errors that arise when controlling
 a superconducting fluxonium qubit.
 
-Numerical techniques for QOC have been remarkably successful in
-state preparation, designing high fidelity gates, and determining
-optimized pulse sequences (citations needed). Many popular numerical techniques
-are iterative, indirect shooting
-methods \cite{leung2017speedup, goer2019krotov, abdelhafez2019gradient,
-  machnes2015gradient}.
-An initial guess for the control parameters is used to forward-simulate
-the quantum state trajectory under the time-dependent Schroedinger equation. Then, gradients
-with respect to the controls are computed for an objective evaluated on
-the evolved quantum state. The gradients are used to update
-the control parameters and the procedure is repeated iteratively.
-A convenient way to enforce constraints in this framework is
-to employ control filtering or project gradients onto the constraint manifold.
-In this work we perform optimization using ALTRO, which combines
-an iterative indirect shooting method with the augmented Lagrangian
-method \cite{howell2019altro}. The augmented Lagrangian method
-allows us to enforce arbitrary, simultaneous constraints and achieve
-fast convergence without being restricted to the constraint
-manifold.
-
-QOC techniques have been effective in mitigating the effects
-of systematic errors. Typically, the model used in optimization
-differs from the experimental system due to parameter drift, the inability
-to realize control parameters exactly, and noise.
-These systematic errors cause the trajectory of the quantum system
-in the experiment to deviate from that predicted by the optimization.
-A set of controls is said to be robust if the experimental state trajectory
-it produces is insensitive to systematic errors.
+Analytic and numerical techniques for QOC have been remarkably successful in
+designing high fidelity gates (citations needed). In addition to the high
+simulated fidelities which can be obtained with these techniques, it is desirable for the
+resultant quantum state trajectory to be insensitive to experimental errors
+such as parameter drift, noise, and finite control resolution. Controls that produce
+quantum state trajectories that are insensitive to these effects are said to be robust.
+In line with this objective, recent work has sought to mitigate systematic errors
+and decoherence present in the experiment.
 Considering the dynamical and geometric phases of quantum state
-evolution has led to analytic methods for achieving
-robustness to dynamical errors and mitigating pure dephasing
+trajectories has led to analytic methods for achieving
+robustness to systematic errors and mitigating pure dephasing
 \cite{han2020experimental, merrill2014progress, xu2020nonadiabatic, zhang2020universal}.
-We mitigate systematic errors numerically by employing
-open loop optimization. We draw on robust trajectory optimization
-techniques to encode systematic errors in optimization objectives.
-We consider three
-techniques. The first is the sampling method, which has been applied
+Floquet techniques have been experimentally demonstrated to simultaneously mitigate
+decoherence due to longitudinal relaxation and pure dephasing
+\cite{huang2020engineering, mundada2020floquet}.
+Numerical QOC techniques have been adapted to mitigate longitudinal relaxation
+by modeling master equations \cite{rembold2020introduction} and employing
+Monte Carlo style quantum trajectories \cite{abdelhafez2019gradient}.
+Additionally, efforts have been made to incorporate experimental feedback
+into optimization \cite{huang2020engineering}. Comprehensive tools that interleave characterization
+and pulse design are under active development \cite{wittler2020integrated}.
+
+In this work we employ state of the art trajectory optimization techniques
+to mitigate systematic errors and decoherence. We frame the QOC problem as an
+open loop optimization problem, optimizing the controls to make the
+quantum state trajectory robust to systematic errors and decoherence.
+We consider three robust trajectory optimization techniques.
+The first is the sampling method, which has been applied
 previously in the context of QOC
 \cite{carvalho2020error, reinhold2019controlling, rembold2020introduction}.
 The second is the unscented sampling
 method, which derives from the unscented transformation used
 for non-linear Kalman filtering
 \cite{julier2004unscented, lee2013sigma, manchester2016derivative}.
-We propose a third method, which we call the derivative method.
-This method takes advantage of derivative information of systematic
-errors with respect to the state evolution. We make this method efficient
-by employing mixed-mode differentiation.
-
-Further, many analytic and numerical techniques have been developed to mitigate decoherence.
-Floquet techniques have been experimentally demonstrated to simultaneously mitigate
-decoherence due to longitudinal relaxation and pure dephasing
-\cite{huang2020engineering, mundada2020floquet}.
-Numerical techniques have mitigated decoherence by evolving the
-system using master equations \cite{rembold2020introduction} and employing
-Monte Carlo style quantum trajectories \cite{abdelhafez2019gradient}.
-In this work we take advantage of the known dependence of the
-quantum system's controls on longitudinal relaxation. We encode
+We propose a third method, which uses derivative information
+of parameter deviations with respect to the quantum state evolution.
+We make this method efficient by employing mixed-mode differentiation.
+Additionally, we take advantage of the known dependence of the
+system's controls on longitudinal relaxation. We encode
 the decoherence in an efficient optimization objective that does
 not pay the increased computational cost of integrating a master equation.
+We perform these optimization using the ALTRO framework \cite{howell2019altro}.
+Many popular numerical techniques
+for QOC use gradient-based control update procedures, which are readily amenable to control filtering
+or constraint manifold projection techniques to enforce constraints \cite{leung2017speedup,
+  goer2019krotov, abdelhafez2019gradient, machnes2015gradient}.
+The ALTRO method we employ combines
+an iterative indirect shooting method with the augmented Lagrangian
+method. The augmented Lagrangian method
+allows us to enforce arbitrary, simultaneous constraints and achieve
+fast convergence without being restricted to the constraint
+manifold.
 
-We compare our techniques using the heavy fluxonium qubit presented in
-in \cite{zhang2020universal}. This quantum system is an exciting
+We compare our techniques using the heavy fluxonium qubit and assocaited analytic gates
+presented in \cite{zhang2020universal}. This quantum system is an exciting
 platform for quantum computation due to its long longitudinal relaxation
 and pure dephasing times at the flux frustation point. This system is also
 efficient to simulate due to its accurate two-level approximation.
@@ -178,9 +166,9 @@ and map them to the ALTRO framework. Next, we
 outline a method for making the optimization aware of longitudinal
 relaxation. We achieve a factor of 5 increase in longitudinal relaxation times
 over the baseline gate set. Then we present three methods for achieving
-robustness to systematic errors. We find that we are able to
-decrease the gate error arising from systematic errors super-linearly
-in the gate duration, achieving orders of magntidue reduction in gate errors.
+robustness to static parameter deviations. We find that we are able to
+decrease the gate error arising from parameter deviations super-linearly
+in the gate duration, achieving orders of magntidue reductions in single gate errors.
 We also find that the numerical techniques we employ are able to produce
 fixed phase gates in arbitrary times, a method that could be used
 to control multi-qubit systems in the lab frame. Finally,
@@ -333,7 +321,6 @@ the desired state transition $\ket{\psi_{N}} = \ket{\psi_{f}}$.
 In addition to these constraints we penalize the norm
 of the first and second derivatives of the flux amplitude to
 ensure its smoothness, and in doing so mitigate AWG ringing.
-
 The optimization is performed over the second derivative of the flux amplitude
 $\frac{d^{2}}{dt^{2}} a$ which is contained in the
 augmented control vector. The first derivative
@@ -361,7 +348,6 @@ device are dielectric loss in the capacitor, resistive loss in the inductor,
 and Purcell loss. The main contributions to pure dephasing in our
 device are $1/f$ flux noise and decay via charge and flux coupling
 to the control lines.
-
 Dissipation to the thermal bath via longitudinal
 relaxation is an irreversible process
 that results in information loss.
@@ -380,7 +366,7 @@ and increases away from the flux frustration point
 $T_{1}(a = 0.34 \textrm{GHz}) = 4.3$ms. Given the nature
 of the decay processes and the tradeoff, we choose
 to maximize the longitudinal relaxation time directly
-via the flux amplitude and employ robust control techniques to mitigate
+by tuning the flux amplitude and employ robust control techniques to mitigate
 pure dephasing.
 
 %% TODO: talk about quadratic cost vs. infidelity
@@ -531,7 +517,7 @@ we mitigate errors arising from the drift and finite measurement
 precision of the qubit frequency $\tilde{f_{q}} = f_{q} \pm \sigma_{f_{q}}$.
 We consider three robust control techniques.
 The first is the sampling method, which has
-been preposed previously in the context of QOC
+been proposed previously in the context of QOC
 \cite{rembold2020introduction, reinhold2019controlling, carvalho2020error}. In the
 sampling method, multiple states are evolved under distinct deviant dynamics
 to capture the effect of parameter deviations. We also
@@ -745,7 +731,21 @@ an effective method for mitigating them.
 
 %% S7
 \section{Conclusion}
-We have proposed some schemes and they work well.
+In conclusion, we have demonstrated techniques for achieving robustness to systematic
+errors and mitigating decoherence on a quantum system using state-of-the-art trajectory
+optimization. We have proposed a scheme for mitigating longitudinal relaxation with time-optimal
+control and an efficient optimization metric that comes at a constant computational cost as
+opposed to integrating a master equation which scales quadratically with
+the dimension of the Hilbert space.
+We have proposed the derivative method for robust control which achieves
+super-linear gate error reductions in the gate duration for the problem we studied here.
+We have shown that robust control techniques can be used to mitigate decoherence due
+to 1/$f$ flux noise, a dominant source of coherent errors for flux controlled qubits.
+The numerical techniques we have studied can be used to perform phase gates in arbitrary times,
+which will be critical for synchronizing multi-qubit systems. Our
+techniques significantly improve the state-of-the-art for controlling quantum systems subject
+systematic errors and decoherence, and will be used in efforts to lower gate errors
+for fault-tolerant quantum computing and NISQ applications.
 
 
 %% ACK
