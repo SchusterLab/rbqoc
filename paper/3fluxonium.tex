@@ -1,0 +1,91 @@
+%% S3
+\section{QOC on the Fluxonium}
+In the following we study
+the quantum optimal control problem on the fluxonium qubit.
+The fluxonium qubit is a promising building block for superconducting
+circuits, and the experimental constraints we encode in the optimization reflect
+those of a realistic device. Furthermore, the accurate
+two-level approximation of the system Hamiltonian makes it
+efficient to perform quantum optimal control on
+a classical computer. In the two-level
+approximation the system Hamiltonian takes the form
+\label{eq:hamiltonian}
+\begin{align}
+  H/h &= f_{q} \frac{\sigma_{z}}{2} + a(t) \frac{\sigma_{x}}{2}
+\end{align}
+where $f_{q} = 14$MHz is the qubit frequency at the flux frustration point,
+$a$ is the flux drive amplitude, $h$ is Planck's constant, and $\sigma_{x}, \sigma_{y}$
+are Pauli matrices. The flux amplitude $a$ is experimentally
+realized by modulating the flux 
+threading the device. We consider the task of constructing $Z/2$, $Y/2$, and $X/2$
+gates for the fluxonium qubit subject to experimental constraints, decoherence, and
+systematic errors. We compare the gates we obtain with numerical
+methods to the analytically constructed gates reported in
+\cite{zhang2020universal} for the same device.
+
+In addition to imposing optimization constraints that
+reflect physical limitations of the apparatus, we impose
+constraints that improve the experimental realization of the control pulse.
+To ensures gates may be concatenated arbitrarily without
+inducing AWG ringing due to high-frequency transitions,
+we require $a(t = 0) = a(t = t_{N}) = 0$.
+Furthermore, we require $\int_{0}^{t_{N}} a(t) dt = 0$. This
+constraint ensures the pulse has zero net flux, mitigating
+the hysteresis ubiquitous in flux bias lines.
+%% TODO: See ref. 28 in Helin paper
+We require $-0.5 \textrm{GHz} \le a(t) \le 0.5 \textrm{GHz}$
+to ensure the two-level approximation \ref{eq:hamiltonian}
+remains valid. Additionally, we require that each gate achieves
+the desired state transition $\ket{\psi_{N}} = \ket{\psi_{f}}$.
+In addition to these constraints we penalize the norm
+of the first and second derivatives of the flux amplitude to
+ensure its smoothness, and in doing so mitigate AWG ringing.
+The optimization is performed over the second derivative of the flux amplitude
+$\frac{d^{2}}{dt^{2}} a$ which is contained in the
+augmented control vector. The first derivative
+$\frac{d}{dt} a$, proportional $a$, and integral $\int a$
+flux amplitude terms
+are contained in the augmented state vector. They are obtained from
+the second derivative of the flux amplitude by
+integration in the dynamics function.
+Both the zero net flux and target quantum state constraint
+are then handled by ensuring the target augmented state is
+reached $x_{N} = x_{f}$.
+The equality and inequality constraints on $a$ are handled
+with a bound constraint.
+%% TODO: probably want to list equations for the constraints
+
+In addition to obeying experimental constraints
+and achieving low simulated gate errors, we desire
+to make our gates perform well in the presence of decoherence.
+Decoherence of the quantum state due to external noise
+is typically modeled by two phenomena: longitudinal relaxation and pure dephasing.
+They are modeled using their $1/e$ decay times $T_{1}$ and $T_{\phi}$ respectively
+(see Appendix).
+The main contributions to longitudinal relaxation in our
+device are dielectric loss in the capacitor, resistive loss in the inductor,
+and Purcell loss. The main contributions to pure dephasing in our
+device are $1/f$ flux noise and decay via charge and flux coupling
+to the control lines.
+Dissipation to the thermal bath via longitudinal
+relaxation is an irreversible process
+that results in information loss.
+Converesely, pure dephasing is a reversible process.
+There is a tradeoff between the two decoherence processes. In the case of white
+noise the sum of the noise weights $W_{1}$ and $W_{\phi}$
+is constant \cite{huang2020engineering}.
+Our device achieves its best pure dephasing
+protection at the flux frustration point
+$T_{2e}(a = 0) \sim 300 \mu\textrm{s}$
+where the qubit is first-order insensitive to changes in flux.
+It becomes more succeptable to pure dephasing as the flux is tuned away from the flux
+frustration point $|a| > 0$. Conversely, longitudinal relaxation is at a minimum
+at the flux frustration point $T_{1}(a = 0) = 0.315$ms,
+and increases away from the flux frustration point
+$T_{1}(a = 0.34 \textrm{GHz}) = 4.3$ms. Given the nature
+of the decay processes and the tradeoff, we choose
+to maximize the longitudinal relaxation time directly
+by tuning the flux amplitude and employ robust control techniques to mitigate
+pure dephasing.
+
+%% TODO: talk about quadratic cost vs. infidelity

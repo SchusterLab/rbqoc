@@ -1,0 +1,42 @@
+\section{Derivative Method}
+To obtain the dynamics for the derivative of the state $\partial_{x}^{l} \ket{\psi(t)}$
+we differentiate the TDSE dynamics \ref{eq:tdse} with respect to the parameter of interest
+($x$). Using the fluxonium hamiltonian \ref{eq:hamiltonian} we obtain the derivative of the
+state with respect to the qubit frequency ($f_{q}$) and the flux amplitude ($a$).
+Here we present the dynamics for the second derivative of the state with respect to the
+qubit frequency. The case is analogous for the flux amplitude. Both $H$ and $\ket{\psi}$ are functions
+of $f_{q}$, $a$, and $t$, but we omit the explicit dependence in notation for
+brevity.
+\begin{equation}
+  \begin{aligned}
+      \partial_{f_{q}} \partial_{t} \ket{\psi} &= \partial_{f_{q}} H \ket{\psi}\\
+      &= (\partial_{f_{q}} H) \ket{\psi} + H (\partial_{f_{q}} \ket{\psi})\\
+      &= \frac{\sigma_{z}}{2} \ket{\psi} + H (\partial_{f_{q}} \ket{\psi})
+  \end{aligned}
+\end{equation}
+\begin{equation}
+  \begin{aligned}
+    \partial_{f_{q}}^{2} \partial_{t} \ket{\psi} &= \partial_{f_{q}} (\partial_{f_{q}} H \ket{\psi})\\
+    &= (\partial_{f_{q}}^{2} H) \ket{\psi} + 2 (\partial_{f_{q}} H)(\partial_{f_{q}} \ket{\psi})\\
+    &\quad + H (\partial_{f_{q}}^{2} \ket{\psi})\\
+    &= \sigma_{z} (\partial_{f_{q}} \ket{\psi}) + H (\partial_{f_{q}}^{2} \ket{\psi})
+  \end{aligned}
+\end{equation}
+The augmented state vector carries $\partial_{f_{q}}^{l} \ket{\psi}$
+which appears explicitly in its own dynamics. Due to the dependence of $H$ on $f_{q}$ and $a$,
+the $l$\textsuperscript{th} state derivative is coupled to the
+$l - 1$\textsuperscript{th} state derivative.
+
+%% T2
+\begin{table}
+  \begin{tabular}{c | c | c}
+    Method & ${\lvert \ket{\partial_{f_{q}} \psi_{N}} \rvert}^{2}$ ($10^{3}$)
+    & ${\lvert \ket{\partial^{2}_{f_{q}} \psi_{N}} \rvert}^{2}$ ($10^{7}$)\\
+    \hline
+    D-1 & 2.051 & 17.935\\
+    D-2 & 2.511 & 7.628\\
+  \end{tabular}
+  \caption{Norm of the first basis state's derivate with respect to the qubit frequency
+    for $Z/2$ gates optimized using the derivative methods. The norms are computed
+    at the end of the gate's duration $t_{N} = 38$ns.}
+\end{table}
