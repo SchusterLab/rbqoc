@@ -1,0 +1,65 @@
+\section{Longitudinal Relaxation}
+The probability of longitudinal relaxation metric and gate error due to longitudinal
+relaxation metric are compared in Table I for the experiment shown in Figure 1c.
+The relative performance between the analytic and numerical techniques we study
+is similar across the two metrics.
+
+\begin{table}[h!]
+  \begin{tabular}{c | c | c}
+    Gate & $P_{1\textrm{A}} / P_{1\textrm{N}}$ & GE$_{\textrm{A}}$ / GE$_{\textrm{N}}$\\
+    \hline
+    Z/2 & 5.745/1.149 = 5.000 & 1.776/0.371 = 4.787\\
+    Y/2 & 5.253/1.157 = 4.540 & 1.539/0.370 = 4.159\\
+    X/2 & 16.251/2.660 = 6.109 & 5.347/0.863 = 6.196\\
+  \end{tabular}
+  \caption{
+    Single gate probability of longitudinal relaxation
+    ratios and single gate error due to longitudinal relaxation
+    ratios for the analytic and numerical methods. Both probabilities
+    and gate errors are shown in units of $10^{-5}$.
+  }
+\end{table}
+
+To compute the gate error due to longitudinal relaxation,
+we require the final state of the quantum system subject
+to longitudinal relaxation. To obtain the final state we employ
+the Lindblad master equation. This equation takes the form
+\begin{equation}
+  \frac{d}{dt} \rho = \frac{-i}{\hbar} [H, \rho]
+  + \sum_{i = 1}^{n^{2} - 1} \gamma_{i} (L_{i} \rho L_{i}^{\dagger}
+  - \frac{1}{2} \{L_{i}^{\dagger} L_{i}, \rho\})
+\end{equation}
+where $\rho = \ket{\psi}\bra{\psi}$ is the density matrix, $n = \textrm{dim}(\mathcal{H})$,
+and $[\cdot, \cdot], \{\cdot, \cdot \}$ are the algebraic commutator and anti-commutator.
+For longitudinal relaxation $\gamma_{\uparrow} = T_{1, \uparrow}^{-1}$,
+$\gamma_{\downarrow} = T_{1, \downarrow}^{-1}$,
+$L_{\uparrow} = \sigma^{+}/2$, and
+$L_{\downarrow} = \sigma^{-}/2$ where $\sigma^{\pm} = \sigma_{x} \pm i \sigma_{y}$.
+Both $T_{1, \uparrow}$ and $T_{1, \downarrow}$ are obtained from the spline shown in Figure 1b.
+The $T_{1}$ values in this spline are obtained experimentally by driving the qubit at the desired flux amplitude
+and monitoring the resultant decay. For more details consult \cite{zhang2020universal}.
+
+Exponential integrators can be employed to integrate the Lindblad master equation
+using the Vectorization/Choi-Jamiolkowski isomorphism \cite{Landi2018}
+\begin{equation}
+  \frac{d}{dt} \textrm{vec}({\rho}) = \hat{\mathcal{L}} \textrm{vec}({\rho})
+\end{equation}
+\begin{equation}
+  \begin{aligned}
+    \hat{\mathcal{L}} &= -i(I \otimes H - H^{T} \otimes I)\\
+    &+ \sum_{i = 1}^{n^{2} - 1} \gamma_{i}
+    (L_{i}^{*} \otimes L_{i} - \frac{1}{2} (I \otimes L_{i}^{\dagger}L_{i}
+    - L_{i}^{T}L_{i}^{*} \otimes I))
+  \end{aligned}
+\end{equation}
+where $\rho = \sum_{i, j} \alpha_{i, j} \ket{i}\bra{j}$
+and $\textrm{vec}(\rho) = \sum_{i, j} \alpha_{i, j} \ket{i} \otimes \ket{j}$.
+We use zero-order hold on the controls so the integration is exact
+$\textrm{vec}(\rho_{k + 1}) = \exp(\hat{\mathcal{L}} \Delta t_{k}) \textrm{vec}(\rho_{k})$.
+This isomorphism transforms $(n^{2} \times n^{2}) \times (n^{2} \times n^{2})$
+matrix-matrix multiplications to $(n^{4} \times n^{4}) \times n^{4}$ matrix-vector
+multiplications. For small $n$ and zero-order held controls, we find that it is
+faster to use an exponential integrator on the vectorized equation than to perform
+Runge-Kutta on the unvectorized equation. The latter requires decreasing the integration
+time step to maintain accuracy, resulting in more knot points.
+

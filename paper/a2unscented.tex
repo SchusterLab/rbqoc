@@ -1,0 +1,35 @@
+\section{Unscented Transformation}
+In this section we outline the full unscented sampling procedure.
+First we remark that ALTRO does not natively support complex numbers, so our optimization
+is performed under the isomorphism $\mathcal{H}(\mathbb{C}^{n}) \cong \mathcal{H}(\mathbb{R}^{2n})$.
+The unscented sampling method concerns a state $\psi \in \mathbb{R}^{2n}$ with dynamics
+$\psi_{k + 1} = f(\psi_{k}, \lambda_{k})$ with deviant parameters $\lambda \in \mathbb{R}^{d}$.
+The nominal initial state and parameters are given $\psi_{0}$, $\lambda_{0}$ with associated
+positive-definite covariance matrices $P \in \mathbb{R}_{++}^{n \times n}$,
+$L \in \mathbb{R}_{++}^{d \times d}$. We set $\lambda_{0} = 0$ for convenience and modify
+any offset in the dynamics function. Physically, $P$ can represent the state preparation error,
+but is typically chosen to be non-zero even if there is a small state preparation error.
+Using these initial values we generate
+\begin{equation}
+  \begin{bmatrix} \Psi_{0} \\ \Lambda_{0} \end{bmatrix} = \mathcal{N}(
+  \begin{bmatrix} \psi_{0} \\ 0\end{bmatrix}, \begin{bmatrix} P & 0\\ 0 & L\end{bmatrix})
+\end{equation}
+Then the initial states are propagated in the dynamics function
+\begin{equation}
+  \tilde{\Psi_{1}} = f(\Psi_{0}, \Lambda_{0})
+\end{equation}
+We then compute the mean and covariance of the sigma points.
+
+
+
+The desired initial state is given $x_{0}$ with a known covariance $P_{0} \in \mathbb{R}^{n \times n}$.
+These two 
+which is used to generate the initial samples 
+In the case of QOC $x = \ket{\psi} \in $
+
+We will consider a single quantum state $\ket{\psi}$ and associated
+deviant parameters $\vec{\omega}$. $\ket{\psi_{0}}$
+with associated samples $\Psi_{0} = \{\ket{\psi_{0}^{i}}\}$, $i \in \{1, \dots, 2(n + d)\}$.
+The initial samples are generated using covariance matrices for the
+
+

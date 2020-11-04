@@ -16,8 +16,7 @@ __pycache__
 *.log
 *.out
 *.pdf
-!report/report.pdf
-!paper/paper.pdf
+!paper/main.pdf
 
 # julia
 Manifest.toml
