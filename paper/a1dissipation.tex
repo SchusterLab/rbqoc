@@ -29,7 +29,7 @@ the Lindblad master equation. This equation takes the form
   + \sum_{i = 1}^{n^{2} - 1} \gamma_{i} (L_{i} \rho L_{i}^{\dagger}
   - \frac{1}{2} \{L_{i}^{\dagger} L_{i}, \rho\})
 \end{equation}
-where $\rho = \ket{\psi}\bra{\psi}$ is the density matrix, $n = \textrm{dim}(\mathcal{H})$,
+Here $\rho = \ket{\psi}\bra{\psi}$ is the density matrix, $n = \textrm{dim}(\mathcal{H})$,
 and $[\cdot, \cdot], \{\cdot, \cdot \}$ are the algebraic commutator and anti-commutator.
 For longitudinal relaxation $\gamma_{\uparrow} = T_{1, \uparrow}^{-1}$,
 $\gamma_{\downarrow} = T_{1, \downarrow}^{-1}$,
@@ -52,10 +52,10 @@ using the Vectorization/Choi-Jamiolkowski isomorphism \cite{Landi2018}
     - L_{i}^{T}L_{i}^{*} \otimes I))
   \end{aligned}
 \end{equation}
-where $\rho = \sum_{i, j} \alpha_{i, j} \ket{i}\bra{j}$
+Here $\rho = \sum_{i, j} \alpha_{i, j} \ket{i}\bra{j}$
 and $\textrm{vec}(\rho) = \sum_{i, j} \alpha_{i, j} \ket{i} \otimes \ket{j}$.
 We use zero-order hold on the controls so the integration is exact
-$\textrm{vec}(\rho_{k + 1}) = \exp(\hat{\mathcal{L}} \Delta t_{k}) \textrm{vec}(\rho_{k})$.
+$\textrm{vec}(\rho_{k + 1}) = \exp(\Delta t_{k} \hat{\mathcal{L}}_{k}) \textrm{vec}(\rho_{k})$.
 This isomorphism transforms $(n^{2} \times n^{2}) \times (n^{2} \times n^{2})$
 matrix-matrix multiplications to $(n^{4} \times n^{4}) \times n^{4}$ matrix-vector
 multiplications. For small $n$ and zero-order held controls, we find that it is

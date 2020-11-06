@@ -29,16 +29,16 @@ The linear term is $L = H$ and the non-linear term is $N = (\partial_{\lambda} H
 With zero-order hold on the controls the exact propagation is
 \begin{equation}
   \begin{aligned}
-    \ket{\partial_{\lambda} \psi_{k + 1}} &= \exp(L_{k} \Delta t_{k}) \ket{\partial_{\lambda} \psi_{k}}\\
-    &+ \int_{0}^{\Delta t_{k}} \exp(L_{k}(\Delta t_{k} - t^{'})) N(t_{k} + t^{'}) dt^{'}\\
+    \ket{\partial_{\lambda} \psi_{k + 1}} &= \exp(\Delta t_{k} L_{k}) \ket{\partial_{\lambda} \psi_{k}}\\
+    &+ \int_{0}^{\Delta t_{k}} \exp((\Delta t_{k} - t^{'})L_{k}) N(t_{k} + t^{'}) dt^{'}\\
   \end{aligned}
 \end{equation}
 General exponential integrators proceed by breaking the integral into a discrete sum, similar to the procedure
 for Runge-Kutta schemes. We use a simple approximation known as the Lawson-Euler method \cite{berland2005solving}
 \begin{equation}
   \begin{aligned}
-    \ket{\partial_{\lambda} \psi_{k + 1}} &\approx \exp(L_{k} \Delta t_{k}) \ket{\partial_{\lambda} \psi_{k}}\\
-    &+ \exp(L_{k} \Delta t_{k}) N_{k}\\
+    \ket{\partial_{\lambda} \psi_{k + 1}} &\approx \exp(\Delta t_{k}L_{k}) \ket{\partial_{\lambda} \psi_{k}}\\
+    &+ \exp(\Delta t_{k}L_{k}) N_{k}\\
   \end{aligned}
 \end{equation}
 This method provides a good tradeoff between accuracy and efficiency, requiring one unique matrix

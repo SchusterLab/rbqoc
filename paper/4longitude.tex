@@ -28,7 +28,7 @@ control parameters in a range of superconducting circuit platforms.
 It is advantageous to tune the controls to extend the longitudinal
 relaxation time.
 Computing the gate error due to longitudinal relaxation
-requires propagating density matrices of size $n \times n$ under Master equation
+requires propagating density matrices of size $n \times n$ under master equation
 dynamics, rather than state vectors of size $n$ under the TDSE dynamics.
 We avoid this increase in computational complexity by
 penalizing the integrated rate of longitudinal relaxation,
@@ -112,19 +112,19 @@ The numerically optimized gates converge on similar solutions, a periodic
 waveform with amplitude $\sim 0.2 \textrm{GHz}$, see Figure 1.
 They extend their gate times
 beyond their analytic counterparts, trading longer gate times for access
-to higher amplitudes and therefore higher $T_{1}$ times. All numerically optimized gates reduce
+to higher amplitudes and therefore higher $T_{1}$ times. All numerical gates reduce
 their single gate errors by a factor of $5$ over
 their analytic counterparts which is commensurate to their
 probability of longitudinal relaxation reductions, see Appendix.
 The gate error reported in this text is the infidelity
 of the evolved state and the target state averaged over 1000 pseudo-randomly
-generated initial states. The optimized $Z/2$ and $Y/2$ gates perform simlarly in
+generated initial states. The numerical $Z/2$ and $Y/2$ gates perform simlarly in
 the concatenated gate application comparision, suppressing accumulated gate errors to $8 \cdot 10^{-3}$
-over $2000$ gate applications $\sim 40 \mu\textrm{s}$. The optimized $X/2$ gate
+over $2000$ gate applications $\sim 40 \mu\textrm{s}$. The numerical $X/2$ gate
 achieves an accumulated gate error of $1.7 \cdot 10^{-2}$ over $2000$ gate applications $\sim 124 \mu\textrm{s}$.
-Both the analytic and optimized gates attain single gate errors sufficient for
+Both the analytic and numerical gates attain single gate errors sufficient for
 quantum error correction $< 10^{-4}$, requisite for fault-tolerant quantum computing.
-The low gate errors achieved by the optimized gates for extend computations
+The low gate errors achieved by the numerical gates for extend computations
 are critical for noisy, intermediate-scale quantum (NISQ) applications.
 These improvements are significant for the realistic constraints we have imposed
 on the gates, and do not represent a fundamental limit to the optimization methods we have

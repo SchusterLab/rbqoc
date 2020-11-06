@@ -1,35 +1,56 @@
 \section{Unscented Transformation}
 In this section we outline the full unscented sampling procedure.
-First we remark that ALTRO does not natively support complex numbers, so our optimization
-is performed under the isomorphism $\mathcal{H}(\mathbb{C}^{n}) \cong \mathcal{H}(\mathbb{R}^{2n})$.
-The unscented sampling method concerns a state $\psi \in \mathbb{R}^{2n}$ with dynamics
-$\psi_{k + 1} = f(\psi_{k}, \lambda_{k})$ with deviant parameters $\lambda \in \mathbb{R}^{d}$.
-The nominal initial state and parameters are given $\psi_{0}$, $\lambda_{0}$ with associated
-positive-definite covariance matrices $P \in \mathbb{R}_{++}^{n \times n}$,
-$L \in \mathbb{R}_{++}^{d \times d}$. We set $\lambda_{0} = 0$ for convenience and modify
-any offset in the dynamics function. Physically, $P$ can represent the state preparation error,
-but is typically chosen to be non-zero even if there is a small state preparation error.
-Using these initial values we generate
+First, we remark that ALTRO does not natively support complex numbers, so our optimization
+is performed under an isomorphism $\mathcal{H}(\mathbb{C}^{n}) \cong \mathcal{H}(\mathbb{R}^{2n})$.
 \begin{equation}
-  \begin{bmatrix} \Psi_{0} \\ \Lambda_{0} \end{bmatrix} = \mathcal{N}(
-  \begin{bmatrix} \psi_{0} \\ 0\end{bmatrix}, \begin{bmatrix} P & 0\\ 0 & L\end{bmatrix})
+  H \psi \cong \begin{pmatrix} H_{\textrm{re}} & -H_{\textrm{im}} \\ H_{\textrm{im}} & H_{\textrm{re}}\end{pmatrix}
+  \begin{pmatrix} \psi_{\textrm{re}} \\ \psi_{\textrm{im}}\end{pmatrix}
 \end{equation}
-Then the initial states are propagated in the dynamics function
+
+The unscented sampling method concerns a quantum state $\psi \in \mathbb{R}^{2n}$ with
+deviant parameters $\lambda \in \mathbb{R}^{d}$ and dynamics $\psi_{k + 1} = f(\psi_{k}, \lambda_{k})$.
+The nominal initial quantum state is given by $\psi_{0}$ with an associated
+positive-definite covariance matrix $P_{0} \in \mathbb{R}_{++}^{n \times n}$
+which describes the uncertainty in the initial state.
+$P_{0}$ is typically chosen to be non-zero even if the state preparation error is negligible.
+The deviant parameter
+is assumed to have zero mean and its distribution is given by the covariance matrix
+$L_{k} \in \mathbb{R}_{++}^{d \times d}$ at knot point $k$. The zero mean assumption
+is convenient for deriving the update procedure. A non-zero mean can be encoded
+in the dynamics $f$.
+
+The initial $4n + 2d$ sigma points and initial $4n + 2d$ deviant parameters are sampled
+from the initial distributions
 \begin{equation}
-  \tilde{\Psi_{1}} = f(\Psi_{0}, \Lambda_{0})
+  \begin{bmatrix} \Psi_{0}^{i} \\ \Lambda_{0}^{i} \end{bmatrix} =
+  \begin{bmatrix} \bar{\Psi}_{0} \\ 0\end{bmatrix}
+    \pm \beta \sqrt{\begin{bmatrix} P_{0} & 0\\ 0 & L_{0}\end{bmatrix}}^{\; i}
 \end{equation}
-We then compute the mean and covariance of the sigma points.
+We have written $\bar{\Psi}_{0} = \psi_{0}$. $\beta$
+is a hyperparameter which controls the spacing of the covariance contour.
+The $\pm$ is understood to take $+$ for $ i \in \{1, \dots, 2n + d\}$ and $-$ for
+$i \in \{2n + d + 1, \dots, 4n + 2d\}$. We use the Cholesky factorization
+to compute the square root of the
+joint covariance matrix, though other methods
+such as the principal square root may be employed.
+The superscript indicates the $i$\textsuperscript{th} column of the
+lower triangular Cholesky factor.
+Then, the sigma points are normalized
+\begin{equation}
+  \Psi_{0}^{i} \gets \frac{\Psi_{0}^{i}}{\sqrt{\Psi_{0}^{i^{T}} \Psi_{0}^{i}}}
+\end{equation}
+The sigma points are propagated to the next knot point
+\begin{equation}
+  \Psi_{1} = f(\Psi_{0}, \Lambda_{0})
+\end{equation}
+The mean and covariance of the sigma points is computed
+\begin{align}
+  \bar{\Psi}_{1} &= \frac{1}{4n + 2d} \sum_{i = 1}^{4n + 2d} \Psi_{1}^{i}\\
+  P_{1} &= \frac{1}{\beta^{2}(4n + 2d)} \sum_{i = 1}^{4n + 2d}
+  (\Psi^{i}_{1} - \bar{\Psi}_{1})^{T}(\Psi^{i}_{1} - \bar{\Psi}_{1})
+\end{align}
+The sigma points are then resampled and propagated to the next knot point using eq B2, B3, and B4.
 
 
-
-The desired initial state is given $x_{0}$ with a known covariance $P_{0} \in \mathbb{R}^{n \times n}$.
-These two 
-which is used to generate the initial samples 
-In the case of QOC $x = \ket{\psi} \in $
-
-We will consider a single quantum state $\ket{\psi}$ and associated
-deviant parameters $\vec{\omega}$. $\ket{\psi_{0}}$
-with associated samples $\Psi_{0} = \{\ket{\psi_{0}^{i}}\}$, $i \in \{1, \dots, 2(n + d)\}$.
-The initial samples are generated using covariance matrices for the
 
 

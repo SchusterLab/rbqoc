@@ -44,8 +44,8 @@ into optimization \cite{huang2020engineering}. Comprehensive tools that interlea
 and pulse design are under active development \cite{wittler2020integrated}.
 
 In this work we develop robust trajectory optimization techniques to mitigate
-errors arising from longitudinal relaxation, system parameter deviations, and 1/$f$ flux noise
-on the fluxonium qubit. We perform these optimization using the ALTRO
+errors arising from longitudinal relaxation, parameter deviations, and 1/$f$ flux noise
+on the fluxonium qubit presented in \cite{zhang2020universal}. We perform these optimization using the ALTRO
 method \cite{howell2019altro} which combines the iterative, indirect shooting
 flavor of methods such as GOAT \cite{machnes2015gradient}, GRAPE
 \cite{khaneja2005optimal, leung2017speedup}, and Krotov's \cite{goerz2019krotov}
@@ -59,7 +59,7 @@ on the controls in an efficient optimization objective that does
 not pay the increased computational cost of integrating a master equation.
 Additionally, we consider three robust
 robust trajectory opitmization techniques to make the
-quantum state trajectory robust to system parameter deviations.
+quantum state trajectory robust to parameter deviations.
 The first is the sampling method, which has been applied
 previously in the context of QOC
 \cite{carvalho2020error, reinhold2019controlling, rembold2020introduction}.
@@ -71,14 +71,11 @@ We propose a third method, which uses derivative information
 of parameter deviations with respect to the quantum state trajectory.
 We make this method efficient by employing mixed-mode differentiation.
 
-We compare the performance of these numerical techniques
-on the heavy fluxonium qubit and against the assocaited analytic techniques
-presented in \cite{zhang2020universal}. This paper is outlined as follows.
+This paper is organized as follows.
 First, we introduce the ALTRO method in the context of QOC.
-We describe experimentally
-realistic constraints for the fluxonium and
+We describe realistic constraints for the fluxonium and
 map them to the ALTRO method. Then, we
 outline a method for making the optimization aware of longitudinal
 relaxation. Next, we outline three methods for achieving
 robustness to static parameter deviations. Finally,
-we employ the robust control techniques to mitigate magnetic flux noise.
+we employ the robust control techniques to mitigate 1/$f$ flux noise.
