@@ -1,22 +1,27 @@
 \section{Longitudinal Relaxation}
-The probability of longitudinal relaxation metric and gate error due to longitudinal
+\label{appendix:longitude}
+We comment on the longitudinal relaxation metrics and then give
+our procedure for integrating the Lindblad master equation.
+The longitudal relaxation probability metric and gate error due to longitudinal
 relaxation metric are compared in Table I for the experiment shown in Figure 1c.
-The relative performance between the analytic and numerical techniques we study
+The relative performance of the analytic and numerical techniques we study
 is similar across the two metrics.
 
 \begin{table}[h!]
-  \begin{tabular}{c | c | c}
-    Gate & $P_{1\textrm{A}} / P_{1\textrm{N}}$ & GE$_{\textrm{A}}$ / GE$_{\textrm{N}}$\\
+  \begin{tabular}{c | c | c | c | c | c | c}
+         & $P_{1\textrm{A}}$ & $P_{1\textrm{N}}$ & & GE$_{\textrm{A}}$ & GE$_{\textrm{N}}$ &\\
+    Gate & $(10^{-5})$ & $(10^{-5})$ & $P_{1\textrm{A}}/ P_{1\textrm{N}}$ & $(10^{-5})$ &
+    $(10^{-5})$ & GE$_{\textrm{A}} / \textrm{GE}_{\textrm{N}}$\\
     \hline
-    Z/2 & 5.745/1.149 = 5.000 & 1.776/0.371 = 4.787\\
-    Y/2 & 5.253/1.157 = 4.540 & 1.539/0.370 = 4.159\\
-    X/2 & 16.251/2.660 = 6.109 & 5.347/0.863 = 6.196\\
+    Z/2 & 5.745 & 1.149 & 5.000 & 1.776 & 0.371 & 4.787\\
+    Y/2 & 5.253 & 1.157 & 4.540 & 1.539 & 0.370 & 4.159\\
+    X/2 & 16.251 & 2.660 & 6.109 & 5.347 & 0.863 & 6.196\\
   \end{tabular}
   \caption{
-    Single gate probability of longitudinal relaxation
-    ratios and single gate error due to longitudinal relaxation
-    ratios for the analytic and numerical methods. Both probabilities
-    and gate errors are shown in units of $10^{-5}$.
+    Single gate longitudinal relaxation probability ratios
+    and single gate error due to longitudinal relaxation ratios.
+    Values are reported for the analytic (A) and numerical (N) techniques
+    presented in the main text.
   }
 \end{table}
 

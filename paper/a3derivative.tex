@@ -1,14 +1,18 @@
 \section{Derivative Method}
+\label{appendix:derivative}
+We comment on the relative performance of the derivative methods and then
+outline how to efficiently integrate their dynamics.
 We believe the 1\textsuperscript{st}-order derivative method tends
 to outperform the 2\textsuperscript{nd}-order
 derivative method in the small, static detuning regime, see Figure 2b,
 because second-order contributions to the gate error are small.
 The norm of the state derivatives for the 1\textsuperscript{st}- and 2\textsuperscript{nd}-order
-derivative methods are provided in Table 2 for the solutions of the optimization outlined
+derivative methods are provided in Table \ref{tab:dnorm} for the solutions of the optimization outlined
 in section V at the gate duration $t_{N} = 38$ns.
 
 %%TODO: the values in this table are not up to date until this comment is removed
 \begin{table}[h]
+  \label{tab:dnorm}
   \begin{tabular}{c | c | c}
     Method & ${\lvert \braket{\partial_{f_{q}} \psi_{N} | \partial_{f_{q}} \psi_{N}} \rvert}^{2}$ ($10^{3}$)
     & ${\lvert \braket{\partial^{2}_{f_{q}} \psi_{N} | \partial^{2}_{f_{q}} \psi_{N}} \rvert}^{2}$ ($10^{7}$)\\
@@ -21,20 +25,24 @@ in section V at the gate duration $t_{N} = 38$ns.
     at the end of the gate's duration $t_{N} = 38$ns.}
 \end{table}
 
-The dynamics for the derivative methods can be integrated efficiently using exponential integrators.
+The dynamics for the derivative methods can be integrated efficiently using exponential integrators
+\cite{berland2005solving, einkemmer2017performance}.
 General exponential integrators break the dynamics into a linear term and a non-linear term. For example, consider
 integrating the dynamics of the first state derivative $\frac{d}{dt} \ket{\partial_{\lambda} \psi} =
 H \ket{\partial_{\lambda} \psi} + (\partial_{\lambda} H) \ket{\psi}$ in units of $i\hbar = 1$.
 The linear term is $L = H$ and the non-linear term is $N = (\partial_{\lambda} H) \ket{\psi}$.
 With zero-order hold on the controls the exact propagation is
 \begin{equation}
+  \label{eq:dgeneralexp}
   \begin{aligned}
     \ket{\partial_{\lambda} \psi_{k + 1}} &= \exp(\Delta t_{k} L_{k}) \ket{\partial_{\lambda} \psi_{k}}\\
     &+ \int_{0}^{\Delta t_{k}} \exp((\Delta t_{k} - t^{'})L_{k}) N(t_{k} + t^{'}) dt^{'}\\
   \end{aligned}
 \end{equation}
-General exponential integrators proceed by breaking the integral into a discrete sum, similar to the procedure
-for Runge-Kutta schemes. We use a simple approximation known as the Lawson-Euler method \cite{berland2005solving}
+General exponential integrators proceed by breaking the integral in \eqref{eq:dgeneralexp}
+into a discrete sum, similar to the procedure
+for Runge-Kutta schemes. We use a simple approximation known as the Lawson-Euler
+method \cite{berland2005solving}
 \begin{equation}
   \begin{aligned}
     \ket{\partial_{\lambda} \psi_{k + 1}} &\approx \exp(\Delta t_{k}L_{k}) \ket{\partial_{\lambda} \psi_{k}}\\
@@ -42,8 +50,8 @@ for Runge-Kutta schemes. We use a simple approximation known as the Lawson-Euler
   \end{aligned}
 \end{equation}
 This method provides a good tradeoff between accuracy and efficiency, requiring one unique matrix
-exponential computation per stage. Exact integration accuracy is not of the utmost importance because the
-state derivatives guide the robust optimization, and do not correspond to experimental parameters
+exponential computation per stage. Integration accuracy is not of the utmost importance because the
+state derivatives guide the optimization, and do not correspond to experimental parameters
 which must be realized with high accuracy.
 
 

@@ -48,6 +48,7 @@ and the size of the state vector. $d$ is the number of deviant parameters.
 
 %% F3
 \begin{figure*}[ht]
+  \label{fig:stochastic}
   \begin{subfigure}{.4\textwidth}
     \includegraphics[width=\linewidth]{assets/f3a.png}
   \end{subfigure}\hspace{0.025\textwidth}
@@ -80,11 +81,12 @@ This resampling procedure, the unscented transformation, accurately propagates
 first and second moments of the distribution and ensures the points
 lie on the $\sqrt{n}$\textsuperscript{th}
 covariance contour at each knot point. A detailed update procedure is given
-in the appendix. Each initial state from the operator basis
+in Appendix \ref{appendix:unscented}. Each initial state from the operator basis
 is represented with a distribution of $2 (n + d)$ samples. Hence,
 the number of states in the augmented state vector scales as $O(n^{3} + dn^{2})$.
 The gate error of each sample state is penalized as in the sampling method.
 
+%% TODO: comment on the fact that we can reduce the number of sample states
 The derivative method draws on the intuition that
 the sensitivity of the state evolution to a parameter
 $\lambda$ is encoded in the $l$\textsuperscript{th}-order
@@ -111,8 +113,8 @@ for the 1\textsuperscript{st}-order derivative method are
   (\partial_{\lambda} H) \ket{\psi}
 \end{align}
 Exponential integrators that account for the non-linear
-term may be used to efficiently integrate the coupled dynamics
-\cite{berland2005solving, einkemmer2017performance}.
+term may be used to efficiently integrate the coupled dynamics,
+see Appendix \ref{appendix:derivative}.
 For this method $m$ state derivatives are associated with each
 initial state from the operator basis.
 So, the number of states in the augmented state vector scales as
@@ -128,8 +130,9 @@ the sampling methods accordingly. For each method we compute the gate error for
 one simulated gate application subject to the deviant dynamics given by the
 stated qubit frequency detuning $\delta f_{q}$.
 
+%% TODO: fix figure and table referencing
 We compare the numerical methods
-to an analytically derived $Z/2$ gate. This gate corresponds to
+to an analytically derived $Z/2$ gate, see Figure \ref{fig:static}a. This gate corresponds to
 idling at the flux frustration point $a = 0$. The analytic gate
 is at the device's speed limit for a $Z/2$ gate $t_{Z/2} = 1 / 4 f_{q}$ and
 is simple to derive. Its erroneous rotation angle $2 \pi t_{Z/2} \delta f_{q}$ is linearly sensitive to
@@ -137,13 +140,13 @@ the qubit frequency detuning, resulting in a gate error that is quadratically se
 to the qubit frequency detutning.
 At a one-percent
 qubit frequency detuning the analytic gate achieves a gate error $\sim 4.5 \cdot 10^{-5}$,
-which is sufficient for quantum error correction, see Figure 2b.
+which is sufficient for quantum error correction, see Figure \ref{fig:static}b.
 Although the analytic $Z/2$ gate performs well, it works
 only at the gate time $t_{Z/2}$. The ability to perform $Z$ rotations in arbitrary times is critical
 for operating multi-qubit experiments in the lab frame.
 Each numerical method is able to find solutions at
-all gate times above $t_{Z/2}$, but is unable to find solutions at shorter times,
-see Figure 2b. These numerical methods offer an effective scheme for synchronizing
+all gate times above $t_{Z/2}$, but is unable to find solutions at shorter times.
+These numerical methods offer an effective scheme for synchronizing
 qubits operating at different frequencies $f_{q, i} \neq f_{q, j}$.
 
 %% TOOD: intro sentence
@@ -162,12 +165,12 @@ use fast traingle pulses at the boundaries and balance time
 on either side of the flux-frustration point symmetrically at low amplitudes.
 Both methods achieve a super-linear scaling in their gate error as
 a function of the gate duration. The gate error for the 1\textsuperscript{st}-order
-derivative method approaches zero at the larmor period $1 / f_{q}$.
+derivative method approaches zero at the larmor period $1 / f_{q}$, see Figure \ref{fig:static}c.
 We believe the 1\textsuperscript{st}-order method outperforms the \textsuperscript{nd}-order
 method due to the low contribution of second-order
-terms to the gate error in this deviation regime, see Table 2.
+terms to the gate error in this deviation regime, see Appendix \ref{appendix:derivative}.
 
-%% TODO: comment on the fact that we can reduce the number of sample states
+
 %% TODO: how do I tie this in?
 Multiple analytic methods have also been presented to construct gates
 that mitigate the error arising from parameter deviations

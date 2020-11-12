@@ -1,5 +1,6 @@
 %% F1
 \begin{figure*}[ht]
+  \label{fig:longitude}
   \begin{subfigure}{.315\textwidth}
     \includegraphics[width=\linewidth]{assets/f1a.png}
   \end{subfigure}\hfill
@@ -77,6 +78,7 @@ of the time step $\lvert \Delta t_{k} \rvert$ in optimization.
 
 %% F2
 \begin{figure*}[ht]
+  \label{fig:static}
   \begin{subfigure}{.315\textwidth}
     \includegraphics[width=\linewidth]{assets/f2a.png}
   \end{subfigure}\hfill
@@ -109,13 +111,13 @@ We compare the numerical method we have developed to the analytic gates
 on the task of achieving low gate errors in the presence of longitudinal relaxation
 for the $Z/2$, $Y/2$, and $X/2$ gates.
 The numerically optimized gates converge on similar solutions, a periodic
-waveform with amplitude $\sim 0.2 \textrm{GHz}$, see Figure 1.
+waveform with amplitude $\sim 0.2 \textrm{GHz}$, see Figure \ref{fig:longitude}.
 They extend their gate times
 beyond their analytic counterparts, trading longer gate times for access
 to higher amplitudes and therefore higher $T_{1}$ times. All numerical gates reduce
 their single gate errors by a factor of $5$ over
 their analytic counterparts which is commensurate to their
-probability of longitudinal relaxation reductions, see Appendix.
+probability of longitudinal relaxation reductions, see Appendix \ref{appendix:longitude}.
 The gate error reported in this text is the infidelity
 of the evolved state and the target state averaged over 1000 pseudo-randomly
 generated initial states. The numerical $Z/2$ and $Y/2$ gates perform simlarly in

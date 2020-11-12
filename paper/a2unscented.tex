@@ -1,7 +1,9 @@
 \section{Unscented Transformation}
+\label{appendix:unscented}
 In this section we outline the full unscented sampling procedure.
 First, we remark that ALTRO does not natively support complex numbers, so our optimization
-is performed under an isomorphism $\mathcal{H}(\mathbb{C}^{n}) \cong \mathcal{H}(\mathbb{R}^{2n})$.
+is performed under an isomorphism $\mathcal{H}(\mathbb{C}^{n}) \cong \mathcal{H}(\mathbb{R}^{2n})$
+\cite{leung2017speedup}
 \begin{equation}
   H \psi \cong \begin{pmatrix} H_{\textrm{re}} & -H_{\textrm{im}} \\ H_{\textrm{im}} & H_{\textrm{re}}\end{pmatrix}
   \begin{pmatrix} \psi_{\textrm{re}} \\ \psi_{\textrm{im}}\end{pmatrix}
@@ -21,35 +23,36 @@ in the dynamics $f$.
 
 The initial $4n + 2d$ sigma points and initial $4n + 2d$ deviant parameters are sampled
 from the initial distributions
-\begin{equation}
+\begin{equation}\label{eq:uupdate}
   \begin{bmatrix} \Psi_{0}^{i} \\ \Lambda_{0}^{i} \end{bmatrix} =
   \begin{bmatrix} \bar{\Psi}_{0} \\ 0\end{bmatrix}
     \pm \beta \sqrt{\begin{bmatrix} P_{0} & 0\\ 0 & L_{0}\end{bmatrix}}^{\; i}
 \end{equation}
 We have written $\bar{\Psi}_{0} = \psi_{0}$. $\beta$
 is a hyperparameter which controls the spacing of the covariance contour.
-The $\pm$ is understood to take $+$ for $ i \in \{1, \dots, 2n + d\}$ and $-$ for
+The $(\pm)$ is understood to take $(+)$ for $ i \in \{1, \dots, 2n + d\}$ and $(-)$ for
 $i \in \{2n + d + 1, \dots, 4n + 2d\}$. We use the Cholesky factorization
 to compute the square root of the
 joint covariance matrix, though other methods
 such as the principal square root may be employed.
-The superscript indicates the $i$\textsuperscript{th} column of the
-lower triangular Cholesky factor.
+The superscript on the matrix square root indicates the $i$\textsuperscript{th}
+column (mod $2n + d$) of the lower triangular Cholesky factor.
 Then, the sigma points are normalized
-\begin{equation}
+\begin{equation}\label{eq:unormalize}
   \Psi_{0}^{i} \gets \frac{\Psi_{0}^{i}}{\sqrt{\Psi_{0}^{i^{T}} \Psi_{0}^{i}}}
 \end{equation}
 The sigma points are propagated to the next knot point
-\begin{equation}
+\begin{equation}\label{eq:upropagate}
   \Psi_{1} = f(\Psi_{0}, \Lambda_{0})
 \end{equation}
-The mean and covariance of the sigma points is computed
+The mean and covariance of the sigma points are computed
 \begin{align}
   \bar{\Psi}_{1} &= \frac{1}{4n + 2d} \sum_{i = 1}^{4n + 2d} \Psi_{1}^{i}\\
   P_{1} &= \frac{1}{\beta^{2}(4n + 2d)} \sum_{i = 1}^{4n + 2d}
   (\Psi^{i}_{1} - \bar{\Psi}_{1})^{T}(\Psi^{i}_{1} - \bar{\Psi}_{1})
 \end{align}
-The sigma points are then resampled and propagated to the next knot point using eq B2, B3, and B4.
+The sigma points are then resampled and propagated to the next knot point using
+\eqref{eq:uupdate}, \eqref{eq:unormalize}, and \eqref{eq:upropagate}.
 
 
 

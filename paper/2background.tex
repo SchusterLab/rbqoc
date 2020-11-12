@@ -54,14 +54,17 @@ $x_{k + 1} = f(x_{k}, u_{k}, t_{k}, \Delta t_{k})$.
 In the case of quantum optimal control $\ket{\psi_{k}} \subseteq x_{k}$
 and $f$ encodes the TDSE dynamics. In the following
 we refer to $\ket{\psi}$ as the state, $x$ as the augmented
-state, and $u$ as the augmented controls.
+state, and $u$ as the augmented controls. In practice the final state
+of the quantum system matching the target state
+is the most important metric, which is reflected in the weight
+bias $Q_{N} \sim N \cdot Q_{1}$ and $Q_{k} = Q_{1}$.
 
 The advantage of the LQR formulation
 is that there exists a dynamic programming algorithm to compute the
 optimal update to the augmented controls ($u_{k}$) which minimizes the functional
 ($J_{\textrm{iLQR}, k}$) for each knot point. This algorithm proceeds by deriving a
 recurrence relation between knot points $k$ and $k + 1$ for the optimal
-feedback law--known as the Ricatti recursion (see Appendix). The
+feedback law--known as the Ricatti recursion. The
 iterative LQR (iLQR) algorithm computes $J_{\textrm{iLQR}}$
 and applies the Ricatti recursion to all knot points on multiple
 executions.
