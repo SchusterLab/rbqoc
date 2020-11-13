@@ -1,5 +1,4 @@
-%% S5
-\section{Robustness to Static Parameter Deviations}
+\section{Robustness to Static Parameter Deviations \label{sec:static}}
 We have formulated the quantum optimal control
 problem as an open loop optimization problem, i.e.
 feedback from the experiment is not incorporated in optimization.
@@ -48,14 +47,12 @@ and the size of the state vector. $d$ is the number of deviant parameters.
 
 %% F3
 \begin{figure*}[ht]
-  \label{fig:stochastic}
   \begin{subfigure}{.4\textwidth}
     \includegraphics[width=\linewidth]{assets/f3a.png}
   \end{subfigure}\hspace{0.025\textwidth}
   \begin{subfigure}{.4\textwidth}
     \includegraphics[width=\linewidth]{assets/f3b.png}
   \end{subfigure}
-
   \caption{
     (a) $X/2$ gates robust to flux offsets constructed with the analytic,
     sampling, unscented sampling, and the 1\textsuperscript{st}-
@@ -65,6 +62,7 @@ and the size of the state vector. $d$ is the number of deviant parameters.
     successive gate applications. The reported gate error is the cumulative
     gate error after each gate application.
   }
+  \label{fig:stochastic}
 \end{figure*}
 
 The strategy of the unscented sampling method is to

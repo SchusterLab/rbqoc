@@ -1,28 +1,32 @@
 \section{Derivative Method}
 \label{appendix:derivative}
-We comment on the relative performance of the derivative methods and then
+We comment on the optimization metrics of the derivative methods and then
 outline how to efficiently integrate their dynamics.
-We believe the 1\textsuperscript{st}-order derivative method tends
+The 1\textsuperscript{st}-order derivative method tends
 to outperform the 2\textsuperscript{nd}-order
-derivative method in the small, static detuning regime, see Figure 2b,
-because second-order contributions to the gate error are small.
-The norm of the state derivatives for the 1\textsuperscript{st}- and 2\textsuperscript{nd}-order
-derivative methods are provided in Table \ref{tab:dnorm} for the solutions of the optimization outlined
-in section V at the gate duration $t_{N} = 38$ns.
+derivative method in the small, static detuning regime, see Figure \ref{fig:static}b.
+The norms of the state derivatives for the 1\textsuperscript{st}- and 2\textsuperscript{nd}-order
+methods are provided in Table \ref{tab:dnorm} for the solutions at $t_{N} = 60$ns.
+The 2\textsuperscript{nd}-order method is able to decrease the 2\textsuperscript{nd}-order
+state derivate norm relative to the 1\textsuperscript{st}-order method at the expense of increasing
+its 1\textsuperscript{st}-order derivative norm. In the problem
+we have studied it is likely the 2\textsuperscript{nd}-order derivative norm has a smaller
+contribution to the gate error than the 1\textsuperscript{st}-order derivative norm. A
+careful analysis could be completed for future problems to predict the efficacy of the
+derivative method at each order.
 
-%%TODO: the values in this table are not up to date until this comment is removed
 \begin{table}[h]
-  \label{tab:dnorm}
   \begin{tabular}{c | c | c}
     Method & ${\lvert \braket{\partial_{f_{q}} \psi_{N} | \partial_{f_{q}} \psi_{N}} \rvert}^{2}$ ($10^{3}$)
-    & ${\lvert \braket{\partial^{2}_{f_{q}} \psi_{N} | \partial^{2}_{f_{q}} \psi_{N}} \rvert}^{2}$ ($10^{7}$)\\
+    & ${\lvert \braket{\partial^{2}_{f_{q}} \psi_{N} | \partial^{2}_{f_{q}} \psi_{N}} \rvert}^{2}$ ($10^{6}$)\\
     \hline
-    D-1 & 2.051 & 17.935\\
-    D-2 & 2.511 & 7.628\\
+    D-1 & 0.436 & 57.817\\
+    D-2 & 1.702 & 9.030\\
   \end{tabular}
-  \caption{Norm of the first basis state's derivate with respect to the qubit frequency
+  \caption{Norm of state derivates with respect to the qubit frequency
     for $Z/2$ gates optimized using the derivative methods. The norms are computed
-    at the end of the gate's duration $t_{N} = 38$ns.}
+    at the end of the gate's duration $t_{N} = 60$ns and are averaged over each initial state.}
+  \label{tab:dnorm}
 \end{table}
 
 The dynamics for the derivative methods can be integrated efficiently using exponential integrators
