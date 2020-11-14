@@ -93,19 +93,19 @@ class PulseType(Enum):
 #ENDDEF
 
 PT_STR = {
-    PulseType.analytic: "Anl.",
+    PulseType.analytic: "A",
     PulseType.qoc: "QOC",
-    PulseType.s2: "S-8",
+    PulseType.s2: "S",
     PulseType.s4: "S-4",
-    PulseType.d1: "D-1",
-    PulseType.d2: "D-2",
+    PulseType.d1: "D1",
+    PulseType.d2: "D2",
     PulseType.d3: "D-3",
     PulseType.s2b: "S-2",
     PulseType.s4b: "S-4",
     PulseType.d2b: "D-2",
     PulseType.d3b: "D-2",
     PulseType.corpse: "C-2",
-    PulseType.sut8: "SU-10",
+    PulseType.sut8: "SU",
 }
 
 PT_COLOR = {
@@ -427,7 +427,7 @@ def make_figure1c():
     #ENDFOR
 
     # configure main 
-    ax.set_ylabel("Gate Error", fontsize=LABEL_FS)
+    ax.set_ylabel("Total Gate Error", fontsize=LABEL_FS)
     ax.set_xlabel("Gate Count", fontsize=LABEL_FS)
     ax.set_xlim(0, gate_count)
     xticks_ = [0, 500, 1000, 1500, 2000]
@@ -496,11 +496,11 @@ def make_figure2a():
         axs[i].tick_params(direction="in", labelsize=TICK_FS)
         axs[i].set_xticks([])
     #ENDFOR
-    fig.text(0.27, 0.91, "Anl.", fontsize=TEXT_FS)
-    fig.text(0.27, 0.75, "S-8", fontsize=TEXT_FS)
-    fig.text(0.27, 0.59, "SU-10", fontsize=TEXT_FS)
-    fig.text(0.27, 0.425, "D-1", fontsize=TEXT_FS)
-    fig.text(0.27, 0.265, "D-2", fontsize=TEXT_FS)
+    fig.text(0.27, 0.91, PT_STR[PulseType.analytic], fontsize=TEXT_FS)
+    fig.text(0.27, 0.75, PT_STR[PulseType.s2], fontsize=TEXT_FS)
+    fig.text(0.27, 0.59, PT_STR[PulseType.sut8], fontsize=TEXT_FS)
+    fig.text(0.27, 0.425, PT_STR[PulseType.d1], fontsize=TEXT_FS)
+    fig.text(0.27, 0.265, PT_STR[PulseType.d2], fontsize=TEXT_FS)
     axs[2].set_ylabel("$a$ (GHz)", fontsize=LABEL_FS)
     axs[4].set_xlabel("$t$ (ns)", fontsize=LABEL_FS)
     xticks = [0 - F2A_XEPS, 10, 20, 30]
@@ -680,11 +680,11 @@ def make_figure3a():
         axs[i].tick_params(direction="in", labelsize=TICK_FS)
         axs[i].set_xticks([])
     #ENDFOR
-    fig.text(0.3, 0.895, "Anl.", fontsize=TEXT_FS)
-    fig.text(0.3, 0.735, "S-8", fontsize=TEXT_FS)
-    fig.text(0.3, 0.56, "SU-10", fontsize=TEXT_FS)
-    fig.text(0.3, 0.39, "D-1", fontsize=TEXT_FS)
-    fig.text(0.3, 0.22, "D-2", fontsize=TEXT_FS)
+    fig.text(0.3, 0.895, PT_STR[PulseType.analytic], fontsize=TEXT_FS)
+    fig.text(0.3, 0.735, PT_STR[PulseType.s2], fontsize=TEXT_FS)
+    fig.text(0.3, 0.56, PT_STR[PulseType.sut8], fontsize=TEXT_FS)
+    fig.text(0.3, 0.39, PT_STR[PulseType.d1], fontsize=TEXT_FS)
+    fig.text(0.3, 0.22, PT_STR[PulseType.d2], fontsize=TEXT_FS)
     axs[2].set_ylabel("$a$ (GHz)", fontsize=LABEL_FS)
     axs[4].set_xlabel("$t$ (ns)", fontsize=LABEL_FS)
     axs[4].set_xticks([0 - F3A_XEPS[i], 10, 20, 30, 40, 50])
@@ -722,7 +722,7 @@ def make_figure3b():
                 color=color, linestyle=linestyle, label=label)
     #ENDFOR
 
-    ax.set_ylabel("Gate Error", fontsize=LABEL_FS)
+    ax.set_ylabel("Total Gate Error", fontsize=LABEL_FS)
     ax.set_xlabel("Gate Count", fontsize=LABEL_FS)
     ax_xticks = np.arange(0, gate_count + 1, 20)
     ax_xtick_labels = ["0"] + [""] * 4 + ["100"] + [""] * 4 + ["200"]
