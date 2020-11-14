@@ -2,9 +2,9 @@
 \label{appendix:longitude}
 We comment on the longitudinal relaxation metrics and then give
 our procedure for integrating the Lindblad master equation.
-The longitudal relaxation probability metric and gate error due to longitudinal
-relaxation metric are compared in Table I for the experiment shown in Figure 1c.
-The relative performance of the analytic and numerical techniques we study
+The longitudal relaxation probability and the gate error due to longitudinal
+relaxation metrics are compared in Table \ref{tab:longitude} for the experiment shown in Figure \ref{fig:longitude}c.
+The relative performance of the analytic and numerical techniques
 is similar across the two metrics.
 
 \begin{table}[h!]
@@ -23,6 +23,7 @@ is similar across the two metrics.
     Values are reported for the analytic (A) and numerical (N) techniques
     presented in the main text.
   }
+  \label{tab:longitude}
 \end{table}
 
 To compute the gate error due to longitudinal relaxation,
@@ -40,7 +41,7 @@ For longitudinal relaxation $\gamma_{\uparrow} = T_{1, \uparrow}^{-1}$,
 $\gamma_{\downarrow} = T_{1, \downarrow}^{-1}$,
 $L_{\uparrow} = \sigma^{+}/2$, and
 $L_{\downarrow} = \sigma^{-}/2$ where $\sigma^{\pm} = \sigma_{x} \pm i \sigma_{y}$.
-Both $T_{1, \uparrow}$ and $T_{1, \downarrow}$ are obtained from the spline shown in Figure 1b.
+Both $T_{1, \uparrow}$ and $T_{1, \downarrow}$ are obtained from the spline shown in Figure \ref{fig:longitude}b.
 The $T_{1}$ values in this spline are obtained experimentally by driving the qubit at the desired flux amplitude
 and monitoring the resultant decay. For more details consult \cite{zhang2020universal}.
 

@@ -1,4 +1,3 @@
-%% S3
 \section{QOC on the Fluxonium}
 In the following we study
 the quantum optimal control problem on the fluxonium qubit.
@@ -31,8 +30,8 @@ inducing AWG ringing due to high-frequency transitions,
 we require $a(t = 0) = a(t = t_{N}) = 0$.
 Furthermore, we require $\int_{0}^{t_{N}} a(t) dt = 0$. This
 constraint ensures the pulse has zero net flux, mitigating
-the hysteresis ubiquitous in flux bias lines.
-%% TODO: See ref. 28 in Helin paper
+the hysteresis ubiquitous in flux bias lines,
+\cite{battistel2019fast, krantz2019quantum, zhang2020universal}.
 We require $-0.5 \textrm{GHz} \le a(t) \le 0.5 \textrm{GHz}$
 to ensure the two-level approximation \ref{eq:hamiltonian}
 remains valid. Additionally, we require that each gate achieves
