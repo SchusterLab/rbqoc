@@ -311,12 +311,12 @@ function forward_pass(save_file_path; derivative_order=0, integrator_type=rk3)
     n = state_dim(model)
     m = control_dim(model)
     time = 0.
-    astate = SVector{n}([
-        INITIAL_STATE1;
-        INITIAL_STATE2;
-        zeros(3 * CONTROL_COUNT);
-        zeros(derivative_order * HDIM_ISO);
-    ])
+    astate = zeros(n)
+    astate[STATE1_IDX] = INITIAL_STATE1
+    astate[STATE2_IDX] = INITIAL_STATE2
+    astate[STATE3_IDX] = INITIAL_STATE3
+    astate[STATE4_IDX] = INITIAL_STATE4
+    astate = SVector{n}(astate)
     acontrols = [SVector{m}([d2controls[i, 1],]) for i = 1:knot_count - 1]
 
     for i = 1:knot_count - 1
