@@ -91,11 +91,17 @@ function unscented_transform(model::Model, astate::AbstractVector,
     s8 = astate[offset + S8_IDX]
     s9 = astate[offset + S9_IDX]
     s10 = astate[offset + S10_IDX]
+    # println("s1:")
+    # show_nice(s1)
+    # println("")
     # compute state mean
     sm = SAMPLES_PER_STATE_INV .* (
         s1 + s2 + s3 + s4 + s5
         + s6 + s7 + s8 + s9 + s10
     )
+    # println("sm:")
+    # show_nice(sm)
+    # println("")
     # compute state covariance
     d1 = s1 - sm
     d2 = s2 - sm
@@ -112,11 +118,17 @@ function unscented_transform(model::Model, astate::AbstractVector,
         + d5 * d5' + d6 * d6' + d7 * d7' + d8 * d8'
         + d9 * d9' + d10 * d10'
     )
+    # println("s_cov:")
+    # show_nice(s_cov)
+    # println("")
     # perform cholesky decomposition on joint covariance
     cov = zeros(eltype(s_cov), HDIM_ISO + 1, HDIM_ISO + 1)
     cov[1:HDIM_ISO, 1:HDIM_ISO] .= s_cov
     cov[HDIM_ISO + 1, HDIM_ISO + 1] = model.fq_cov
     # TOOD: cholesky! requires writing zeros in upper triangle
+    # println("cov:")
+    # show_nice(cov)
+    # println("")
     cov_chol = model.alpha * cholesky(Symmetric(cov)).L
     s_chol1 = cov_chol[1:HDIM_ISO, 1]
     s_chol2 = cov_chol[1:HDIM_ISO, 2]
@@ -389,7 +401,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     xf[STATE1_IDX] = gate * IS1_ISO_
     xf[STATE2_IDX] = gate * IS2_ISO_
     state_dist = Distributions.Normal(0., state_cov)
-    sample_states = (IS1_ISO_, IS2_ISO_, IS3_ISO_, IS4_ISO_)
+    sample_states = (IS1_ISO_, IS2_ISO_, [1, 0, 0, 0], [1, 0, 0, 0])
     target_states = zeros(SAMPLE_STATE_COUNT * HDIM_ISO)
     for (i, sample_state) in enumerate(sample_states)
         target = gate * sample_state
@@ -399,6 +411,10 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         for j = 1:SAMPLES_PER_STATE
             sample = sample_state .+ rand(state_dist, HDIM_ISO)
             sample = sample ./ sqrt(sample'sample)
+            # sample = sample_state
+            # println("sample($(i), $(j)):")
+            # show_nice(sample)
+            # println("")
             inds = astate_sample_inds(i, j)
             x0[inds] = sample
             xf[inds] = target
@@ -542,53 +558,23 @@ end
 function sample_diffs(saved)
     gate_type = GateType(saved["gate_type"])
     knot_count = size(saved["astates"], 1)
-    diffs_ = zeros(SAMPLE_COUNT, knot_count)
-    fds_ = zeros(SAMPLE_COUNT, knot_count)
-    target_state = GT_GATE_ISO[gate_type] * IS3_ISO_
-    offset = ASTATE_SIZE_BASE
-    for i = 1:knot_count
-        s1 = saved["astates"][i, offset + S1_IDX]
-        s2 = saved["astates"][i, offset + S2_IDX]
-        s3 = saved["astates"][i, offset + S3_IDX]
-        s4 = saved["astates"][i, offset + S4_IDX]
-        s5 = saved["astates"][i, offset + S5_IDX]
-        s6 = saved["astates"][i, offset + S6_IDX]
-        s7 = saved["astates"][i, offset + S7_IDX]
-        s8 = saved["astates"][i, offset + S8_IDX]
-        s9 = saved["astates"][i, offset + S9_IDX]
-        s10 = saved["astates"][i, offset + S10_IDX]
-        d1 = s1 - target_state
-        d2 = s2 - target_state
-        d3 = s3 - target_state
-        d4 = s4 - target_state
-        d5 = s5 - target_state
-        d6 = s6 - target_state
-        d7 = s7 - target_state
-        d8 = s8 - target_state
-        d9 = s9 - target_state
-        d10 = s10 - target_state
-        diffs_[1, i] = d1'd1
-        diffs_[2, i] = d2'd2
-        diffs_[3, i] = d3'd3
-        diffs_[4, i] = d4'd4
-        diffs_[5, i] = d5'd5
-        diffs_[6, i] = d6'd6
-        diffs_[7, i] = d7'd7
-        diffs_[8, i] = d8'd8
-        diffs_[9, i] = d9'd9
-        diffs_[10, i] = d10'd10
-        fds_[1, i] = fidelity_vec_iso2(s1, target_state)
-        fds_[2, i] = fidelity_vec_iso2(s2, target_state)
-        fds_[3, i] = fidelity_vec_iso2(s3, target_state)
-        fds_[4, i] = fidelity_vec_iso2(s4, target_state)
-        fds_[5, i] = fidelity_vec_iso2(s5, target_state)
-        fds_[6, i] = fidelity_vec_iso2(s6, target_state)
-        fds_[7, i] = fidelity_vec_iso2(s7, target_state)
-        fds_[8, i] = fidelity_vec_iso2(s8, target_state)
-        fds_[9, i] = fidelity_vec_iso2(s9, target_state)
-        fds_[10, i] = fidelity_vec_iso2(s10, target_state)
+    fds = zeros(knot_count, SAMPLE_COUNT)
+    gate_iso = GT_GATE_ISO[gate_type]
+    target_states = [gate_iso * is for is in (IS1_ISO_, IS2_ISO_, IS3_ISO_, IS4_ISO_)]
+    astates = saved["astates"]
+    for i = 1:SAMPLE_STATE_COUNT
+        target_state = target_states[i]
+        for j = 1:SAMPLES_PER_STATE
+            astate_inds = astate_sample_inds(i, j)
+            store_ind = (i - 1) * SAMPLES_PER_STATE + j
+            for k = 1:knot_count
+                sample = astates[k, astate_inds]
+                fds[k, store_ind] = fidelity_vec_iso2(sample, target_state)
+            end
+        end
     end
-    return (fds_, diffs_)
+
+    return fds
 end
 
 

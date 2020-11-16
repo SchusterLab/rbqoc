@@ -427,7 +427,7 @@ def make_figure1c():
     #ENDFOR
 
     # configure main 
-    ax.set_ylabel("Total Gate Error", fontsize=LABEL_FS)
+    ax.set_ylabel("Cumulative Gate Error", fontsize=LABEL_FS)
     ax.set_xlabel("Gate Count", fontsize=LABEL_FS)
     ax.set_xlim(0, gate_count)
     xticks_ = [0, 500, 1000, 1500, 2000]
@@ -722,7 +722,7 @@ def make_figure3b():
                 color=color, linestyle=linestyle, label=label)
     #ENDFOR
 
-    ax.set_ylabel("Total Gate Error", fontsize=LABEL_FS)
+    ax.set_ylabel("Cumulative Gate Error", fontsize=LABEL_FS)
     ax.set_xlabel("Gate Count", fontsize=LABEL_FS)
     ax_xticks = np.arange(0, gate_count + 1, 20)
     ax_xtick_labels = ["0"] + [""] * 4 + ["100"] + [""] * 4 + ["200"]
