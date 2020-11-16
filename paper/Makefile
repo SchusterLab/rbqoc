@@ -1,6 +1,6 @@
 PDF=pdflatex
 BIB=bibtex
-LATEXOBJS= *.aux *.log *.out *.pdf *.bbl *.blg
+LATEXOBJS= *.aux *.log *.out *.pdf *.bbl *.blg mainNotes.bib
 
 PHEADER=main
 PSRCS=$(PHEADER).tex

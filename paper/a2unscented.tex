@@ -48,11 +48,13 @@ The sigma points are propagated to the next knot point
 The mean and covariance of the sigma points are computed
 \begin{align}
   \bar{\Psi}_{1} &= \frac{1}{4n + 2d} \sum_{i = 1}^{4n + 2d} \Psi_{1}^{i}\\
-  P_{1} &= \frac{1}{\beta^{2}(4n + 2d)} \sum_{i = 1}^{4n + 2d}
+  P_{1} &= \frac{1}{2 \beta^{2}} \sum_{i = 1}^{4n + 2d}
   (\Psi^{i}_{1} - \bar{\Psi}_{1})^{T}(\Psi^{i}_{1} - \bar{\Psi}_{1})
 \end{align}
 The sigma points are then resampled and propagated to the next knot point using
-\eqref{eq:uupdate}, \eqref{eq:unormalize}, and \eqref{eq:upropagate}.
+\eqref{eq:uupdate}, \eqref{eq:unormalize}, and \eqref{eq:upropagate}. Our
+choice of sigma points follows the prescription in equation 11 of \cite{julier2004unscented}.
+Other prescriptions may be chosen to reduce the number of required sigma points \cite{julier2002reduced}.
 
 
 

@@ -62,11 +62,13 @@ robust trajectory opitmization techniques to make the
 quantum state trajectory robust to parameter deviations.
 The first is the sampling method, which has been applied
 previously in the context of QOC
+%%TODO: the citations for unscented sampling
+%% and sampling are the same as in section V
 \cite{carvalho2020error, reinhold2019controlling, rembold2020introduction}.
 The second is the unscented sampling
 method, which derives from the unscented transformation used
 for non-linear Kalman filtering
-\cite{julier2004unscented, lee2013sigma, manchester2016derivative}.
+\cite{howell2020direct, julier2004unscented, lee2013sigma, manchester2016derivative}.
 We propose a third method, which uses derivative information
 of parameter deviations with respect to the quantum state trajectory.
 We make this method efficient by employing mixed-mode differentiation.

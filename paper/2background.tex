@@ -1,15 +1,15 @@
 \section{QOC + AL-iLQR}
-(QOC Problem Statement) Here we introduce the notation
+In this section we introduce the notation
 we will use throughout the paper,
 review the quantum optimal control problem statement,
 and introduce the trajectory optimization framework.
 Quantum optimal control concerns the evolution of
 a quantum state $\ket{\psi(t)}$ governed by the time-dependent
-Schroedinger equation (TDSE)
-\label{eq:tdse}
-\begin{align}
-  i \hbar \frac{d}{dt} \ket{\psi} &= H(u(t), t) \ket{\psi}
-\end{align}
+Schr{\"o}dinger equation (TDSE)
+\begin{equation}
+  i \hbar \frac{d}{dt} \ket{\psi} = H(u(t), t) \ket{\psi}
+  \label{eq:tdse}
+\end{equation}
 The evolution is sometimes cast with the evolution
 of a density matrix under the Lindblad master equation to
 model the decoherence of the state explicitly. The Hamiltonian
@@ -18,53 +18,57 @@ The controls are so called because they are the means the experimentalist has to
 act on the system. Numerical quantum optimal control techniques make
 the problem tractable by discretizing the problem into $N$
 knot points (time steps). Typical explicit integration techniques for the TDSE include
-exponential integrators and integrators of the Runge-Kutta type
+exponential integrators \cite{auer2018magnus, berland2005solving, einkemmer2017performance}
+and Runge-Kutta integrators \cite{jorgensen2011numerical}.
 
 Quantum optimal control seeks the control
 parameters that minimize a functional $J(u(t))$.
 In the simplest case the functional is
-$J = 1 - {\lvert \braket{\psi_{f} \lvert \psi_{N}(u(t))} \rvert}^{2}$
 the infidelity between the inital state evolved
-to the final knot point ($\ket{\psi_{N}(u(t))}$)
-and the target state ($\ket{\psi_{f}}$). In general
-$J$ is a linear combinaion of cost functions on the state, e.g.
+to the final knot point and the target state
+$J = 1 - {\lvert \braket{\psi_{f} \lvert \psi_{N}(u(t))} \rvert}^{2}$
+In general $J$ is a linear combinaion of cost functions on the state, e.g.
 forbidden-state occupation, as well as
 cost functions on the controls, e.g. the norm of the control amplitudes
 \cite{leung2017speedup}. Typical quantum optimal control
 algorithms employ automatic differentiation
-to compute first order information for the functional ($\nabla_{u} J(u)$).
-They employ a first-order optimizer to minimize $J$ with respect to $u$.
+to compute first order information for the functional $\nabla_{u} J(u)$.
+This information is used in a first-order optimizer to minimize $J$ with respect to $u$.
+This scheme lends itself to projected gradient methods
+which restrict the optimization to the constraint manifold
+\cite{clarkson2010coresets, hauswirth2016projected}.
 
-(AL-iLQR Problem Statement) The trajectory optimization
+The trajectory optimization
 literature solves a more general class of non-linear programs that resemble
-the quantum optimal control problem. The quantum optimal control
+the QOC problem. The QOC
 problem is a specific case of the linear quadratic regulator (LQR).
 LQR is so called because the dynamics are linear in the state and
-the functional is quadratic in the state. In the LQR formulation
-the same functional is evaluated at each knot point
+the functional is quadratic in the state. A general LQR cost
+function takes the form
 \begin{equation}
-  J_{\textrm{iLQR}} = \tilde{x}_{N}^{T} Q_{N} \tilde{x}_{N}
-  + \sum_{k = 0}^{N - 1} \tilde{x}_{k}^{T} Q_{k} \tilde{x}_{k} + u_{k}^{T} R_{k} u_{k}
+  J_{\textrm{iLQR}} = \ell_{N}({x}_{N})
+  + \sum_{k = 0}^{N - 1} \ell_{k}({x}_{k}, u_{k})
 \end{equation}
-where $\tilde{x}_{k} = x_{k} - x_{f}$ is the difference between the state
-at knot point $k$ and final state, $u_{k}$ are the controls,
-and $Q_{k}, R_{k}$ are matrices that define the penalty metric.
-The state is propagated using a dynamics function
-$x_{k + 1} = f(x_{k}, u_{k}, t_{k}, \Delta t_{k})$.
-In the case of quantum optimal control $\ket{\psi_{k}} \subseteq x_{k}$
-and $f$ encodes the TDSE dynamics. In the following
-we refer to $\ket{\psi}$ as the state, $x$ as the augmented
-state, and $u$ as the augmented controls. In practice the final state
-of the quantum system matching the target state
-is the most important metric, which is reflected in the weight
-bias $Q_{N} \sim N \cdot Q_{1}$ and $Q_{k} = Q_{1}$.
-
-The advantage of the LQR formulation
-is that there exists a dynamic programming algorithm to compute the
-optimal update to the augmented controls ($u_{k}$) which minimizes the functional
-($J_{\textrm{iLQR}, k}$) for each knot point. This algorithm proceeds by deriving a
+The subscript $k$ denotes the knot point, $x$ is the augmented state vector,
+and $u$ is the augmented control vector. The augmented state is propagated
+to the next knot point by the dynamics function $x_{k + 1} = f(x_{k}, u_{k}, t_{k}, \Delta t_{k})$.
+In the case of QOC $\ket{\psi_{k}} \subseteq x_{k}$
+and $f$ encodes the TDSE dynamics \eqref{eq:tdse}. The
+cost function $\ell_{k}$ includes contributions from the infidelity
+$1 - {\lvert \braket{\psi_{f} \lvert \psi_{k}} \rvert}^{2}$, final state deviations
+$\tilde{x}^{T}_{k} Q_{k} \tilde{x}_{k}$ where $\tilde{x}_{k} = x_{f} - x_{k}$,
+and control regularization $u^{T}_{k} R_{k} u_{k}$.
+Placing cost functions at each knot point smoothens the optimization
+landscape. In QOC realizing the final state
+is the most important objective so the cost function at the final knot point
+carries a higher realtive weight $\ell_{N} \sim N \cdot \ell_{k}$.
+The LQR formulation restricts the cost functions to operate on the augmented
+state and controls at each knot point. The advantage of the LQR formulation
+is that there exists a differentiable dynamic programming algorithm to compute the
+optimal update to the augmented controls $u_{k}$ which minimizes the cost
+function $\ell_{k}$ at each knot point. This algorithm proceeds by deriving a
 recurrence relation between knot points $k$ and $k + 1$ for the optimal
-feedback law--known as the Ricatti recursion. The
+feedback law--known as the Ricatti recursion (citations needed). The
 iterative LQR (iLQR) algorithm computes $J_{\textrm{iLQR}}$
 and applies the Ricatti recursion to all knot points on multiple
 executions.
@@ -73,29 +77,26 @@ In order to incorporate constraints we employ
 the augmented Lagrangian method. Constraints are contributions
 to the functional of arbitrary form $c_{k}(x_{k}, u_{k})$ which are
 zero or negative when the constraint is satisfied. The AL-iLQR
-method associates a penalty multiplier with the functional
+method associates a penalty multiplier with the constraint
 that estimates the constraint's Lagrange multiplier.
 The algorithm updates the penalty multiplier between
 iLQR executions. In this scheme the functional takes the form
 \begin{equation}
-  \begin{aligned}
-    J_{\textrm{AL-iLQR}} = \ &(\lambda_{k} + \frac{1}{2}I_{\mu_{k}} c_{k}(x_{k}, u_{k}))^{T} c_{k}(x_{k}, u_{k})\\
-    &+ J_{\textrm{iLQR}}
-  \end{aligned}
+\begin{aligned}
+    J_{\textrm{AL-iLQR}} &= J_{\textrm{iLQR}}\\
+    &+ (\lambda_{N} + \frac{1}{2}I_{\mu_{N}} c_{N}(x_{N}))^{T} c_{N}(x_{N})\\
+    &+ \sum^{N - 1}_{k = 0} (\lambda_{k} + \frac{1}{2}I_{\mu_{k}} c_{k}(x_{k}, u_{k}))^{T} c_{k}(x_{k}, u_{k})\\
+\end{aligned}
 \end{equation}
-where $\lambda_{k}$ is a Lagrange multiplier and $I_{\mu_{k}}$ is a penalty matrix
+Here $\lambda_{k}$ is a Lagrange multiplier and $I_{\mu_{k}}$ is a penalty matrix
 with $\mu_{k}$ along the diagonal.
 $\lambda_{k}$ and $\mu_{k}$ are updated after each augmented Lagrangian iteration according to
 \begin{align}
-  \lambda_{k_{i}} &\gets \max(0, \lambda_{k_{i}} + \mu_{k_{i}} c_{k_{i}}(x_{k}^{*}, u_{k}^{*}))\\
-  \mu_{k_{i}} &\gets \phi \mu_{k_{i}}
+  \lambda^{i}_{k} &\gets \max(0, \lambda^{i}_{k} + \mu^{i}_{k} c^{i}_{k}(x_{k}^{*}, u_{k}^{*}))\\
+  \mu^{i}_{k} &\gets \phi \mu^{i}_{k}
 \end{align}
-where $x^{*}, u^{*}$ are the optimal augmented state and augmented controls from the iLQR execution,
+Here $x^{*}, u^{*}$ are the optimal augmented state and augmented controls from the iLQR execution,
 $i$ indicates the $i$-th constraint functional,
-and $\phi$ is a hyperparameter. With this updated form of the cost
-functional there still exists a recurrence relation to calculate the optimal control
-updates, see \cite{howell2019altro}.
-
-
-%% TODO: include comment about control filtering and constraint manifold
-%% projection of GOAT, Krotov, GRAPE, etc.
+and $\phi$ is a hyperparameter. An optimal control update, similar to the Ricatti
+recursion, can be formed to calculate the optimal control updates for this functional,
+see \cite{howell2019altro}.
