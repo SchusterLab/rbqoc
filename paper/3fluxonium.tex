@@ -22,6 +22,18 @@ systematic errors. We compare the gates we obtain with numerical
 methods to the analytically constructed gates reported in
 \cite{zhang2020universal} for the same device.
 
+\todo{I highly suggest writing out the optimization problem explicitly here. I've started it 
+for you below. You can reference the individual lines as you explain your problem setup.
+Also explicitly spell out what your state and control vectors are.}
+{\color{red}
+\begin{mini!}[2]
+    {x_{0:N}, u_{0:N\text{-}1}}{\sum_{k=1}^N \norm{x_k\text{-}x_f}_{Q_k} + \sum_{k=1}^{N-1} \norm{u_k}_{R_k}}{}{}
+    \addConstraint{x_{k+1}}{= f(x_k, u_k)}  \label{eq:dyn_con}
+    \addConstraint{x_1 }{= x_\text{init}} \label{eq:init_con}
+    \addConstraint{x_N}{= x_f} \label{eq:term_con}
+\end{mini!}
+}
+
 In addition to imposing optimization constraints that
 reflect physical limitations of the apparatus, we impose
 constraints that improve the experimental realization of the control pulse.
@@ -40,16 +52,20 @@ In addition to these constraints we penalize the norm
 of the first and second derivatives of the flux amplitude to
 ensure its smoothness, and in doing so mitigate AWG ringing.
 The optimization is performed over the second derivative of the flux amplitude
-$\frac{d^{2}}{dt^{2}} a$ which is contained in the
+$\pdv*[2]{a}{t}$ which is contained in the
 augmented control vector. The first derivative
-$\frac{d}{dt} a$, proportional $a$, and integral $\int a$
+$\pdv*{a}{t}$, proportional $a$, and integral $\int a$
 flux amplitude terms
 are contained in the augmented state vector. They are obtained from
 the second derivative of the flux amplitude by
 integration in the dynamics function.
 Both the zero net flux and target quantum state constraint
 are then handled by ensuring the target augmented state is
-reached $x_{N} = x_{f}$, the constraint functional takes the form
+reached $x_{N} = x_{f}$, the constraint functional 
+\todo{not sure what the convention is in your community, but for us a functional is a 
+function of functions (or trajectories). This would just be a function. Also, shouldn't 
+this just be $x_N = x_f$ and $\abs{x_k} \le b$? Why are you squaring the functions?}
+ takes the form
 $c_{k} = (x_{k} - x_{f})^{T}(x_{k} - x_{f})$.
 The equality and inequality constraints on $a$ are handled
 with a bound constraint which takes the form
@@ -58,6 +74,7 @@ and $0$ otherwise.
 In addition the norm of the quantum state
 is constrained to ensure discretization error is not
 exploited $c_{k} = {\lvert \braket{\psi_{k} \lvert \psi_{k}} \rvert}^{2} - 1$.
+\todo{is this last constraint supposed to be an inequality constraint?}
 
 In addition to obeying experimental constraints
 and achieving low simulated gate errors, we desire
@@ -87,3 +104,5 @@ of the decay processes and the tradeoff, we choose
 to maximize the longitudinal relaxation time directly
 by tuning the flux amplitude and employ robust control techniques to mitigate
 pure dephasing.
+
+\todo{maybe reference the next Sections as you mention these points?}

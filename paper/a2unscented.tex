@@ -2,8 +2,12 @@
 \label{appendix:unscented}
 In this section we outline the full unscented sampling procedure.
 First, we remark that ALTRO does not natively support complex numbers, so our optimization
-is performed under an isomorphism $\mathcal{H}(\mathbb{C}^{n}) \cong \mathcal{H}(\mathbb{R}^{2n})$
-\cite{leung2017speedup}
+is performed under an isomorphism 
+$\mathcal{H}(\mathbb{C}^{n}) \cong \mathcal{H}(\mathbb{R}^{2n})$
+\cite{leung2017speedup}. 
+\todo{this should probably be mentioned explicitly in the main body of the paper. Also 
+make sure you're being consistent on your definition of $n$. The definition here doesn't seem 
+to match your definition other places, especially when you start augmenting the dynamics.}
 \begin{equation}
   H \psi \cong \begin{pmatrix} H_{\textrm{re}} & -H_{\textrm{im}} \\ H_{\textrm{im}} & H_{\textrm{re}}\end{pmatrix}
   \begin{pmatrix} \psi_{\textrm{re}} \\ \psi_{\textrm{im}}\end{pmatrix}

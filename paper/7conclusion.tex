@@ -10,8 +10,15 @@ super-linear gate error reductions in the gate duration for the problem we studi
 We have shown that robust control techniques can be used to mitigate decoherence due
 to 1/$f$ flux noise, a dominant source of coherent errors for flux controlled qubits.
 The numerical techniques we have studied here can be used to perform phase gates in arbitrary times,
-which will be critical for synchronizing multi-qubit systems. Additionally,
-interleaving the error models with existing
+which will be critical for synchronizing multi-qubit systems 
+\todo{it might be worth mentioning the scaling properties of your method
+here, since you suggest scaling it up to systems with more states. How may
+the different methods you suggest perform at scale? Maybe there will be an
+advantage to using the sampling-based methods as the problems grow? Also you
+don't mention the sampling methods in the conclusion? The derivative methods only
+outperformed the sampling methods on the simpler of your 2 test cases,
+so I'd be hesitant to imply that the derivative method is the better choice}. 
+Additionally, interleaving the error models with existing
 characterization methods will improve their effectiveness in experiments.
 These techniques will be employed to achieve the low gate errors
 required for fault-tolerant quantum computing applications. Our

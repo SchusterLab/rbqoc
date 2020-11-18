@@ -26,7 +26,9 @@ The unscented sampling method is modified so that its sampled deviations
 follow a 1/$f$ distribution by carrying the state of a finite impulse response filter
 in the augmented state vector. In principle the basic sampling method could be modified
 similarly but we choose to sample statically at $\delta a$ for comparision. The derivative
-methods require no modification from the static case.
+methods require no modification from the static case. \todo{can you provide a little more 
+detail on how this noise factors into the dynamics? Are you just adding some white 
+noise to $a(t)$? Are you also considering uncertainty in $f_q$ at the same time?}
 
 We simulate successive applications of the gate constructed by each method
 and compute the cumulative gate error

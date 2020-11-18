@@ -45,6 +45,10 @@ longitudinal relaxation probability. Our scheme for time-optimal
 control is applicable to any time-optimal problem, not only
 the one we study here.
 
+\todo{again, I'd recommend writing out either the entire optimization problem or at least
+point to the parts of the optimization problem defined in the previous section you had to 
+change. Just make it a little more concrete.}
+
 The longitudinal relaxation probability is given by
 \begin{equation}
   P_{1}(t) = \int_{0}^{t} T_{1}^{-1}(a(t^{\prime})) dt^{\prime}
@@ -124,7 +128,8 @@ over $2000$ gate applications $\sim 40 \mu\textrm{s}$. The numerical $X/2$ gate
 achieves an accumulated gate error of $1.7 \cdot 10^{-2}$ over $2000$ gate applications $\sim 124 \mu\textrm{s}$.
 Both the analytic and numerical gates attain single gate errors sufficient for
 quantum error correction $< 10^{-4}$, requisite for fault-tolerant quantum computing.
-The low gate errors achieved by the numerical gates for extend computations
+The low gate errors achieved by the numerical gates \todo{typo / awkward sentence} 
+for extend computations
 are critical for noisy, intermediate-scale quantum (NISQ) applications.
 These improvements are significant for the realistic constraints we have imposed
 on the gates, and do not represent a fundamental limit to the optimization methods we have

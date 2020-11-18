@@ -8,7 +8,8 @@ of this form using robust control techniques,
 making the state evolution insensitive
 to Hamiltonian parameter deviations. As an example
 we mitigate errors arising from the drift and finite measurement
-precision of the qubit frequency $\tilde{f_{q}} = f_{q} \pm \sigma_{f_{q}}$.
+precision of the qubit frequency $\tilde{f_{q}} = f_{q} \pm \sigma_{f_{q}}$ \todo{maybe 
+reference \eqref{eq:hamiltonian} here?}.
 We consider three robust control techniques.
 The first is the sampling method, which has
 been proposed previously in the context of QOC
@@ -27,6 +28,10 @@ information encoding the sensitivity of the
 state trajectory with respect to the deviant parameter
 is used to penalize state trajectory deviations.
 
+\todo{I think you can make this more concrete and simpler to understand by just defining
+the new augmented state vector and explaining you stack multiple copies of the state vector
+together, each evolving with a different static parameter. In this case there's only one 
+parameter being changed, so I'd just state it explicitly.}
 In the sampling method, sample states evolve under a
 Hamiltonian where a parameter is replaced by
 a deviant value. We propagate the additional states $\ket{\psi^{\pm}}$ with
@@ -41,7 +46,8 @@ that their outer products span the operators on the
 Hilbert space $\{\ket{0}, \ket{1}, (\ket{0} + i\ket{1}) / \sqrt{2},
 (\ket{0} - \ket{1}) / \sqrt{2}\}$ \cite{chow2009randomized}.
 For this method the number of states in the augmented state vector
-scales as $O(dn^{2})$ because each of $n^{2}$ initial
+scales as $O(dn^{2})$ \todo{is this right?}
+because each of $n^{2}$ initial
 states is represented by $2d$ samples. $n$ is both the dimension of the Hilbert space
 and the size of the state vector. $d$ is the number of deviant parameters.
 
@@ -76,13 +82,14 @@ knot point using separate deviant dynamics. Then, the mean and covariance of
 the propagated ensemble is calculated. New states are sampled from the distribution
 given by the calculated statistics for propagation to the next knot point.
 This resampling procedure, the unscented transformation, accurately propagates
-first and second moments of the distribution and ensurnes the points
+first and second moments of the distribution and ensures the points
 lie on the $\sqrt{2n}$\textsuperscript{th}
 covariance contour at each knot point. A detailed update procedure is given
 in Appendix \ref{appendix:unscented}. Each initial state from the operator basis
 is represented with a distribution of $4n + 2d$ samples. Hence,
 the number of states in the augmented state vector scales as $O(n^{3} + dn^{2})$.
 The gate error of each sample state is penalized as in the sampling method.
+\todo{I think this section needs some more detailed explanation.}
 
 The derivative method draws on the intuition that
 the sensitivity of the state evolution to a parameter
@@ -109,6 +116,7 @@ for the 1\textsuperscript{st}-order derivative method are
   H \ket{\partial_{\lambda} \psi} +
   (\partial_{\lambda} H) \ket{\psi}
 \end{align}
+\todo{inconsistent use of $\hbar$ vs $h$.}
 Exponential integrators that account for the non-linear
 term may be used to efficiently integrate the coupled dynamics,
 see Appendix \ref{appendix:derivative}.
@@ -119,7 +127,18 @@ $O(dmn^{2})$. Additionally, we note that the number of initial
 states and samples we have employed for each of the three
 methods follows standard perscriptions. However, knowledge
 of the problem can typically be used to reduced the number
-of required samples.
+of required samples. \todo{I think this also needs some more explanation. It's not 
+clear exactly what you're doing. You're penalizing the derivatives of the dynamics with
+respect to the uncertain parameter in the objective, so why do you need to augment the 
+state vector? Or are you adding the derivatives to the state vector so that you have 
+standard quadratic penalty terms in the objective? Again, I think this confusion would 
+be easily cleared up by explicitly writing down your new dynamics, objective function, 
+and any additional constraints you impose on the system. Since this is really the meat of 
+the paper, it's worth spending the time to make sure this is clear and easy to understand,
+especially for those who aren't very familiar with trajectory optimization or optimization 
+in general. Also, I think you should explicitly state the size of the problem you're
+actually solving. Might be worth putting in a table, along with some timing results, to 
+give an idea of how well these methods scale.}
 
 To demonstrate the applicability of these techniques
 to mitigate parameter deviations,
@@ -132,7 +151,9 @@ one simulated gate application subject to the deviant dynamics given by the
 stated qubit frequency detuning $\delta f_{q}$.
 
 We compare the numerical methods
-to an analytically derived $Z/2$ gate, see Figure \ref{fig:static}a. This gate corresponds to
+to an analytically derived $Z/2$ gate, see Figure \ref{fig:static}a 
+\todo{{\LaTeX} suggetion: don't hard-code the sublabels. You can directly reference them.}. 
+This gate corresponds to
 idling at the flux frustration point $a = 0$. The analytic gate
 is at the device's speed limit for a $Z/2$ gate $t_{Z/2} = 1 / 4 f_{q}$ and
 is simple to derive. Its erroneous rotation angle $2 \pi t_{Z/2} \delta f_{q}$ is linearly sensitive to
