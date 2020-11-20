@@ -32,14 +32,12 @@ forbidden-state occupation, as well as
 cost functions on the controls, e.g. the norm of the control amplitudes
 \cite{leung2017speedup}. Typical quantum optimal control
 algorithms employ automatic differentiation
-to compute first order information for the functional $\nabla_{u} J(u)$.
-This information is used in a first-order optimizer to minimize $J$ with respect to $u$.
-This scheme lends itself to projected gradient methods
-which restrict the optimization to the constraint manifold
+to compute gradients of the functional $\nabla_{u} J(u)$,
+which can easily be used to implement first-order optimization methods
 \cite{clarkson2010coresets, hauswirth2016projected}.
 
 Alternatively, the QOC problem can be formulated as a trajectory optimization problem 
-and solved using any of the state-of-the-art solvers developed by the robotics community.
+and solved using a variety of specialized solvers developed by the robotics community \cite{Schulman13,Tedrake16,Hereid2017FROST,howell2019altro}.
 Trajectory optimization problems are typically of the following form: 
 \begin{mini}[2]
     {x_{0:N},u_{0:N-1}}{\ell_f(x_N) + \sum_{k=0}^{N-1} \ell(x_k,u_k) }{}{}
@@ -65,7 +63,7 @@ using a backward Riccati recursion to derive a closed-loop linear feedback law a
 trajectory. By simulating the system forward with the feedback law, the trajectory is 
 brought closer to the (locally) optimal trajectory. DDP-based solvers such as iLQR
 are popular since they are very computationally efficient, are always dynamically feasible,
-and provide a closed-loop control policy about the optimal trajectory for free; however,
+and provide a locally stabilizing closed-loop control policy about the optimal trajectory. However,
 standard implementations have no ability to deal with nonlinear equality and inequality 
 constraints. ALM handles constraints by successively solving unconstrained minimization 
 problems of the form:
@@ -74,12 +72,15 @@ problems of the form:
     \label{opt:alm}
 \end{mini}
 where $f(z)$ is the objective function, $c(z) : \R^n \mapsto \R^p$ is the constraint 
-function, $\lambda \in \R^p$ are the Lagrange multipliers, and $I_\mu$ is a diagonal matrix
-of penalty weights, whose magnitude depend on whether the constraint is active or inactive.
+function, $\lambda \in \R^p$ is a Lagrange multiplier estimate, and $I_\mu$ is a diagonal matrix
+of penalty weights, $\mu$, whose magnitudes depend on whether the corresponding constraint is active or inactive.
 For ALTRO, $f(z)$ is the objective function of \eqref{opt:discrete_trajopt}, $c(z)$ is the 
 concatenation of $g_k$ and $h_k$, and $z$ is the concatenation of the states and controls 
-across all time steps. After minimizing \eqref{opt:alm} using iLQR, the penalty terms and 
-Lagrange multipliers are updated, and the process repeats until convergence.
+across all time steps. After minimizing \eqref{opt:alm} using iLQR, the Lagrange multiplier estimates are updated according to,
+\begin{equation}
+	\lambda \gets \lambda + \mu c(z) ,
+\end{equation}
+the penalty terms are updated, and the process repeats until convergence.
 
 ALM converges superlinearly but tends to exhibit slow constraint convergence near the optimal 
 solution due to poor numerical conditioning. To address this shortcoming, ALTRO provides a 
