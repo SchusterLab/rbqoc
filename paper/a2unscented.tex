@@ -1,18 +1,6 @@
 \section{Unscented Transformation}
 \label{appendix:unscented}
 In this section we outline the full unscented sampling procedure.
-First, we remark that ALTRO does not natively support complex numbers, so our optimization
-is performed under an isomorphism 
-$\mathcal{H}(\mathbb{C}^{n}) \cong \mathcal{H}(\mathbb{R}^{2n})$
-\cite{leung2017speedup}. 
-\todo{this should probably be mentioned explicitly in the main body of the paper. Also 
-make sure you're being consistent on your definition of $n$. The definition here doesn't seem 
-to match your definition other places, especially when you start augmenting the dynamics.}
-\begin{equation}
-  H \psi \cong \begin{pmatrix} H_{\textrm{re}} & -H_{\textrm{im}} \\ H_{\textrm{im}} & H_{\textrm{re}}\end{pmatrix}
-  \begin{pmatrix} \psi_{\textrm{re}} \\ \psi_{\textrm{im}}\end{pmatrix}
-\end{equation}
-
 The unscented sampling method concerns a quantum state $\psi \in \mathbb{R}^{2n}$ with
 deviant parameters $\lambda \in \mathbb{R}^{d}$ and dynamics $\psi_{k + 1} = f(\psi_{k}, \lambda_{k})$.
 The nominal initial quantum state is given by $\psi_{0}$ with an associated

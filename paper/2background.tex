@@ -1,4 +1,4 @@
-\section{QOC + AL-iLQR}
+\section{QOC + AL-iLQR \label{sec:background}}
 In this section we introduce the notation
 we will use throughout the paper,
 review the quantum optimal control problem statement,
@@ -10,9 +10,10 @@ Schr{\"o}dinger equation (TDSE)
   i \hbar \frac{d}{dt} \ket{\psi} = H(u(t), t) \ket{\psi}
   \label{eq:tdse}
 \end{equation}
-The evolution is sometimes cast with the evolution
-of a density matrix under the Lindblad master equation to
-model the decoherence of the state explicitly. The Hamiltonian
+%% The evolution is sometimes cast with the evolution
+%% of a density matrix under the Lindblad master equation to
+%% model the decoherence of the state explicitly.
+The Hamiltonian
 has an arbitrary dependence on the possibly multi-valued controls $u(t)$.
 The controls are so called because they are the means the experimentalist has to
 act on the system. Numerical quantum optimal control techniques make
@@ -26,7 +27,7 @@ parameters that minimize a functional $J(u(t))$.
 In the simplest case the functional is
 the infidelity between the inital state evolved
 to the final knot point and the target state
-$J = 1 - {\lvert \braket{\psi_{f} \lvert \psi_{N}(u(t))} \rvert}^{2}$
+$J = 1 - {\lvert \braket{\psi_{f}}{\psi_{N}(u(t))} \rvert}^{2}$.
 In general $J$ is a linear combinaion of cost functions on the state, e.g.
 forbidden-state occupation, as well as
 cost functions on the controls, e.g. the norm of the control amplitudes

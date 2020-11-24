@@ -1,4 +1,4 @@
-\section{QOC on the Fluxonium}
+\section{QOC on the Fluxonium \label{sec:fluxonium}}
 In the following we study
 the quantum optimal control problem on the fluxonium qubit.
 The fluxonium qubit is a promising building block for superconducting
@@ -22,22 +22,44 @@ systematic errors. We compare the gates we obtain with numerical
 methods to the analytically constructed gates reported in
 \cite{zhang2020universal} for the same device.
 
-\todo{I highly suggest writing out the optimization problem explicitly here. I've started it 
-for you below. You can reference the individual lines as you explain your problem setup.
-Also explicitly spell out what your state and control vectors are.}
-{\color{red}
+The optimization problem takes the form:
 \begin{mini!}[2]
     {x_{0:N}, u_{0:N\text{-}1}}{\sum_{k=1}^N \norm{x_k\text{-}x_f}_{Q_k} + \sum_{k=1}^{N-1} \norm{u_k}_{R_k}}{}{}
     \addConstraint{x_{k+1}}{= f(x_k, u_k)}  \label{eq:dyn_con}
-    \addConstraint{x_1 }{= x_\text{init}} \label{eq:init_con}
+    \addConstraint{x_1}{= x_\text{init}} \label{eq:init_con}
     \addConstraint{x_N}{= x_f} \label{eq:term_con}
 \end{mini!}
-}
+where the augmented state and controls are given by:
+\begin{equation}
+  x = \begin{bmatrix} \psi^{(1)} \\ \psi^{(2)} \\ \int a \ dt\\ a \\ \pdv*{a}{t} \end{bmatrix} \quad
+  u = \begin{bmatrix} \pdv*[2]{a}{t} \end{bmatrix}
+\end{equation}
+The initial and final conditions are determined by the
+desired unitary transformation, which requires two quantum states
+to specify $\psi^{(1)}$, $\psi^{(2)}$.
+The ALTRO implementation we use does not currently support complex numbers so
+we compute in the isomorphism $\mathcal{H}(\mathbb{R}^{2n}) \cong \mathcal{H}(\mathbb{C}^{n})$
+given in \cite{leung2017speedup}:
+\begin{equation}
+  H \psi \cong \begin{bmatrix} H_{\textrm{re}} & -H_{\textrm{im}} \\ H_{\textrm{im}} & H_{\textrm{re}}\end{bmatrix}
+  \begin{bmatrix} \psi_{\textrm{re}} \\ \psi_{\textrm{im}}\end{bmatrix}
+\end{equation}
+The dynamics function $f(x_{k}, u_{k})$ integrates the TDSE dynamics for the quantum states
+\eqref{eq:tdse}, \eqref{eq:hamiltonian}
+and integrates the moments of the flux drive amplitude. Exposing lower order moments of the flux
+drive amplitude allows us to penalize their norms, smoothing the flux drive amplitude
+and mitigating AWG ringing due to high frequency transitions.
+The matrices $Q_{k}$ and $R_{k}$ define the penalty metric. We choose $Q$
+to be diagonal because it is computationally efficient. This corresponds
+to penalizing phase differences between the quantum states, although
+other phase-insensitive metrics such as infidelity may be employed.
+The final state transfer is the most important objective which is
+encoded in the realtive metric weight $Q_{N} \sim N \cdot Q_{k}$.
+%%, $k \in \{1, ..., N - 1\}$.
 
-In addition to imposing optimization constraints that
-reflect physical limitations of the apparatus, we impose
-constraints that improve the experimental realization of the control pulse.
-To ensures gates may be concatenated arbitrarily without
+Additionally, we impose constraints that reflect limitations
+of the apparatus and ones that improve the experimental realization
+of the control pulse. To ensure gates may be concatenated arbitrarily without
 inducing AWG ringing due to high-frequency transitions,
 we require $a(t = 0) = a(t = t_{N}) = 0$.
 Furthermore, we require $\int_{0}^{t_{N}} a(t) dt = 0$. This
@@ -47,34 +69,19 @@ the hysteresis ubiquitous in flux bias lines,
 We require $-0.5 \textrm{GHz} \le a(t) \le 0.5 \textrm{GHz}$
 to ensure the two-level approximation \eqref{eq:hamiltonian}
 remains valid. Additionally, we require that each gate achieves
-the desired state transition $\ket{\psi_{N}} = \ket{\psi_{f}}$.
-In addition to these constraints we penalize the norm
-of the first and second derivatives of the flux amplitude to
-ensure its smoothness, and in doing so mitigate AWG ringing.
-The optimization is performed over the second derivative of the flux amplitude
-$\pdv*[2]{a}{t}$ which is contained in the
-augmented control vector. The first derivative
-$\pdv*{a}{t}$, proportional $a$, and integral $\int a$
-flux amplitude terms
-are contained in the augmented state vector. They are obtained from
-the second derivative of the flux amplitude by
-integration in the dynamics function.
+the desired state transition $\psi_{N} = \psi_{f}$.
 Both the zero net flux and target quantum state constraint
 are then handled by ensuring the target augmented state is
-reached $x_{N} = x_{f}$, the constraint functional 
-\todo{not sure what the convention is in your community, but for us a functional is a 
-function of functions (or trajectories). This would just be a function. Also, shouldn't 
-this just be $x_N = x_f$ and $\abs{x_k} \le b$? Why are you squaring the functions?}
- takes the form
+reached $x_{N} = x_{f}$, the constraint function
+takes the form
 $c_{k} = (x_{k} - x_{f})^{T}(x_{k} - x_{f})$.
 The equality and inequality constraints on $a$ are handled
 with a bound constraint which takes the form
 $c_{k} = (x_{k} - b)^{T}(x_{k} - b)$ if $\lvert x_{k} \rvert \ge b$
 and $0$ otherwise.
-In addition the norm of the quantum state
-is constrained to ensure discretization error is not
-exploited $c_{k} = {\lvert \braket{\psi_{k} \lvert \psi_{k}} \rvert}^{2} - 1$.
-\todo{is this last constraint supposed to be an inequality constraint?}
+In addition the norm of the quantum states
+are constrained to $1$ to ensure discretization error is not
+exploited $c_{k} = x_{k}^{T}x_{k} - 1$.
 
 In addition to obeying experimental constraints
 and achieving low simulated gate errors, we desire
@@ -102,7 +109,5 @@ and increases away from the flux frustration point
 $T_{1}(a = 0.34 \textrm{GHz}) = 4.3$ms. Given the nature
 of the decay processes and the tradeoff, we choose
 to maximize the longitudinal relaxation time directly
-by tuning the flux amplitude and employ robust control techniques to mitigate
-pure dephasing.
-
-\todo{maybe reference the next Sections as you mention these points?}
+by tuning the flux amplitude \ref{sec:longitude} and employ robust control techniques to mitigate
+pure dephasing \ref{sec:static}, \ref{sec:stochastic}.

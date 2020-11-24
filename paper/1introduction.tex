@@ -33,14 +33,14 @@ resolution.
 % trajectories that are insensitive to these effects are said to be robust.
 % In line with this objective, 
 In order to address these issues,
-recent work has sought to mitigate decoherence
-and errors due to parameter deviations
+recent work has sought to mitigate
+errors due to parameter deviations.
 Considering the dynamical and geometric phases of quantum state
 trajectories has led to analytic methods for mitigating
 errors due to parameter deviations and pure dephasing
 \cite{han2020experimental, merrill2014progress, xu2020nonadiabatic, zhang2020universal}.
 Floquet techniques have been experimentally demonstrated to simultaneously mitigate
-decoherence due to longitudinal relaxation and pure dephasing
+longitudinal relaxation and pure dephasing decoherence
 \cite{huang2020engineering, mundada2020floquet}.
 Numerical QOC techniques have been adapted to mitigate longitudinal relaxation
 by modeling master equations \cite{rembold2020introduction} and employing
@@ -76,9 +76,11 @@ sensitive to model uncertainty:
 % robust trajectory opitmization techniques to make the
 % quantum state trajectory robust to parameter deviations.
 \begin{enumerate}
-  \item A sampling method, similar to the work of \cite{carvalho2020error, reinhold2019controlling, rembold2020introduction}.
+\item A sampling method, similar to the work of \cite{carvalho2020error, reinhold2019controlling,
+  rembold2020introduction}.
   \item An unscented sampling method, adapted from the unscented tranform used in the 
-  state estimation community \cite{howell2020direct, julier2004unscented, lee2013sigma, manchester2016derivative}.
+    state estimation community \cite{howell2020direct, julier2004unscented,
+      lee2013sigma, manchester2016derivative}.
   \item A derivative-penalization method, which uses efficient mixed-mode differentiation
   to compute derivative information of parameter deviations with respect to the 
   quantum state trajectory.
@@ -96,11 +98,12 @@ sensitive to model uncertainty:
 % of parameter deviations with respect to the quantum state trajectory.
 % We make this method efficient by employing mixed-mode differentiation.
 
-This paper is organized as follows. \todo{use section labels?}
-First, we introduce the ALTRO method in the context of QOC.
+This paper is organized as follows.
+First, we introduce the ALTRO method in the context of QOC \ref{sec:background}.
 We describe realistic constraints for the fluxonium and
-map them to the ALTRO method. Then, we
+map them to the ALTRO method \ref{sec:fluxonium}. Then, we
 outline a method for making the optimization aware of longitudinal
-relaxation. Next, we outline three methods for achieving
-robustness to static parameter deviations. Finally,
-we employ the robust control techniques to mitigate 1/$f$ flux noise.
+relaxation \ref{sec:longitude}. Next, we outline three methods for achieving
+robustness to static parameter deviations \ref{sec:static}. Finally,
+we employ the robust control techniques to mitigate 1/$f$ flux noise
+\ref{sec:stochastic}.
