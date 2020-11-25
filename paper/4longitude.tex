@@ -2,12 +2,15 @@
   
   \begin{subfigure}{.315\textwidth}
     \includegraphics[width=\linewidth]{assets/f1a.png}
+    \caption{\label{fig:longitudea}}
   \end{subfigure}\hfill
   \begin{subfigure}{.23\textwidth}
     \includegraphics[width=\linewidth]{assets/f1b.png}
+    \caption{\label{fig:longitudeb}}
   \end{subfigure}\hfill
   \begin{subfigure}{.4\textwidth}
     \includegraphics[width=\linewidth]{assets/f1c.png}
+    \caption{\label{fig:longitudec}}
   \end{subfigure}
   \caption{
     (a) Numerically optimized gates (red) and analytically optimized gates (blue).
@@ -23,13 +26,17 @@
 \end{figure*}
 
 \section{Longitudinal Relaxation Awareness \label{sec:longitude}}
+Dissipation to the thermal bath via longitudinal relaxation
+is an irreversible process that results in information loss.
+This process is modeled using its $1/e$ decay time $T_{1}$.
 The longitudinal relaxation time $T_{1}$ varies with
-control parameters in a range of superconducting circuit platforms.
+control parameters in a range of superconducting circuit platforms,
+including the fluxonium qubit.
 It is advantageous to tune the controls to extend the longitudinal
 relaxation time.
 Computing the gate error due to longitudinal relaxation
 requires propagating density matrices of size $n \times n$ under master equation
-dynamics, rather than state vectors of size $n$ under the TDSE dynamics.
+dynamics, rather than state vectors of size $n$ under the TDSE dynamics \eqref{eq:tdse}.
 We avoid this increase in computational complexity by
 penalizing the integrated rate of longitudinal relaxation,
 i.e. the probability of longitudinal relaxation.
@@ -45,18 +52,15 @@ longitudinal relaxation probability. Our scheme for time-optimal
 control is applicable to any time-optimal problem, not only
 the one we study here.
 
-\todo{again, I'd recommend writing out either the entire optimization problem or at least
-point to the parts of the optimization problem defined in the previous section you had to 
-change. Just make it a little more concrete.}
-
-The longitudinal relaxation probability is given by
+The longitudinal relaxation probability is given by,
 \begin{equation}
   P_{1}(t) = \int_{0}^{t} T_{1}^{-1}(a(t^{\prime})) dt^{\prime}
 \end{equation}
-$P_{1}$ is penalized using a quadratic cost at each knot point
-${\lvert P_{1}(t_{k}) \rvert}^{2}$.
+This value is appended to the augmented state vector \eqref{eq:astatecontrols}
+and penalized according to \eqref{eq:costfun}.
 $T_{1}(a_{k})$ is obtained at each knot point by evaluating
-a spline fit to experimental data of the form $\{(a, T_{1})\}$.
+a spline fit to experimental data of the form $\{(a, T_{1})\}$,
+see Figure \ref{fig:longitudeb}.
 It is also possible to use a spline fit to theoretically obtained data.
 However, $T_{1}$ values are known to fluctuate greatly
 with laboratory temperatures \cite{klimov2018fluctuations}.
@@ -68,27 +72,28 @@ making the time step between each knot point $\Delta t_{k}$
 a decision variable. Promoting $\Delta t_{k}$ to a decision variable, rather
 than the number of knot points $N$, preserves the
 Markovian decision structure of the trajectory
-optimization problem. To ensure numerical
+optimization problem. The square root of the time step $\sqrt{\Delta t_{k}}$
+is appended to the augmented control vector \eqref{eq:astatecontrols}
+and the squared root
+of the time step $\lvert \Delta t_{k} \rvert$ is used
+for integration in the discrete dynamics function \eqref{eq:dyn_con}.
+To ensure numerical
 integration accuracy is maintained we add a bound
-constraint at each knot point
-$5\textrm{e-}2 \ \textrm{ns} \le
-\Delta t_{k} \le 2\textrm{e-}1 \ \textrm{ns}$.
-This bound constraint may be
-violated for intermediate iterations of the optimization,
-so we add the square root of the time step $\sqrt{\Delta t_{k}}$
-to the augmented control vector and use the squared root
-of the time step $\lvert \Delta t_{k} \rvert$ in optimization.
+constraint on the time step at each knot point.
 
 %% F2
 \begin{figure*}[ht]
   \begin{subfigure}{.315\textwidth}
     \includegraphics[width=\linewidth]{assets/f2a.png}
+    \label{fig:statica}
   \end{subfigure}\hfill
   \begin{subfigure}{.4\textwidth}
     \includegraphics[width=\linewidth]{assets/f2c.png}
+    \label{fig:staticb}
   \end{subfigure}\hfill
   \begin{subfigure}{.23\textwidth}
     \includegraphics[width=\linewidth]{assets/f2b.png}
+    \label{fig:staticc}
   \end{subfigure}
   \caption{
     (a) $Z/2$ gates robust to qubit frequency detunings constructed with the

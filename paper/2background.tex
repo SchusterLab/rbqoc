@@ -5,14 +5,11 @@ review the quantum optimal control problem statement,
 and introduce the trajectory optimization framework.
 Quantum optimal control concerns the evolution of
 a quantum state $\ket{\psi(t)}$ governed by the time-dependent
-Schr{\"o}dinger equation (TDSE)
+Schr{\"o}dinger equation (TDSE),
 \begin{equation}
   i \hbar \frac{d}{dt} \ket{\psi} = H(u(t), t) \ket{\psi}
   \label{eq:tdse}
 \end{equation}
-%% The evolution is sometimes cast with the evolution
-%% of a density matrix under the Lindblad master equation to
-%% model the decoherence of the state explicitly.
 The Hamiltonian
 has an arbitrary dependence on the possibly multi-valued controls $u(t)$.
 The controls are so called because they are the means the experimentalist has to
@@ -28,19 +25,17 @@ In the simplest case the functional is
 the infidelity between the inital state evolved
 to the final knot point and the target state
 $J = 1 - {\lvert \braket{\psi_{f}}{\psi_{N}(u(t))} \rvert}^{2}$.
-In general $J$ is a linear combinaion of cost functions on the state, e.g.
-forbidden-state occupation, as well as
-cost functions on the controls, e.g. the norm of the control amplitudes
-\cite{leung2017speedup}. Typical quantum optimal control
+In general $J$ is a linear combinaion of cost functions on the state
+as well as cost functions on the controls \cite{leung2017speedup}.
+Typical quantum optimal control
 algorithms employ automatic differentiation
-to compute first order information for the functional $\nabla_{u} J(u)$.
-This information is used in a first-order optimizer to minimize $J$ with respect to $u$.
-This scheme lends itself to projected gradient methods
-which restrict the optimization to the constraint manifold
+to compute gradients of the functional $\nabla_{u} J(u)$,
+which can easily be used to implement first-order optimization methods
 \cite{clarkson2010coresets, hauswirth2016projected}.
 
 Alternatively, the QOC problem can be formulated as a trajectory optimization problem 
-and solved using any of the state-of-the-art solvers developed by the robotics community.
+and solved using a variety of specialized solvers developed by the robotics community
+\cite{Schulman13,Tedrake16,Hereid2017FROST,howell2019altro}.
 Trajectory optimization problems are typically of the following form: 
 \begin{mini}[2]
     {x_{0:N},u_{0:N-1}}{\ell_f(x_N) + \sum_{k=0}^{N-1} \ell(x_k,u_k) }{}{}
@@ -66,7 +61,7 @@ using a backward Riccati recursion to derive a closed-loop linear feedback law a
 trajectory. By simulating the system forward with the feedback law, the trajectory is 
 brought closer to the (locally) optimal trajectory. DDP-based solvers such as iLQR
 are popular since they are very computationally efficient, are always dynamically feasible,
-and provide a closed-loop control policy about the optimal trajectory for free; however,
+and provide a locally stabilizing closed-loop control policy about the optimal trajectory. However,
 standard implementations have no ability to deal with nonlinear equality and inequality 
 constraints. ALM handles constraints by successively solving unconstrained minimization 
 problems of the form:
@@ -75,81 +70,30 @@ problems of the form:
     \label{opt:alm}
 \end{mini}
 where $f(z)$ is the objective function, $c(z) : \R^n \mapsto \R^p$ is the constraint 
-function, $\lambda \in \R^p$ are the Lagrange multipliers, and $I_\mu$ is a diagonal matrix
-of penalty weights, whose magnitude depend on whether the constraint is active or inactive.
+function, $\lambda \in \R^p$ is a Lagrange multiplier estimate, and $I_\mu$ is a diagonal matrix
+of penalty weights, $\mu$, whose magnitudes depend on whether the corresponding constraint is active or inactive.
 For ALTRO, $f(z)$ is the objective function of \eqref{opt:discrete_trajopt}, $c(z)$ is the 
 concatenation of $g_k$ and $h_k$, and $z$ is the concatenation of the states and controls 
-across all time steps. After minimizing \eqref{opt:alm} using iLQR, the penalty terms and 
-Lagrange multipliers are updated, and the process repeats until convergence.
+across all time steps. After minimizing \eqref{opt:alm} using iLQR,
+the Lagrange multiplier estimates are updated according to,
+\begin{equation}
+	\lambda \gets \lambda + \mu c(z) ,
+\end{equation}
+the penalty terms are updated, and the process repeats until convergence.
 
 ALM converges superlinearly but tends to exhibit slow constraint convergence near the optimal 
 solution due to poor numerical conditioning. To address this shortcoming, ALTRO provides a 
 solution-polishing phase that takes 1-2 Newton steps on the active constraint set to provide 
 machine-precision constraint satisfaction. For more information on the details of the ALTRO
-solver, see \cite{howell2019altro,Jackson2020altroc}.
+solver, see \cite{howell2019altro, Jackson2020altroc}.
 
-% For the QOC problem, the state $x$ consists of \todo{fill this out} while the control input
-% $u$ includes the flux drive amplitude. The cost functions $\ell_N$
-% The trajectory optimization
-% literature, driven primarily by the robotics community,
-% solves a more general class of non-linear programs that resemble
-% the QOC problem. The QOC
-% problem is a specific case of the linear quadratic regulator (LQR).
-% LQR is so called because the dynamics are linear in the state and
-% the functional is quadratic in the state. A general LQR cost
-% function takes the form
-% \begin{equation}
-%   J_{\textrm{iLQR}} = \ell_{N}({x}_{N})
-%   + \sum_{k = 0}^{N - 1} \ell_{k}({x}_{k}, u_{k})
-% \end{equation}
-% The subscript $k$ denotes the knot point, $x$ is the augmented state vector,
-% and $u$ is the augmented control vector. The augmented state is propagated
-% to the next knot point by the dynamics function $x_{k + 1} = f(x_{k}, u_{k}, t_{k}, \Delta t_{k})$.
-% In the case of QOC $\ket{\psi_{k}} \subseteq x_{k}$
-% and $f$ encodes the TDSE dynamics \eqref{eq:tdse}. The
-% cost function $\ell_{k}$ includes contributions from the infidelity
-% $1 - {\lvert \braket{\psi_{f} \lvert \psi_{k}} \rvert}^{2}$, final state deviations
-% $\tilde{x}^{T}_{k} Q_{k} \tilde{x}_{k}$ where $\tilde{x}_{k} = x_{f} - x_{k}$,
-% and control regularization $u^{T}_{k} R_{k} u_{k}$.
-% Placing cost functions at each knot point smoothens the optimization
-% landscape. In QOC realizing the final state
-% is the most important objective so the cost function at the final knot point
-% carries a higher realtive weight $\ell_{N} \sim N \cdot \ell_{k}$.
-% The LQR formulation restricts the cost functions to operate on the augmented
-% state and controls at each knot point. The advantage of the LQR formulation
-% is that there exists a differentiable dynamic programming algorithm to compute the
-% optimal update to the augmented controls $u_{k}$ which minimizes the cost
-% function $\ell_{k}$ at each knot point. This algorithm proceeds by deriving a
-% recurrence relation between knot points $k$ and $k + 1$ for the optimal
-% feedback law--known as the Ricatti recursion (citations needed). The
-% iterative LQR (iLQR) algorithm computes $J_{\textrm{iLQR}}$
-% and applies the Ricatti recursion to all knot points on multiple
-% executions.
+The ALTRO method has fast tail-convergence and
+allows us to impose arbitrary constraints without restricting
+the optimization to the constraint manifold.
+This contrasts typical first-order QOC methods that employ the same
+update procedure for the duration of optimization
+and employ projected gradient methods
+which restrict the optimization to the constraint manifold.
+To see how to use the ALTRO method for QOC, we will present
+a concrete example in the following section.
 
-% In order to incorporate constraints we employ
-% the augmented Lagrangian method. Constraints are contributions
-% to the functional of arbitrary form $c_{k}(x_{k}, u_{k})$ which are
-% zero or negative when the constraint is satisfied. The AL-iLQR
-% method associates a penalty multiplier with the constraint
-% that estimates the constraint's Lagrange multiplier.
-% The algorithm updates the penalty multiplier between
-% iLQR executions. In this scheme the functional takes the form
-% \begin{equation}
-% \begin{aligned}
-%     J_{\textrm{AL-iLQR}} &= J_{\textrm{iLQR}}\\
-%     &+ (\lambda_{N} + \frac{1}{2}I_{\mu_{N}} c_{N}(x_{N}))^{T} c_{N}(x_{N})\\
-%     &+ \sum^{N - 1}_{k = 0} (\lambda_{k} + \frac{1}{2}I_{\mu_{k}} c_{k}(x_{k}, u_{k}))^{T} c_{k}(x_{k}, u_{k})\\
-% \end{aligned}
-% \end{equation}
-% Here $\lambda_{k}$ is a Lagrange multiplier and $I_{\mu_{k}}$ is a penalty matrix
-% with $\mu_{k}$ along the diagonal.
-% $\lambda_{k}$ and $\mu_{k}$ are updated after each augmented Lagrangian iteration according to
-% \begin{align}
-%   \lambda^{i}_{k} &\gets \max(0, \lambda^{i}_{k} + \mu^{i}_{k} c^{i}_{k}(x_{k}^{*}, u_{k}^{*}))\\
-%   \mu^{i}_{k} &\gets \phi \mu^{i}_{k}
-% \end{align}
-% Here $x^{*}, u^{*}$ are the optimal augmented state and augmented controls from the iLQR execution,
-% $i$ indicates the $i$-th constraint functional,
-% and $\phi$ is a hyperparameter. An optimal control update, similar to the Ricatti
-% recursion, can be formed to calculate the optimal control updates for this functional,
-% see \cite{howell2019altro}.

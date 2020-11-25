@@ -7,31 +7,25 @@ circuits \cite{heeres2017implementing,
   huang2020engineering, leng2019robust, leung2017speedup, xu2020nonadiabatic},
 neutral and ionized atoms \cite{van2016optimal}, nitrogen-vacancy centers in
 diamond \cite{rembold2020introduction}, and Bose-Einstien condensates
-\cite{sorensen2018quantum}. For quantum computation
+\cite{sorensen2018quantum}.
+For quantum computation
 QOC techniques are employed to achieve high fidelity gates
 while adhering to experimental constraints.
-The decision variables of the optimization problem are the time-dependent control
-parameters, particular to the quantum system, that govern its evolution.
-Experimental errors may cause the system evolution to deviate from that predicted in
+Experimental errors may cause the system's trajectory to deviate from that predicted in
 optimization, hampering performance.
-The field of classical control theory has developed robust control techniques
-to encode experimental errors in optimization objectives, improving
-experimental performance (citations appreciated).
+Robust control techniques 
+address this issue by encoding
+experimental errors in optimization objectives, yielding performance
+garauntees in the presence of model uncertainty \cite{Zhou97,Morimoto00,Manchester18}.
 In this work we employ robust control techniques to mitigate
 realistic system parameter deviations and decoherence that arise when controlling
 a superconducting fluxonium qubit.
 
 Analytic and numerical techniques for QOC have been remarkably successful in
-designing high fidelity gates (citations needed). 
+designing high fidelity gates \todo{citations needed}. 
 While these methods are able to predict system behavior with high accuracy, they tend 
 to be sensitive to experimental errors such as parameter drift, noise, and finite control 
 resolution. 
-% In addition to the high
-% simulated fidelities which can be obtained with these techniques, it is desirable for the
-% resultant quantum state trajectory to be insensitive to experimental errors
-% such as parameter drift, noise, and finite control resolution. Quantum state
-% trajectories that are insensitive to these effects are said to be robust.
-% In line with this objective, 
 In order to address these issues,
 recent work has sought to mitigate
 errors due to parameter deviations.
@@ -49,32 +43,9 @@ Additionally, efforts have been made to incorporate experimental feedback
 into optimization \cite{huang2020engineering}. Comprehensive tools that interleave characterization
 and pulse design are under active development \cite{wittler2020integrated}.
 
-In this work we mitigate
-errors arising from longitudinal relaxation, parameter deviations, and 1/$f$ flux noise
-on the fluxonium qubit \cite{zhang2020universal} by solving a robust trajectory 
-optimization problem. 
-Leveraging recent advances in trajectory optimization within the field of robotics, we
-solve this optimization problem using the ALTRO solver, which uses iterative LQR 
-(iLQR)---a differential-dynamic programming (DDP)-based indirect method similar to shooting
-methods such as GOAT \cite{machnes2015gradient}, GRAPE
-\cite{khaneja2005optimal, leung2017speedup}, and Krotov's \cite{goerz2019krotov}---within 
-an augmented Lagrangian framework to handle nonlinear equality and inequality constraints at 
-each time step \cite{howell2019altro}. 
-% The augmented Lagrangian method
-% allows us to enforce arbitrary, simultaneous constraints and achieve
-% fast convergence without being restricted to the constraint
-% manifold. 
-To mitigate errors due to longitudinal
-relaxation, we perform time-optimal control and
-encode the dependence of longitudinal relaxation
-on the controls in an efficient optimization objective that does
-not pay the increased computational cost of integrating a master equation.
-Additionally, to make the quantum state trajectory robust to parameter deviations,
-we consider three different approaches to making the optimized trajectory less 
-sensitive to model uncertainty:
-% we consider three robust
-% robust trajectory opitmization techniques to make the
-% quantum state trajectory robust to parameter deviations.
+In this work, we study three robust control techniques that
+make the optimized trajectory less sensitive
+to static and time-dependent parameter deviations:
 \begin{enumerate}
 \item A sampling method, similar to the work of \cite{carvalho2020error, reinhold2019controlling,
   rembold2020introduction}.
@@ -85,25 +56,30 @@ sensitive to model uncertainty:
   to compute derivative information of parameter deviations with respect to the 
   quantum state trajectory.
 \end{enumerate}
-% The first is the sampling method, which has been applied
-% previously in the context of QOC
-%%TODO: the citations for unscented sampling
-%% and sampling are the same as in section V
-% \cite{carvalho2020error, reinhold2019controlling, rembold2020introduction}.
-% The second is the unscented sampling
-% method, which derives from the unscented transformation used
-% for non-linear Kalman filtering
-% \cite{howell2020direct, julier2004unscented, lee2013sigma, manchester2016derivative}.
-% We propose a third method, which uses derivative information
-% of parameter deviations with respect to the quantum state trajectory.
-% We make this method efficient by employing mixed-mode differentiation.
+We apply these techniques to the fluxonium qubit presented in \cite{zhang2020universal}.
+We also show that QOC can solve important problems for fluxonium-based qubits,
+in particular taking advantage of the $T_{1}$-dependence of the controls
+to mitigate longitudinal relaxation and
+performing phase gates in arbitrary times.
+To mitigate errors due to longitudinal
+relaxation, we perform time-optimal control and
+utilize an efficient optimization objective that does
+not pay the increased computational cost of integrating a master equation.
+Leveraging recent advances in trajectory optimization within the field of robotics, we
+solve these optimization problems using the ALTRO solver, which uses iterative LQR 
+(iLQR)---a differential-dynamic programming (DDP)-based indirect method similar to shooting
+methods such as GOAT \cite{machnes2015gradient}, GRAPE
+\cite{khaneja2005optimal, leung2017speedup}, and Krotov's \cite{goerz2019krotov}---within 
+an augmented Lagrangian framework to handle nonlinear equality and inequality constraints at 
+each time step \cite{howell2019altro}. 
 
 This paper is organized as follows.
-First, we introduce the ALTRO method in the context of QOC \ref{sec:background}.
+First, we introduce the ALTRO method in the context of QOC
+in Section \ref{sec:background}.
 We describe realistic constraints for the fluxonium and
-map them to the ALTRO method \ref{sec:fluxonium}. Then, we
+map them to the ALTRO method in Section \ref{sec:fluxonium}. Then, we
 outline a method for making the optimization aware of longitudinal
-relaxation \ref{sec:longitude}. Next, we outline three methods for achieving
-robustness to static parameter deviations \ref{sec:static}. Finally,
+relaxation in Section \ref{sec:longitude}. Next, we outline three methods for achieving
+robustness to static parameter deviations in Section \ref{sec:static}. Finally,
 we employ the robust control techniques to mitigate 1/$f$ flux noise
-\ref{sec:stochastic}.
+in Section \ref{sec:stochastic}.
