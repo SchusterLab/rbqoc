@@ -1,0 +1,24 @@
+\section{Computational Performance and Scaling}
+\todo{timing table}
+
+\todo{make complexity analysis a coherent paragraph}
+(sampling) For the sampling method the number of sample states in the augmented state vector
+scales as $O(dn^{2})$
+because each of $n^{2}$ initial
+states is represented by $2d$ samples. $n$ is both the dimension of the Hilbert space
+and the size of a state vector. $d$ is the number of deviant parameters.
+
+(unscented) Each initial state from the operator basis
+is represented with a distribution of $4n + 2d$ samples. Hence,
+the number of states in the augmented state vector scales as $O(n^{3} + dn^{2})$.
+The gate error of each sample state is penalized as in the sampling method.
+
+
+(derivative) For this method $m$ state derivatives are associated with each
+initial state from the operator basis.
+So, the number of states in the augmented state vector scales as
+$O(dmn^{2})$. Additionally, we note that the number of initial
+states and samples we have employed for each of the three
+methods follows standard perscriptions. However, knowledge
+of the problem can typically be used to reduced the number
+of required samples.

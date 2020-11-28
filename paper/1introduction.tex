@@ -1,15 +1,19 @@
 \section{Introduction}
 Quantum optimal control (QOC) techniques are a class of optimization
 algorithms for accurately and efficiently manipulating quantum systems.
-\todo{more nmr and sqc cite} Early techniques were proposed for nuclear magnetic resonance experiments
-\cite{khaneja2005optimal}, and applications now include superconducting
-circuits \cite{heeres2017implementing,
-  huang2020engineering, leng2019robust, leung2017speedup, xu2020nonadiabatic},
-neutral and ionized atoms \cite{
-  brouzos2015quantum, de2008optimal, goerz2011quantum, guo2019high, jensen2019time,
+Early techniques were proposed for nuclear magnetic resonance experiments
+\cite{vandersypen2005nmr, kehlet2004improving, khaneja2005optimal,
+  maximov2008optimal, nielsen2010optimal, skinner2003application, tosner2009optimal},
+and applications now include superconducting circuits \cite{abdelhafez2020universal,
+  chakram2020multimode, fisher2010optimal, gokhale2019partial,
+  huang2020engineering, leng2019robust, leung2017speedup, li2020fast,
+  xu2020nonadiabatic},
+neutral atoms and ions \cite{brouzos2015quantum,
+  de2008optimal, goerz2011quantum, guo2019high, jensen2019time,
   larrouy2020fast, omran2019generation, rosi2013fast, sorensen2019qengine,
-  treutlein2006microwave, van2016optimal}, nitrogen-vacancy centers in
-diamond \cite{chou2015optimal, dolde2014high, geng2016experimental,
+  treutlein2006microwave, van2016optimal},
+nitrogen-vacancy centers in diamond \cite{chou2015optimal,
+  dolde2014high, geng2016experimental,
   nobauer2015smooth, poggiali2018optimal, rembold2020introduction, tian2019optimal},
 and Bose-Einstien condensates \cite{amri2019optimal, sorensen2018quantum}.
 For quantum computation,
@@ -27,20 +31,22 @@ We adapt robust control techniques from the robotics community to mitigate
 realistic model uncertainties for
 a superconducting fluxonium qubit.
 
-Analytic and numerical techniques for QOC have had tremendous success in
+QOC techniques have had tremendous success in
 engineering high fidelity quantum gates \cite{
-  chakram2020multimode, chou2015optimal, dolde2014high, egger2013optimized, egger2014adaptive,
-  gokhale2019partial, grace2007optimal, heeres2017implementing, huang2014optimal,
+  chou2015optimal, dolde2014high, egger2013optimized, egger2014adaptive,
+  grace2007optimal, heeres2017implementing, huang2014optimal,
   kelly2014optimal, leng2019robust, liebermann2016optimal,
   nebendahl2009optimal, rebentrost2009optimal, rebentrost2009optimal2,
   spiteri2018quantum, sporl2007optimal}. 
-While traditional QOC techniques can predict system behavior
+While standard QOC techniques can predict system behavior
 with high accuracy, they are sensitive to experimental
 errors such as parameter drift, noise, finite control 
-resolution, and decoherence. Analytic techniques to mitigate parameter deviation errors
+resolution, and decoherence. Multiple techniques have been developed to address
+these shortcomings. Analytic techniques to mitigate parameter deviation errors
 include dynamic and geometric phase considerations
 \cite{han2020experimental, xu2020nonadiabatic} and
-composite pulses \cite{merrill2014progress}.
+composite pulses \cite{cummins2000use, cummins2003tackling,
+  kupce1995stretched, merrill2014progress}.
 To mitigate decoherence, Floquet techniques have been employed
 \cite{huang2020engineering, mundada2020floquet}.
 Numerical techniques to mitigate parameter deviation errors
