@@ -30,7 +30,7 @@ with the control parameters in a range of superconducting circuit platforms,
 including the fluxonium qubit. Because dissipation to the thermal bath
 via longitudinal relaxation is an irreversible process that results in information loss,
 it is advantageous to tune the controls to extend the longitudinal
-relaxation time $T_{1}$--which represents the $1/e$ decay time
+relaxation time $T_{1}$--which represents the $1/e$ relaxation time
 of the quantum state.
 Computing the gate error due to longitudinal relaxation
 requires propagating density matrices of size $n \times n$ under master equation
@@ -82,15 +82,15 @@ constraint on the time step at each knot point.
 \begin{figure*}[ht]
   \begin{subfigure}{.315\textwidth}
     \includegraphics[width=\linewidth]{assets/f2a.png}
-    \label{fig:statica}
+    \caption{\label{fig:statica}}
   \end{subfigure}\hfill
   \begin{subfigure}{.4\textwidth}
     \includegraphics[width=\linewidth]{assets/f2c.png}
-    \label{fig:staticb}
+    \caption{\label{fig:staticb}}
   \end{subfigure}\hfill
   \begin{subfigure}{.23\textwidth}
     \includegraphics[width=\linewidth]{assets/f2b.png}
-    \label{fig:staticc}
+    \caption{\label{fig:staticc}}
   \end{subfigure}
   \caption{
     (a) $Z/2$ gates robust to qubit frequency detunings constructed with the
