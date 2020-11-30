@@ -1,23 +1,44 @@
-\section{Computational Performance and Scaling \label{appendix:time}}
+\section{Computational Performance \label{appendix:time}}
 We provide runtimes for our optimizations and comment on the scaling of the
-robustness methods. The runtimes for the base optimization in Section \ref{sec:fluxonium},
-longitudinally aware optimization in Section \ref{sec:longitude},
-and robust optimizations in Section \ref{sec:static} are presented
-in Table \ref{tab:time} for a $Z/2$ gate at multiples
-of the analytic gate time.
-\todo{timing table}
+robustness methods. The runtimes for
+the base optimization in Section \ref{sec:fluxonium},
+the longitudinally aware optimization in Section \ref{sec:longitude},
+and the robust optimizations in Section \ref{sec:static}
+are presented in Table \ref{tab:time}
+for a $Z/2$ gate at multiples of the analytic $Z/2$ gate time.
+Compiler optimizations for statically-sized arrays were utilized
+for all methods except for the unscented sampling method.
+The unscented sampling method's augmented state vector size
+was too large to take advantage of these optimizations,
+adversely affecting its run time.
+For the robust methods, the runtime scales super-linearly with the
+gate time. We expect the runtime to scale linearly with the gate time
+for large gate times because
+the number of knot points scales linearly with the gate time.
+We observe this behavior for the base method, which has a smaller
+augmented state vector size than the robust methods.
+We performed optimizations on a single CPU thread in this work as a proof
+of concept. Future work will parallelize the robustness
+methods across the initial states in the operator basis and utilize GPUs
+\cite{leung2017speedup},
+allowing for fast optimization on large Hilbert spaces.
 
-\begin{table}[ht]
+\begin{table}[ht!]
   \begin{tabular} {c | c | c | c | c | c | c}
     & \multicolumn{6}{c}{Wall Time ($\pm 0.001$ s)}\\
     \hline
-    Gate Time (ns) & Base & Long. & S & SU & D1 & D2\\
+    $t_{N}$ (ns) & Base & Long. & S & SU & D1 & D2\\
     \hline
     $18$ & 0.155 & 1.688 & 1.773 & & 16.713 & 48.398\\ % 0.155049
     $36$ & 7.014 & - & 48.213 & & 67.838 & 81.030\\
-    $72$ & 15.906 & - & & & &\\
+    $72$ & 15.906 & - & 281.372 & & 266.997 & 332.182\\
   \end{tabular}
-  \caption{Programs were executed on a single thread of an AMD Ryzen Threadripper 3970X 32-Core Processor.}
+  \caption{
+    \todo{finish timing table}
+    Runtimes for $Z/2$ optimizations.
+    Programs were executed on a single thread of an
+    AMD Ryzen Threadripper 3970X 32-Core Processor.
+  }
   \label{tab:time}
 \end{table}
 
