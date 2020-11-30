@@ -17,17 +17,13 @@ const TO = TrajectoryOptimization
 # paths
 const EXPERIMENT_META = "spin"
 const EXPERIMENT_NAME = "spin11"
-const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
+const SAVE_PATH = abspath(joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME))
 
 # problem
 const CONTROL_COUNT = 1
 const STATE_COUNT = 2
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
 const ACONTROL_SIZE = CONTROL_COUNT
-const INITIAL_STATE1 = [1., 0, 0, 0]
-const INITIAL_STATE2 = [0., 1, 0, 0]
-const INITIAL_STATE3 = [1., 0, 0, 1] ./ sqrt(2)
-const INITIAL_STATE4 = [1., -1, 0, 0] ./ sqrt(2)
 const SAMPLE_COUNT = 4
 # state indices
 const STATE1_IDX = 1:HDIM_ISO
@@ -63,16 +59,16 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model{DO}, astate::SVector,
                               acontrol::SVector, time::Real, dt::Real) where {DO}
     negi_h = (
         FQ_NEGI_H0_ISO
-        + astate[CONTROLS_IDX][1] * NEGI_H1_ISO
+        + astate[CONTROLS_IDX[1]] * NEGI_H1_ISO
     )
     h_prop = exp(negi_h * dt)
     state1_ = astate[STATE1_IDX]
     state2_ = astate[STATE2_IDX]
     state1 =  h_prop * state1_
     state2 = h_prop * state2_
-    intcontrols = astate[INTCONTROLS_IDX] + astate[CONTROLS_IDX] * dt
-    controls = astate[CONTROLS_IDX] + astate[DCONTROLS_IDX] * dt
-    dcontrols = astate[DCONTROLS_IDX] + acontrol[D2CONTROLS_IDX] * dt
+    intcontrols = astate[INTCONTROLS_IDX[1]] + astate[CONTROLS_IDX[1]] * dt
+    controls = astate[CONTROLS_IDX[1]] + astate[DCONTROLS_IDX[1]] * dt
+    dcontrols = astate[DCONTROLS_IDX[1]] + acontrol[D2CONTROLS_IDX[1]] * dt
 
     astate_ = [
         state1; state2; intcontrols; controls; dcontrols;
@@ -110,11 +106,12 @@ end
 
 
 # main
-function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
-                  sqrtbp=false, derivative_order=0, integrator_type=rk3, qs=ones(7),
+function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
+                  sqrtbp=false, derivative_order=0, integrator_type=rk3,
+                  qs=[1e0, 1e0, 1e0, 1e-1, 5e-2, 1e-1, 1e-1, 1e-1],
                   smoke_test=false, dt_inv=Int64(1e1), constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5),
-                  max_cost_value=1e8)
+                  max_cost_value=1e8, benchmark=false)
     # model configuration
     model = Model{derivative_order}()
     n = state_dim(model)
@@ -123,10 +120,10 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
 
     # initial state
     x0_ = zeros(n)
-    x0_[STATE1_IDX] = INITIAL_STATE1
-    x0_[STATE2_IDX] = INITIAL_STATE2
-    x0_[STATE3_IDX] = INITIAL_STATE3
-    x0_[STATE4_IDX] = INITIAL_STATE4
+    x0_[STATE1_IDX] = IS1_ISO_
+    x0_[STATE2_IDX] = IS2_ISO_
+    x0_[STATE3_IDX] = IS3_ISO_
+    x0_[STATE4_IDX] = IS4_ISO_
     x0 = SVector{n}(x0_)
 
     # target state
@@ -144,8 +141,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     xf_ = zeros(n)
     xf_[STATE1_IDX] = target_state1
     xf_[STATE2_IDX] = target_state2
-    xf_[STATE3_IDX] = gate * INITIAL_STATE3
-    xf_[STATE4_IDX] = gate * INITIAL_STATE4
+    xf_[STATE3_IDX] = gate * IS3_ISO_
+    xf_[STATE4_IDX] = gate * IS4_ISO_
     xf = SVector{n}(xf_)
     
     # control amplitude constraint
@@ -181,13 +178,14 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         fill(qs[2], 1); # ∫a
         fill(qs[3], 1); # a
         fill(qs[4], 1); # ∂a
-        fill(0, eval(:($derivative_order >= 1 ? ($SAMPLE_COUNT - $STATE_COUNT) * $HDIM_ISO : 0))) # ψ3, ψ4
+        fill(0, eval(:($derivative_order >= 1 ? ($SAMPLE_COUNT - $STATE_COUNT)
+                       * $HDIM_ISO : 0))) # ψ3, ψ4
         fill(qs[5], eval(:($derivative_order >= 1 ? $SAMPLE_COUNT * $HDIM_ISO : 0))); # ∂ψ
         fill(qs[6], eval(:($derivative_order >= 2 ? $SAMPLE_COUNT * $HDIM_ISO : 0))); # ∂2ψ
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([
-        fill(qs[7], CONTROL_COUNT);
+        fill(qs[7], CONTROL_COUNT); # ∂2a
     ]))
     objective = LQRObjective(Q, R, Qf, xf, N)
 
@@ -197,19 +195,26 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     control_bnd_boundary = BoundConstraint(n, m, x_max=x_max_boundary, x_min=x_min_boundary)
     # must reach target state, must have zero net flux
     target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
-    # must obey unit norm.
-    normalization_constraint_1 = NormConstraint(n, m, 1, TO.Equality(), STATE1_IDX)
-    normalization_constraint_2 = NormConstraint(n, m, 1, TO.Equality(), STATE2_IDX)
+    # must obey unit norm
+    nidxs = [STATE1_IDX, STATE2_IDX]
+    if derivative_order >= 1
+        push!(nidxs, STATE3_IDX)
+        push!(nidxs, STATE4_IDX)
+    end
+    norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idx) for idx in nidxs]
     
     constraints = ConstraintList(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
-    add_constraint!(constraints, target_astate_constraint, N:N);
-    # add_constraint!(constraints, normalization_constraint_1, 2:N-1)
-    # add_constraint!(constraints, normalization_constraint_2, 2:N-1)
+    add_constraint!(constraints, target_astate_constraint, N:N)
+    for norm_constraint in norm_constraints
+        add_constraint!(constraints, norm_constraint, 2:N-1)
+    end
+    
 
     # solve problem
-    prob = Problem{IT_RDI[integrator_type]}(model, objective, constraints, x0, xf, Z, N, t0, evolution_time)
+    prob = Problem{IT_RDI[integrator_type]}(model, objective, constraints,
+                                            x0, xf, Z, N, t0, evolution_time)
     solver = ALTROSolver(prob)
     verbose_pn = verbose ? true : false
     verbose_ = verbose ? 2 : 0
@@ -224,7 +229,12 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
                  projected_newton=projected_newton, iterations_inner=iterations_inner,
                  iterations_outer=iterations_outer, iterations=max_iterations,
                  max_cost_value=max_cost_value)
-    Altro.solve!(solver)
+    if benchmark
+        benchmark_result = Altro.benchmark_solve!(solver)
+    else
+        benchmark_result = nothing
+        Altro.solve!(solver)
+    end
 
     # post-process
     acontrols_raw = TO.controls(solver)
@@ -281,6 +291,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
         end
         result["save_file_path"] = save_file_path
     end
+
+    result = benchmark ? benchmark_result : result
 
     return result
 end

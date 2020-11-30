@@ -1,5 +1,8 @@
 """
-spin12.jl - sampling robustness
+spin12.jl - sampling robustness for the δf problem
+
+This optimization uses the infidelity metric rather than
+the standard diagonal LQR metric.
 """
 
 WDIR = joinpath(@__DIR__, "../../")
@@ -26,10 +29,6 @@ const SAMPLE_COUNT = 8
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
 const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
 const ACONTROL_SIZE = CONTROL_COUNT
-const INITIAL_STATE1 = [1., 0, 0, 0]
-const INITIAL_STATE2 = [0., 1, 0, 0]
-const INITIAL_STATE3 = [1., 0, 0, 1] ./ sqrt(2)
-const INITIAL_STATE4 = [1., -1, 0, 0] ./ sqrt(2)
 # state indices
 const STATE1_IDX = 1:HDIM_ISO
 const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
@@ -107,31 +106,33 @@ end
 
 @inline TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N}) where {N,M,T} = (
     0.5 * astate' * cost.Q * astate + cost.q'astate + cost.c
-    + cost.q_ss1 * gate_error_iso2(astate, cost.target_states[1], S1_IDX[1] - 1)
-    + cost.q_ss2 * gate_error_iso2(astate, cost.target_states[2], S2_IDX[1] - 1)
-    + cost.q_ss3 * gate_error_iso2(astate, cost.target_states[3], S3_IDX[1] - 1)
-    + cost.q_ss4 * gate_error_iso2(astate, cost.target_states[4], S4_IDX[1] - 1)
-    + cost.q_ss1 * gate_error_iso2(astate, cost.target_states[1], S5_IDX[1] - 1)
-    + cost.q_ss2 * gate_error_iso2(astate, cost.target_states[2], S6_IDX[1] - 1)
-    + cost.q_ss3 * gate_error_iso2(astate, cost.target_states[3], S7_IDX[1] - 1)
-    + cost.q_ss4 * gate_error_iso2(astate, cost.target_states[4], S8_IDX[1] - 1)
+    + cost.q_ss1 * gate_error_iso2(astate, cost.target_states[1]; s1o=S1_IDX[1] - 1)
+    + cost.q_ss2 * gate_error_iso2(astate, cost.target_states[2]; s1o=S2_IDX[1] - 1)
+    + cost.q_ss3 * gate_error_iso2(astate, cost.target_states[3]; s1o=S3_IDX[1] - 1)
+    + cost.q_ss4 * gate_error_iso2(astate, cost.target_states[4]; s1o=S4_IDX[1] - 1)
+    + cost.q_ss1 * gate_error_iso2(astate, cost.target_states[1]; s1o=S5_IDX[1] - 1)
+    + cost.q_ss2 * gate_error_iso2(astate, cost.target_states[2]; s1o=S6_IDX[1] - 1)
+    + cost.q_ss3 * gate_error_iso2(astate, cost.target_states[3]; s1o=S7_IDX[1] - 1)
+    + cost.q_ss4 * gate_error_iso2(astate, cost.target_states[4]; s1o=S8_IDX[1] - 1)
 )
 
-@inline TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N}, acontrol::SVector{M}) where {N,M,T} = (
+@inline TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N},
+                      acontrol::SVector{M}) where {N,M,T} = (
     TO.stage_cost(cost, astate) + 0.5 * acontrol' * cost.R * acontrol
 )
 
-function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T}) where {N,M,T}
+function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T},
+                      astate::SVector{N,T}) where {N,M,T}
     E.q = (cost.Q * astate + cost.q + [
         @SVector zeros(ASTATE_SIZE_BASE);
-        cost.q_ss1 * jacobian_gate_error_iso2(astate, cost.target_states[1], S1_IDX[1] - 1);
-        cost.q_ss2 * jacobian_gate_error_iso2(astate, cost.target_states[2], S2_IDX[1] - 1);
-        cost.q_ss3 * jacobian_gate_error_iso2(astate, cost.target_states[3], S3_IDX[1] - 1);
-        cost.q_ss4 * jacobian_gate_error_iso2(astate, cost.target_states[4], S4_IDX[1] - 1);
-        cost.q_ss1 * jacobian_gate_error_iso2(astate, cost.target_states[1], S5_IDX[1] - 1);
-        cost.q_ss2 * jacobian_gate_error_iso2(astate, cost.target_states[2], S6_IDX[1] - 1);
-        cost.q_ss3 * jacobian_gate_error_iso2(astate, cost.target_states[3], S7_IDX[1] - 1);
-        cost.q_ss4 * jacobian_gate_error_iso2(astate, cost.target_states[4], S8_IDX[1] - 1);
+        cost.q_ss1 * jacobian_gate_error_iso2(astate, cost.target_states[1]; s1o=S1_IDX[1] - 1);
+        cost.q_ss2 * jacobian_gate_error_iso2(astate, cost.target_states[2]; s1o=S2_IDX[1] - 1);
+        cost.q_ss3 * jacobian_gate_error_iso2(astate, cost.target_states[3]; s1o=S3_IDX[1] - 1);
+        cost.q_ss4 * jacobian_gate_error_iso2(astate, cost.target_states[4]; s1o=S4_IDX[1] - 1);
+        cost.q_ss1 * jacobian_gate_error_iso2(astate, cost.target_states[1]; s1o=S5_IDX[1] - 1);
+        cost.q_ss2 * jacobian_gate_error_iso2(astate, cost.target_states[2]; s1o=S6_IDX[1] - 1);
+        cost.q_ss3 * jacobian_gate_error_iso2(astate, cost.target_states[3]; s1o=S7_IDX[1] - 1);
+        cost.q_ss4 * jacobian_gate_error_iso2(astate, cost.target_states[4]; s1o=S8_IDX[1] - 1);
     ])
     return false
 end
@@ -191,10 +192,11 @@ end
 
 # main
 function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
-                  sqrtbp=false, integrator_type=rk3, qs=[1e0, 1e0, 1e0, 1e-1, 1e0, 1e0, 1e0, 1e0, 1e-1],
+                  sqrtbp=false, integrator_type=rk3,
+                  qs=[1e0, 1e0, 1e0, 1e-1, 1e0, 1e0, 1e0, 1e0, 1e-1],
                   dt_inv=Int64(1e1), smoke_test=false, constraint_tol=1e-8, al_tol=1e-4,
-                  pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5),
-                  fq_cov=FQ * 1e-2)
+                  pn_steps=2, max_penalty=1e11, verbose=true, save=true,
+                  max_iterations=Int64(2e5), fq_cov=FQ * 1e-2, benchmark=false)
     # model configuration
     h0_samples = Array{SMatrix{HDIM_ISO, HDIM_ISO}}(undef, SAMPLE_COUNT)
     h0_samples[1] = (FQ + fq_cov) * NEGI_H0_ISO
@@ -207,18 +209,19 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
 
     # initial state
     x0 = SVector{n}([
-        INITIAL_STATE1;
-        INITIAL_STATE2;
+        IS1_ISO_;
+        IS2_ISO_;
         zeros(3 * CONTROL_COUNT);
-        repeat([INITIAL_STATE1; INITIAL_STATE2; INITIAL_STATE3; INITIAL_STATE4], 2);
+        repeat([IS1_ISO_; IS2_ISO_; IS3_ISO_; IS4_ISO_], 2);
     ])
-    # target state
+
+    # final state
     gate_unitary = GT_GATE_ISO[gate_type]
     target_states = Array{SVector{HDIM_ISO}, 1}(undef, 4)
-    target_states[1] = gate_unitary * INITIAL_STATE1
-    target_states[2] = gate_unitary * INITIAL_STATE2
-    target_states[3] = gate_unitary * INITIAL_STATE3
-    target_states[4] = gate_unitary * INITIAL_STATE4
+    target_states[1] = gate_unitary * IS1_ISO_
+    target_states[2] = gate_unitary * IS2_ISO_
+    target_states[3] = gate_unitary * IS3_ISO_
+    target_states[4] = gate_unitary * IS4_ISO_
     xf = SVector{n}([
         target_states[1];
         target_states[2];
@@ -226,36 +229,22 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
         repeat([target_states[1]; target_states[2];
                 target_states[3]; target_states[4]], 2);
     ])
+
     # control amplitude constraint
-    x_max = SVector{n}([
-        fill(Inf, STATE_COUNT * HDIM_ISO);
-        fill(Inf, CONTROL_COUNT);
-        fill(MAX_CONTROL_NORM_0, 1); # control
-        fill(Inf, CONTROL_COUNT);
-        fill(Inf, SAMPLE_COUNT * HDIM_ISO);
-    ])
-    x_min = SVector{n}([
-        fill(-Inf, STATE_COUNT * HDIM_ISO);
-        fill(-Inf, CONTROL_COUNT);
-        fill(-MAX_CONTROL_NORM_0, 1); # control
-        fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, SAMPLE_COUNT * HDIM_ISO);
-    ])
+    x_max = fill(Inf, n)
+    x_max[CONTROLS_IDX] .= MAX_CONTROL_NORM_0
+    x_max = SVector{n}(x_max)
+    x_min = fill(-Inf, n)
+    x_min[CONTROLS_IDX] .= -MAX_CONTROL_NORM_0
+    x_min = SVector{n}(x_min)
+    
     # control amplitude constraint at boundary
-    x_max_boundary = SVector{n}([
-        fill(Inf, STATE_COUNT * HDIM_ISO);
-        fill(Inf, CONTROL_COUNT);
-        fill(0, 1); # control
-        fill(Inf, CONTROL_COUNT);
-        fill(Inf, SAMPLE_COUNT * HDIM_ISO);
-    ])
-    x_min_boundary = SVector{n}([
-        fill(-Inf, STATE_COUNT * HDIM_ISO);
-        fill(-Inf, CONTROL_COUNT);
-        fill(0, 1); # control
-        fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, SAMPLE_COUNT * HDIM_ISO);
-    ])
+    x_max_boundary = fill(Inf, n)
+    x_max_boundary[CONTROLS_IDX] .= 0
+    x_max_boundary = SVector{n}(x_max_boundary)
+    x_min_boundary = fill(-Inf, n)
+    x_min_boundary[CONTROLS_IDX] .= 0
+    x_min_boundary = SVector{n}(x_min_boundary)
 
     # initial trajectory
     dt = dt_inv^(-1)
@@ -278,7 +267,7 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([
-        fill(qs[9], CONTROL_COUNT);
+        fill(qs[9], CONTROL_COUNT); # ∂2a
     ]))
     # objective = LQRObjective(Q, R, Qf, xf, N)
     cost_k = Cost(Q, R, xf, target_states, qs[5], qs[6], qs[7], qs[8])
@@ -293,7 +282,8 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
     target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
     # must obey unit norm.
     norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idxs) for idxs in (
-        STATE1_IDX, STATE2_IDX, S1_IDX, S2_IDX, S3_IDX, S4_IDX, S5_IDX, S6_IDX, S7_IDX, S8_IDX,
+        STATE1_IDX, STATE2_IDX, S1_IDX, S2_IDX, S3_IDX,
+        S4_IDX, S5_IDX, S6_IDX, S7_IDX, S8_IDX,
     )]
     constraints = ConstraintList(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)
@@ -304,7 +294,8 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
     end
 
     # solve problem
-    prob = Problem{IT_RDI[integrator_type]}(model, objective, constraints, x0, xf, Z, N, t0, evolution_time)
+    prob = Problem{IT_RDI[integrator_type]}(model, objective, constraints,
+                                            x0, xf, Z, N, t0, evolution_time)
     solver = ALTROSolver(prob)
     verbose_pn = verbose ? true : false
     verbose_ = verbose ? 2 : 0
@@ -318,7 +309,12 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
                  penalty_max=max_penalty, verbose_pn=verbose_pn, verbose=verbose_,
                  projected_newton=projected_newton, iterations_inner=iterations_inner,
                  iterations_outer=iterations_outer, iterations=max_iterations)
-    Altro.solve!(solver)
+    if benchmark
+        benchmark_result = Altro.benchmark_solve!(solver)
+    else
+        benchmark_result = nothing
+        Altro.solve!(solver)
+    end
 
     # post-process
     acontrols_raw = TO.controls(solver)
@@ -374,6 +370,8 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
         result["save_file_path"] = save_file_path
     end
 
+    result = benchmark ? benchmark_result : result
+
     return result
 end
 
@@ -415,10 +413,10 @@ function forward_pass(save_file_path; integrator_type=rk6, gate_type=xpiby2)
     m = control_dim(model)
     time = 0.
     astate = SVector{n}([
-        INITIAL_STATE1;
-        INITIAL_STATE2;
+        IS1;
+        IS2;
         zeros(3 * CONTROL_COUNT);
-        repeat([INITIAL_STATE1; INITIAL_STATE2], sample_count);
+        repeat([IS1; IS2], sample_count);
     ])
     acontrols = [SVector{m}([d2controls[i, 1],]) for i = 1:knot_count - 1]
 
@@ -447,10 +445,10 @@ function state_diffs(save_file_path; gate_type=zpiby2)
     fidelities = zeros(SAMPLE_COUNT)
     mse = zeros(SAMPLE_COUNT)
     gate_unitary = GT_GATE[gate_type]
-    ts1 = gate_unitary * INITIAL_STATE1
-    ts2 = gate_unitary * INITIAL_STATE2
-    ts3 = gate_unitary * INITIAL_STATE3
-    ts4 = gate_unitary * INITIAL_STATE4
+    ts1 = gate_unitary * IS1
+    ts2 = gate_unitary * IS2
+    ts3 = gate_unitary * IS3
+    ts4 = gate_unitary * IS4
     s1 = astates[end, S1_IDX]
     fidelities[1] = fidelity_vec_iso2(s1, ts1)
     d1 = s1 - ts1

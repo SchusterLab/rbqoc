@@ -1030,26 +1030,28 @@ const DT_EN = Dict(
 )
 
 
-@inline gate_error_iso2a(s1::Array{T,1}, s2::Array{T,1};
-                         s1o::Int64=0, s2o::Int64=0) where {T} = (
-    s1[1 + s1o] * s2[1 + s20] + s1[2 + s1o] * s2[2 + s2o]
+@inline gate_error_iso2a(s1::AbstractVector, s2::AbstractVector;
+                         s1o::Int64=0, s2o::Int64=0) = (
+    s1[1 + s1o] * s2[1 + s2o] + s1[2 + s1o] * s2[2 + s2o]
     + s1[3 + s1o] * s2[3 + s2o] + s1[4 + s1o] * s2[4 + s2o]
 )
 
 
-@inline gate_error_iso2b(s1::Array{T,1}, s2::Array{T,1};
-                         s1o::Int64=0, s2o::Int64=0) where {T} = (
+@inline gate_error_iso2b(s1::AbstractVector, s2::AbstractVector;
+                         s1o::Int64=0, s2o::Int64=0) = (
     -s1[3 + s1o] * s2[1 + s2o] - s1[4 + s1o] * s2[2 + s2o]
     + s1[1 + s1o] * s2[3 + s2o] + s1[2 + s1o] * s2[4 + s2o]
 )
 
 
-@inline gate_error_iso2(s1::Array{T,1}, s2::Array{T,1}; s1o::Int64=0, s2o::Int64=0) where {T} = (
+@inline gate_error_iso2(s1::AbstractVector, s2::AbstractVector;
+                        s1o::Int64=0, s2o::Int64=0) = (
     1 - gate_error_iso2a(s1, s2; s1o=s1o, s2o=s2o)^2 - gate_error_iso2b(s1, s2; s1o=s1o, s2o=s2o)^2
 )
 
 
-function jacobian_gate_error_iso2(s1::Array{T,1}, s2::Array{T,1}; s1o::Int64=0, s2o::Int64=0) where {T}
+function jacobian_gate_error_iso2(s1::AbstractVector, s2::AbstractVector;
+                                  s1o::Int64=0, s2o::Int64=0)
     a = 2 * gate_error_iso2a(s1, s2; s1o=s1o, s2o=s2o)
     b = 2 * gate_error_iso2b(s1, s2; s1o=s1o, s2o=s2o)
     jac = [
@@ -1062,7 +1064,7 @@ function jacobian_gate_error_iso2(s1::Array{T,1}, s2::Array{T,1}; s1o::Int64=0, 
 end
 
 
-function hessian_gate_error_iso2(s2::Array{T,1}; s2o::Int64=0) where {T}
+function hessian_gate_error_iso2(s2::AbstractVector; s2o::Int64=0) where {T}
     d11 = -2 * s2[1+s2o]^2 - 2 * s2[3+s2o]^2
     d12 = -2 * s2[1+s2o] * s2[2+s2o] -2 * s2[3+s2o] * s2[4+s2o]
     d13 = 0
