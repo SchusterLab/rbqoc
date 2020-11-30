@@ -17,15 +17,13 @@ const TO = TrajectoryOptimization
 # paths
 const EXPERIMENT_META = "spin"
 const EXPERIMENT_NAME = "spin13"
-const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
+const SAVE_PATH = abspath(joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME))
 
 # problem
 const CONTROL_COUNT = 1
 const STATE_COUNT = 2
 const ASTATE_SIZE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
 const ACONTROL_SIZE = CONTROL_COUNT
-const INITIAL_STATE1 = [1., 0, 0, 0]
-const INITIAL_STATE2 = [0., 1, 0, 0]
 # state indices
 const STATE1_IDX = 1:HDIM_ISO
 const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
@@ -74,8 +72,8 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
 
     # initial state
     x0 = zeros(n)
-    x0[STATE1_IDX] = INITIAL_STATE1
-    x0[STATE2_IDX] = INITIAL_STATE2
+    x0[STATE1_IDX] = IS1_ISO_
+    x0[STATE2_IDX] = IS2_ISO_
     x0 = SVector{n}(x0)
 
     # target state

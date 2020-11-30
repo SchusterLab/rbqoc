@@ -49,7 +49,7 @@ const S8_IDX = SVector{HDIM_ISO}(HDIM_ISO * 7 + 1:HDIM_ISO * 8)
 const S9_IDX = SVector{HDIM_ISO}(HDIM_ISO * 8 + 1:HDIM_ISO * 9)
 const S10_IDX = SVector{HDIM_ISO}(HDIM_ISO * 9 + 1:HDIM_ISO * 10)
 # misc
-const SAMPLE_STATE_COUNT = 4
+const SAMPLE_STATE_COUNT = 1
 const SAMPLES_PER_STATE = 10
 const SAMPLES_PER_STATE_INV = 1//10
 const SAMPLE_COUNT = SAMPLE_STATE_COUNT * SAMPLES_PER_STATE
@@ -77,6 +77,7 @@ Model = Data.Model
         + sample_index * HDIM_ISO
     )
 )
+const SAMPLE_INDICES = [astate_sample_inds(i, j) for i = 1:SAMPLE_STATE_COUNT for j = 1:SAMPLES_PER_STATE]
 
 function unscented_transform(model::Model, astate::AbstractVector,
                              negi_hc::AbstractMatrix, dt::Real, i::Int)
@@ -91,9 +92,12 @@ function unscented_transform(model::Model, astate::AbstractVector,
     s8 = astate[offset + S8_IDX]
     s9 = astate[offset + S9_IDX]
     s10 = astate[offset + S10_IDX]
-    # println("s1:")
+    # println("s1d")
     # show_nice(s1)
+    # println("\ns10d")
+    # show_nice(s10)
     # println("")
+    # @bp
     # compute state mean
     sm = SAMPLES_PER_STATE_INV .* (
         s1 + s2 + s3 + s4 + s5
@@ -206,7 +210,7 @@ using LinearAlgebra
 using TrajectoryOptimization
 const TO = TrajectoryOptimization
 
-const SAMPLE_STATE_COUNT = 4
+const SAMPLE_STATE_COUNT = 1
 const SAMPLES_PER_STATE = 10
 const SAMPLE_COUNT = SAMPLE_STATE_COUNT * SAMPLES_PER_STATE
 const HDIM_ISO = 4
@@ -307,6 +311,7 @@ function Cost(Q::Diagonal{T,Array{T,1}}, R::Diagonal{T,Array{T,1}},
     end
     hess_astate = hess_astate + Q
     hess_astate = Symmetric(hess_astate)
+    # println("q_sample_states\n$(q_sample_states)")
     return Cost{N,M,T}(Q, R, q, c, hess_astate, target_states, q_sample_states)
 end
 
@@ -380,7 +385,8 @@ Cost = Data2.Cost
 
 # main
 function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
-                  sqrtbp=false, integrator_type=rk3, qs=[1e0, 1e0, 1e0, 1e-1, 1e0, 1e-1],
+                  sqrtbp=false, integrator_type=rk3,
+                  qs=[1e0, 1e0, 1e0, 1e-1, 1e0, 1e0, 1e0, 1e0, 1e-1],
                   dt_inv=Int64(1e1), smoke_test=false, constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true,
                   static_bp=false,
@@ -401,7 +407,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     xf[STATE1_IDX] = gate * IS1_ISO_
     xf[STATE2_IDX] = gate * IS2_ISO_
     state_dist = Distributions.Normal(0., state_cov)
-    sample_states = (IS1_ISO_, IS2_ISO_, [1, 0, 0, 0], [1, 0, 0, 0])
+    # sample_states = (IS1_ISO_, IS2_ISO_, IS3_ISO_, IS4_ISO_)
+    sample_states = (IS3_ISO_,)
     target_states = zeros(SAMPLE_STATE_COUNT * HDIM_ISO)
     for (i, sample_state) in enumerate(sample_states)
         target = gate * sample_state
@@ -420,6 +427,19 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
             xf[inds] = target
         end
     end
+    # println("x0")
+    # show_nice(x0)
+    # println("\nxf")
+    # show_nice(xf)
+    # println("\ns1i")
+    # show_nice(x0[ASTATE_SIZE_BASE + S1_IDX])
+    # println("\ns1f")
+    # show_nice(xf[ASTATE_SIZE_BASE + S1_IDX])
+    # println("\ns10i")
+    # show_nice(x0[ASTATE_SIZE_BASE + S10_IDX])
+    # println("\ns10f")
+    # show_nice(xf[ASTATE_SIZE_BASE + S10_IDX])
+    # println("")
     
     # control amplitude constraint
     x_max = fill(Inf, n)
@@ -469,9 +489,10 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     # must reach target state, must have zero net flux
     target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
     # must obey unit norm
-    norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idxs) for idxs in (
-        STATE1_IDX, STATE2_IDX,
-    )]
+    norm_idxs = copy(SAMPLE_INDICES)
+    push!(norm_idxs, STATE1_IDX)
+    push!(norm_idxs, STATE2_IDX)
+    norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idxs) for idxs in norm_idxs]
     constraints = ConstraintList(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
@@ -560,7 +581,8 @@ function sample_diffs(saved)
     knot_count = size(saved["astates"], 1)
     fds = zeros(knot_count, SAMPLE_COUNT)
     gate_iso = GT_GATE_ISO[gate_type]
-    target_states = [gate_iso * is for is in (IS1_ISO_, IS2_ISO_, IS3_ISO_, IS4_ISO_)]
+    # target_states = [gate_iso * is for is in (IS1_ISO_, IS2_ISO_, IS3_ISO_, IS4_ISO_)]
+    target_states = [gate_iso * is for is in (IS3_ISO_,)]
     astates = saved["astates"]
     for i = 1:SAMPLE_STATE_COUNT
         target_state = target_states[i]
@@ -584,11 +606,13 @@ function hyperopt_me(;iterations=50, save=true)
     save_file_paths = fill("", iterations)
     weights = zeros(iterations)
     alphas = zeros(iterations)
+    statecovs = zeros(iterations)
     gate_errors = zeros(iterations)
     
     result::Dict{String, Any} = Dict(
         "weights" => weights,
         "alphas" => alphas,
+        "statecovs" => statecovs,
         "save_file_paths" => save_file_paths,
         "gate_errors" => gate_errors,
     )
@@ -603,21 +627,32 @@ function hyperopt_me(;iterations=50, save=true)
     
     weights_space = exp10.(LinRange(-5, 5, 1000))
     alpha_space = LinRange(1e-1, 10, 1000)
-    ho = Hyperoptimizer(iterations, GPSampler(Min); a=weights_space, b=alpha_space)
-    for (i, weight, alpha) in ho
+    statecov_space = LinRange(1e-6, 1e0, 1000)
+    ho = Hyperoptimizer(iterations, GPSampler(Min); a=weights_space, b=alpha_space, c=statecov_space)
+    for (i, weight, alpha, statecov) in ho
         # evaluate
-        res_train = run_traj(;gate_type=gate_type, qs=[1e0, 1e0, 1e0, 1e-1, weight, 1e-1],
-                             alpha=alpha, verbose=true, save=true)
-        save_file_path_ = res_train["save_file_path"]
-        res_eval = evaluate_fqdev(;save_file_path=save_file_path_, gate_type=gate_type)
-        gate_error = mean(res_eval["gate_errors"])
+        gate_error = 1
+        (gate_error, save_file_path_) = try 
+            res_train = run_traj(;gate_type=gate_type, qs=[1e0, 1e0, 1e0, 1e-1, weight,
+                                                           weight, weight, weight, 1e-1],
+                                 alpha=alpha, state_cov=statecov, verbose=true, save=true)
+            save_file_path_ = res_train["save_file_path"]
+            res_eval = evaluate_fqdev(;save_file_path=save_file_path_, gate_type=gate_type)
+            gate_error = mean(res_eval["gate_errors"])
+            (gate_error, save_file_path_)
+        catch err
+            gate_error = 1
+            save_file_path_ = ""
+            (gate_error, save_file_path_)
+        end
         
         # log
         i_ = Int(i)
         weights[i_] = weight
         alphas[i_] = alpha
+        statecovs[i_] = statecov
         gate_errors[i_] = gate_error
-        save_file_paths[i_] = save_file_path
+        save_file_paths[i_] = save_file_path_
         if save
             h5open(save_file_path, "cw") do save_file
                 for key in keys(result)
@@ -628,7 +663,7 @@ function hyperopt_me(;iterations=50, save=true)
         end
 
         push!(ho.results, gate_error)
-        push!(ho.history, [weight, alpha])
+        push!(ho.history, [weight, alpha, statecov])
     end
 
     if save

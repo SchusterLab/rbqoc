@@ -108,25 +108,36 @@ PT_STR = {
     PulseType.sut8: "SU",
 }
 
+# https://davidmathlogic.com/colorblind/#%23648FFF-%23785EF0-%23DC267F-%23FE6100-%23FFB000
+# https://www.ibm.com/design/v1/language/resources/color-library/
+# COL1 = "#DC267F"
+# COL2 = "#648FFF"
+# COL3 = "#785EF0"
+# COL4 = "#FE6100"
+# COL5 = "#FFB000"
+# https://coolors.co/ef476f-ffd166-06d6a0-118ab2-073b4c
+COL1 = "#EF476F"
+COL2 = "#0B566F" #"#09485D"
+COL3 = "#118AB2"
+COL4 = "#06D6A0"
+COL5 = "#FFD166"
+# https://coolors.co/335c67-fff3b0-e09f3e-9e2a2b-540b0e
+# COL1 = "#335C67"
+# COL2 = "#FFF3B0"
+# COL3 = "#E09F3E"
+# COL4 = "#9E2A2B"
+# COL5 = "#540B0E"
+
 PT_COLOR = {
-    PulseType.analytic: "skyblue",
-    PulseType.qoc: "red",
-    PulseType.s2: "lime",
-    PulseType.s4: "green",
-    PulseType.d2: "darkred",
-    PulseType.d3: "darkred",
-    PulseType.s2b: "lime",
-    PulseType.s4b: "green",
-    PulseType.d2b: "darkred",
-    PulseType.d3b: "darkred",
-    PulseType.corpse: "pink",
-    PulseType.d1: "lightcoral",
-    PulseType.sut8: "green",
-    PulseType.d1: "red",
-    PulseType.d1b: "red",
-    PulseType.d1bb: "red",
-    PulseType.d1bbb: "red",
-    PulseType.sut8b: "green",
+    PulseType.analytic: COL1,
+    PulseType.qoc: COL2,
+    PulseType.d1: COL2,
+    PulseType.d1b: COL2,
+    PulseType.d1bb: COL2,
+    PulseType.d1bbb: COL2,
+    PulseType.d2: COL3,
+    PulseType.s2: COL4,
+    PulseType.sut8: COL5,
 }
 
 PT_LS = {
@@ -515,17 +526,77 @@ def make_figure2a():
           "".format(plot_file_path))
 #ENDDEF
 
-
-F2B_LB = 1.1
+F2B_MS = 30
+F2B_MSS = 50
+F2B_MEW = 0.5
 F2B_PT_ZO = {
+    PulseType.analytic: 6,
+    PulseType.s2: 3,
+    PulseType.sut8: 2,
+    PulseType.d1: 5,
+    PulseType.d2: 4,
+}
+F2B_YEPS = 1e-5
+def make_figure2b():
+    fig = plt.figure(figsize=(PAPER_TW * 0.4, PAPER_TW * 0.315))
+    ax = plt.gca()
+    data_file_path = latest_file_path("h5", "f2c", SAVE_PATH)
+    with h5py.File(data_file_path, "r") as data_file:
+        gate_errors = np.moveaxis(data_file["gate_errors"][()], (0, 1, 2), (2, 1, 0))
+        gate_times = data_file["gate_times"][()]
+        pulse_types = [PulseType(ipt) for ipt in data_file["pulse_types"][()]]
+    #ENDWITH
+    gate_errors = np.mean(gate_errors, axis=2)
+    ge_max = 0
+    
+    for (i, pulse_type) in enumerate(pulse_types):
+        label = "{}".format(PT_STR[pulse_type])
+        color = PT_COLOR[pulse_type]
+        marker = PT_MARKER[pulse_type]
+        marker_size = F2B_MSS if marker == "*" else F2B_MS
+        zorder = F2B_PT_ZO[pulse_type]
+        for (j, gate_time) in enumerate(gate_times):
+            gate_error = gate_errors[i, j]
+            if not np.allclose(gate_error, 1):
+                ge_max = np.maximum(ge_max, gate_error)
+            #ENDIF
+            plt.scatter([gate_time], [gate_error], color=color,
+                        marker=marker, s=marker_size, linewidths=F2B_MEW,
+                        edgecolors="black", zorder=zorder)
+        #ENDFOR
+        plt.scatter([], [], label=label, color=color, linewidths=F2B_MEW,
+                    s=marker_size, marker=marker, edgecolors="black")
+    #ENDFOR
+    yticks_ = np.arange(0, 5 + 1, 1)
+    yticks = 1e-5 * yticks_
+    ytick_labels = ["{:d}".format(ytick) for ytick in yticks_]
+    plt.yticks(yticks, ytick_labels)
+    plt.ylim(yticks[0], yticks[-1])
+    # xticks_ = np.arange(50, 160 + 1, 20)
+    # xtick_labels = ["{:d}".format(xtick) for xtick in xticks_]
+    # plt.xticks(xticks_, xtick_labels)
+    ax.tick_params(direction="in", labelsize=TICK_FS)
+    plt.xlabel("$t_{N}$ (ns)", fontsize=LABEL_FS)
+    plt.ylabel("Gate Error ($10^{-5}$)", fontsize=LABEL_FS)
+    plt.legend(frameon=False, loc="lower left", bbox_to_anchor=(-0.03, 0),
+               handletextpad=0.2, fontsize=8, ncol=2, columnspacing=0.)
+    fig.text(0, 0.955, "(b)", fontsize=TEXT_FS)
+    plt.subplots_adjust(left=0.11, right=0.997, top=0.96, bottom=0.15, hspace=None, wspace=None)
+    plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
+    plt.savefig(plot_file_path, dpi=DPI_FINAL)
+    print("Plotted Figure2b to {}".format(plot_file_path))
+#ENDDEF
+
+F2C_LB = 1.1
+F2C_PT_ZO = {
     PulseType.d1: 1,
     PulseType.d1b: 1,
     PulseType.d1bb: 1,
     PulseType.d1bbb: 1,
     PulseType.analytic: 2,
 }
-def make_figure2b():
-    log_transform = lambda x: np.log10(x) / np.log10(F2B_LB)
+def make_figure2c():
+    log_transform = lambda x: np.log10(x) / np.log10(F2C_LB)
     
     data_file_path = latest_file_path("h5", "f2b", SAVE_PATH)
     with h5py.File(data_file_path, "r") as data_file:
@@ -545,7 +616,7 @@ def make_figure2b():
     fig = plt.figure(figsize=(PAPER_TW * 0.23, PAPER_TW * 0.315))
     ax = plt.gca()
     for (i, pulse_type) in enumerate(pulse_types):
-        zorder = F2B_PT_ZO[pulse_type]
+        zorder = F2C_PT_ZO[pulse_type]
         linestyle = PT_LS[pulse_type]
         color = PT_COLOR[pulse_type]
         log_mge = log_transform(gate_errors[i, :])
@@ -566,81 +637,28 @@ def make_figure2b():
     ax.tick_params(direction="in", labelsize=TICK_FS)
     plt.xlabel("$|\delta f_{q} / f_{q}| \; (\%)$", fontsize=LABEL_FS)
     plt.ylabel("Gate Error", fontsize=LABEL_FS)
-    fig.text(0.78, 0.69, "$t_{N}$", fontsize=TEXT_FS)
-    plt.plot([], [], label="18ns", linestyle="solid", color="black")
-    plt.plot([], [], label="36ns", linestyle=DASH_LS, color="black")
-    plt.plot([], [], label="54ns", linestyle=DDASH_LS, color="black")
-    plt.plot([], [], label="72ns", linestyle=DDDASH_LS, color="black")
-    plt.legend(frameon=False, loc="lower right", bbox_to_anchor=(1.05, 0.24),
-               fontsize=8, handlelength=1.85, handletextpad=0.4)
+    fig.text(0.82, 0.66, "$t_{N}$", fontsize=TEXT_FS)
+    # color legend
+    c1, = plt.plot([], [], label=PT_STR[PulseType.analytic], color=PT_COLOR[PulseType.analytic])
+    c2, = plt.plot([], [], label=PT_STR[PulseType.d1], color=PT_COLOR[PulseType.d1])
+    color_legend = plt.legend(handles=[c1, c2], frameon=False, loc="upper left",
+                              bbox_to_anchor=(-0.02, 1.03), fontsize=LEGEND_FS,
+                              handlelength=2.)
+    ax.add_artist(color_legend)
+    # line legend
+    l1, = plt.plot([], [], label="18ns", linestyle="solid", color="black")
+    l2, = plt.plot([], [], label="36ns", linestyle=DASH_LS, color="black")
+    l3, = plt.plot([], [], label="54ns", linestyle=DDASH_LS, color="black")
+    l4, = plt.plot([], [], label="72ns", linestyle=DDDASH_LS, color="black")
+    line_legend = plt.legend(handles=[l1, l2, l3, l4], frameon=False,
+                             loc="lower right", bbox_to_anchor=(1.05, 0.22),
+                             fontsize=LEGEND_FS, handlelength=1.85, handletextpad=0.4)
     fig.text(0, 0.955, "(c)", fontsize=TEXT_FS)
     plt.subplots_adjust(left=0.3, right=0.97, bottom=0.15, top=0.96, hspace=None, wspace=None)
     plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     plt.savefig(plot_file_path, dpi=DPI_FINAL)
-    print("Plotted Figure2b to {}"
+    print("Plotted Figure2c to {}"
           "".format(plot_file_path))
-#ENDDEF
-
-
-F2C_MS = 30
-F2C_MSS = 40
-F2C_MEW = 0.5
-F2C_PT_ZO = {
-    PulseType.analytic: 6,
-    PulseType.s2: 3,
-    PulseType.sut8: 2,
-    PulseType.d1: 5,
-    PulseType.d2: 4,
-}
-F2C_YEPS = 1e-5
-def make_figure2c():
-    fig = plt.figure(figsize=(PAPER_TW * 0.4, PAPER_TW * 0.315))
-    ax = plt.gca()
-    data_file_path = latest_file_path("h5", "f2c", SAVE_PATH)
-    with h5py.File(data_file_path, "r") as data_file:
-        gate_errors = np.moveaxis(data_file["gate_errors"][()], (0, 1, 2), (2, 1, 0))
-        gate_times = data_file["gate_times"][()]
-        pulse_types = [PulseType(ipt) for ipt in data_file["pulse_types"][()]]
-    #ENDWITH
-    gate_errors = np.mean(gate_errors, axis=2)
-    ge_max = 0
-    
-    for (i, pulse_type) in enumerate(pulse_types):
-        label = "{}".format(PT_STR[pulse_type])
-        color = PT_COLOR[pulse_type]
-        marker = PT_MARKER[pulse_type]
-        marker_size = F2C_MSS if marker == "*" else F2C_MS
-        zorder = F2C_PT_ZO[pulse_type]
-        for (j, gate_time) in enumerate(gate_times):
-            gate_error = gate_errors[i, j]
-            if not np.allclose(gate_error, 1):
-                ge_max = np.maximum(ge_max, gate_error)
-            #ENDIF
-            plt.scatter([gate_time], [gate_error], color=color,
-                        marker=marker, s=marker_size, linewidths=F2C_MEW,
-                        edgecolors="black", zorder=zorder)
-        #ENDFOR
-        plt.scatter([], [], label=label, color=color, linewidths=F2C_MEW,
-                    s=F2C_MS, marker=marker, edgecolors="black")
-    #ENDFOR
-    yticks_ = np.arange(0, 5 + 1, 1)
-    yticks = 1e-5 * yticks_
-    ytick_labels = ["{:d}".format(ytick) for ytick in yticks_]
-    plt.yticks(yticks, ytick_labels)
-    plt.ylim(yticks[0], yticks[-1])
-    # xticks_ = np.arange(50, 160 + 1, 20)
-    # xtick_labels = ["{:d}".format(xtick) for xtick in xticks_]
-    # plt.xticks(xticks_, xtick_labels)
-    ax.tick_params(direction="in", labelsize=TICK_FS)
-    plt.xlabel("$t_{N}$ (ns)", fontsize=LABEL_FS)
-    plt.ylabel("Gate Error ($10^{-5}$)", fontsize=LABEL_FS)
-    plt.legend(frameon=False, loc="lower left", bbox_to_anchor=(-0.03, 0),
-               handletextpad=0.2, fontsize=8, ncol=2, columnspacing=0.)
-    fig.text(0, 0.955, "(b)", fontsize=TEXT_FS)
-    plt.subplots_adjust(left=0.11, right=0.997, top=0.96, bottom=0.15, hspace=None, wspace=None)
-    plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
-    plt.savefig(plot_file_path, dpi=DPI_FINAL)
-    print("Plotted Figure2c to {}".format(plot_file_path))
 #ENDDEF
 
 
@@ -655,7 +673,7 @@ def make_figure3a():
     #ENDWITH
     pulse_type_count = len(pulse_types)
     
-    (fig, axs) = plt.subplots(pulse_type_count, figsize=(PAPER_TW * 0.35, PAPER_TW * 0.25))
+    (fig, axs) = plt.subplots(pulse_type_count, figsize=(PAPER_TW * 0.4, PAPER_TW * 0.315))
     for (i, pulse_type) in enumerate(pulse_types):
         color = PT_COLOR[pulse_type]
         label = "{}".format(PT_STR[pulse_type])
@@ -680,17 +698,17 @@ def make_figure3a():
         axs[i].tick_params(direction="in", labelsize=TICK_FS)
         axs[i].set_xticks([])
     #ENDFOR
-    fig.text(0.3, 0.895, PT_STR[PulseType.analytic], fontsize=TEXT_FS)
-    fig.text(0.3, 0.735, PT_STR[PulseType.s2], fontsize=TEXT_FS)
-    fig.text(0.3, 0.56, PT_STR[PulseType.sut8], fontsize=TEXT_FS)
-    fig.text(0.3, 0.39, PT_STR[PulseType.d1], fontsize=TEXT_FS)
-    fig.text(0.3, 0.22, PT_STR[PulseType.d2], fontsize=TEXT_FS)
+    fig.text(0.22, 0.93, PT_STR[PulseType.analytic], fontsize=TEXT_FS)
+    fig.text(0.22, 0.77, PT_STR[PulseType.s2], fontsize=TEXT_FS)
+    fig.text(0.22, 0.6, PT_STR[PulseType.sut8], fontsize=TEXT_FS)
+    fig.text(0.22, 0.43, PT_STR[PulseType.d1], fontsize=TEXT_FS)
+    fig.text(0.22, 0.27, PT_STR[PulseType.d2], fontsize=TEXT_FS)
     axs[2].set_ylabel("$a$ (GHz)", fontsize=LABEL_FS)
     axs[4].set_xlabel("$t$ (ns)", fontsize=LABEL_FS)
     axs[4].set_xticks([0 - F3A_XEPS[i], 10, 20, 30, 40, 50])
     axs[4].set_xticklabels(["0", "10", "20", "30", "40", "50"])
-    fig.text(0, 0.945, "(a)", fontsize=TEXT_FS)
-    plt.subplots_adjust(left=0.21, right=0.997, top=0.96, bottom=0.116, hspace=0., wspace=None)
+    fig.text(0, 0.95, "(a)", fontsize=TEXT_FS)
+    plt.subplots_adjust(left=0.18, right=0.997, top=0.98, bottom=0.15, hspace=0., wspace=None)
     plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     plt.savefig(plot_file_path, dpi=DPI_FINAL)
     print("Saved Figure3a to {}"
@@ -712,7 +730,7 @@ def make_figure3b():
     gate_count_axis = np.arange(0, gate_count + 1)
     gate_errors = np.mean(gate_errors, axis=2)
 
-    fig = plt.figure(figsize=(PAPER_TW * 0.35, PAPER_TW * 0.25))
+    fig = plt.figure(figsize=(PAPER_TW * 0.4, PAPER_TW * 0.315))
     ax = plt.gca()
     for (i, pulse_type) in enumerate(pulse_types):
         color = PT_COLOR[pulse_type]
@@ -738,8 +756,8 @@ def make_figure3b():
 
     plt.legend(frameon=False, loc="lower right", bbox_to_anchor=(1., 0.05),
                fontsize=8, handlelength=1.85, handletextpad=0.4, ncol=2, columnspacing=0.)
-    fig.text(0, 0.945, "(b)", fontsize=TEXT_FS)
-    plt.subplots_adjust(left=0.2, right=0.96, top=0.96, bottom=0.11, hspace=0., wspace=None)
+    fig.text(0, 0.95, "(b)", fontsize=TEXT_FS)
+    plt.subplots_adjust(left=0.18, right=0.965, top=0.97, bottom=0.15, hspace=0., wspace=None)
     plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
     plt.savefig(plot_file_path, dpi=DPI_FINAL)
     print("Plotted Figure3b to {}"
