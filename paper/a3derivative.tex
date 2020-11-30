@@ -3,28 +3,30 @@ We comment on the optimization metrics of the derivative methods and then
 outline how to efficiently integrate their dynamics.
 The 1\textsuperscript{st}-order derivative method tends
 to outperform the 2\textsuperscript{nd}-order
-derivative method in the small, static detuning regime, see Figure \ref{fig:static}b.
+derivative method in the small, static detuning regime, see Figure \ref{fig:staticb}.
 The norms of the state derivatives for the 1\textsuperscript{st}- and 2\textsuperscript{nd}-order
-methods are provided in Table \ref{tab:dnorm} for the solutions at $t_{N} = 60$ns.
+methods are provided in Table \ref{tab:dnorm} for the solutions to
+the numerical experiment detailed in Section \ref{sec:static} at $t_{N} = 60$ns.
 The 2\textsuperscript{nd}-order method is able to decrease the 2\textsuperscript{nd}-order
 state derivate norm relative to the 1\textsuperscript{st}-order method at the expense of increasing
 its 1\textsuperscript{st}-order derivative norm. In the problem
 we have studied it is likely the 2\textsuperscript{nd}-order derivative norm has a smaller
 contribution to the gate error than the 1\textsuperscript{st}-order derivative norm. A
-careful analysis could be completed for future problems to predict the efficacy of the
-derivative method at each order.
+careful analysis of contributions at each order could be used to predict the efficacy of the
+derivative method for future problems.
 
 \begin{table}[ht]
   \begin{tabular}{c | c | c}
-    Method & ${\lvert \braket{\partial_{f_{q}} \psi_{N} | \partial_{f_{q}} \psi_{N}} \rvert}^{2}$ ($10^{3}$)
-    & ${\lvert \braket{\partial^{2}_{f_{q}} \psi_{N} | \partial^{2}_{f_{q}} \psi_{N}} \rvert}^{2}$ ($10^{6}$)\\
+    Method & $\norm{\partial_{f_{q}} \psi_{N}}_{2}$ ($10^{3}$)
+    & $\norm*{\partial^{2}_{f_{q}} \psi_{N}}_{2}$ ($10^{6}$)\\
     \hline
-    D-1 & 0.436 & 57.817\\
-    D-2 & 1.702 & 9.030\\
+    D1 & 0.436 & 57.817\\
+    D2 & 1.702 & 9.030\\
   \end{tabular}
   \caption{Norm of state derivates with respect to the qubit frequency
     for $Z/2$ gates optimized using the derivative methods. The norms are computed
-    at the end of the gate's duration $t_{N} = 60$ns and are averaged over the four state derivatives.}
+    at the end of the gate $t_{N} = 60$ns
+    and are averaged over the four state derivatives.}
   \label{tab:dnorm}
 \end{table}
 
@@ -35,18 +37,20 @@ For example, consider
 integrating the dynamics of the first state derivative $\frac{d}{dt} \ket{\partial_{\lambda} \psi} =
 H \ket{\partial_{\lambda} \psi} + (\partial_{\lambda} H) \ket{\psi}$ in units of $i\hbar = 1$.
 The linear term is $L = H$ and the non-linear term is $N = (\partial_{\lambda} H) \ket{\psi}$.
-With zero-order hold on the controls the exact propagation is
+With zero-order hold on the controls the exact solution is:
 \begin{equation}
   \label{eq:dgeneralexp}
   \begin{aligned}
-    \ket{\partial_{\lambda} \psi_{k + 1}} &= \exp(\Delta t_{k} L_{k}) \ket{\partial_{\lambda} \psi_{k}}\\
-    &+ \int_{0}^{\Delta t_{k}} \exp((\Delta t_{k} - t^{'})L_{k}) N(t_{k} + t^{'}) dt^{'}\\
+    \ket{\partial_{\lambda} \psi_{k + 1}} &= \exp(\Delta t_{k} L_{k})
+    \ket{\partial_{\lambda} \psi_{k}}\\
+    &+ \int_{0}^{\Delta t_{k}} \exp((\Delta t_{k} - t^{'})L_{k})
+    N(t_{k} + t^{'}) dt^{'}\\
   \end{aligned}
 \end{equation}
 General exponential integrators proceed by breaking the integral in \eqref{eq:dgeneralexp}
 into a discrete sum, similar to the procedure
 for Runge-Kutta schemes. We use a simple approximation known as the Lawson-Euler
-method \cite{berland2005solving}
+method \cite{berland2005solving},
 \begin{equation}
   \begin{aligned}
     \ket{\partial_{\lambda} \psi_{k + 1}} &\approx \exp(\Delta t_{k}L_{k}) \ket{\partial_{\lambda} \psi_{k}}\\

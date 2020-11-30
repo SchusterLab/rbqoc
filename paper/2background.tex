@@ -1,28 +1,28 @@
 \section{QOC + ALTRO \label{sec:background}}
 In this section we
-review the quantum optimal control problem statement
+review the QOC problem statement
 and introduce the ALTRO solver.
-Quantum optimal control concerns the evolution of
-a quantum state $\ket{\psi(t)}$ governed by the time-dependent
+QOC concerns the evolution of
+a (quantum) state $\ket{\psi(t)}$ governed by the time-dependent
 Schr{\"o}dinger equation (TDSE),
 \begin{equation}
   i \hbar \frac{d}{dt} \ket{\psi(t)} = H(u(t), t) \ket{\psi(t)}
   \label{eq:tdse}
 \end{equation}
 The Hamiltonian has an arbitrary dependence on the possibly multi-valued controls $u(t)$.
-The controls are so called because they are the means the experimentalist has to
+The controls are so-called because they are the means the experimentalist has to
 act on the system. To make the problem numerically tractable,
 the controls and quantum state are discretized into $N$ knot points (time steps).
 The optimization problem is to find the
 controls that minimize a functional $J(u)$.
-In the simplest case the functional is
-the infidelity between the inital state evolved
-to the final knot point and the target state
+In the simplest case, the functional is
+the infidelity between the initial state evolved
+to the final knot point and the desired final state
 $J = 1 - {\lvert \braket{\psi_{f}}{\psi_{N}(u)} \rvert}^{2}$.
-In general, $J$ is a linear combinaion of cost functions on the state
+In general, $J$ is a linear combination of cost functions on the state
 as well as cost functions on the controls \cite{leung2017speedup}.
-Typical quantum optimal control
-algorithms employ automatic differentiation
+Standard QOC
+solvers employ automatic differentiation
 to compute gradients of the functional $\nabla_{u} J(u)$,
 which can easily be used to implement first-order optimization methods
 \cite{machnes2015gradient, khaneja2005optimal, leung2017speedup, goerz2019krotov}.
@@ -32,13 +32,13 @@ and solved using a variety of specialized solvers developed by the robotics comm
 \cite{Schulman13,Tedrake16,Hereid2017FROST,howell2019altro}.
 Trajectory optimization problems are typically of the following form: 
 \begin{mini}[2]
-    {x_{0:N},u_{0:N-1}}{\ell_f(x_N) + \sum_{k=1}^{N-1} \ell(x_k,u_k) }{}{}
+    {x_{1:N},u_{1:N-1}}{\ell_f(x_N) + \sum_{k=1}^{N-1} \ell(x_k,u_k) }{}{}
     \addConstraint{x_{k+1} = f(x_k,u_k)}
     \addConstraint{g_k(x_k,u_k)}{\leq 0}
     \addConstraint{h_k(x_k,u_k)}{=0}
     \label{opt:discrete_trajopt},
 \end{mini}
-where $\ell_f$ and $\ell$ are the final and stage cost functions, $x_k \in \R^n$ and
+where $\ell_f$ and $\ell$ are the final and stage cost functions, $x_k \in \R^l$ and
 $u_k \in \R^m$ are the augmented state and input augmented control variables,
 $f(x_k,u_k)$ is the discrete dynamics function, and $g_k(x_k,u_k)$ and
 $h_k(x_k,u_k)$ are the inequality
@@ -64,7 +64,7 @@ problems of the form:
     {z}{f(z) + \lambda^T c(z) + \half c(z)^T I_\mu c(z)}{}{}
     \label{opt:alm}
 \end{mini}
-where $f(z)$ is the objective function, $c(z) : \R^n \mapsto \R^p$ is the constraint 
+where $f(z)$ is the objective function, $c(z) : \R^{l + m} \mapsto \R^p$ is the constraint 
 function, $\lambda \in \R^p$ is a Lagrange multiplier estimate, and $I_\mu$ is a diagonal matrix
 of penalty weights, $\mu$, whose magnitudes depend on whether the corresponding constraint is active or inactive.
 For ALTRO, $f(z)$ is the objective function of \eqref{opt:discrete_trajopt}, $c(z)$ is the 
@@ -82,11 +82,12 @@ solution-polishing phase that takes 1-2 Newton steps on the active constraint se
 machine-precision constraint satisfaction. For more information on the details of the ALTRO
 solver, see \cite{howell2019altro, Jackson2020altroc}.
 
+\todo{Ask Dave to review paragraph}
 As opposed to standard QOC solvers, the ALTRO solver provides a unified framework
 for imposing arbitrary, simultaneous constraints
-on both the state trajectory and the controls and does not restrict
+on both the state and the controls and does not restrict
 optimization to the constraint manifold. First-order solvers like GRAPE
-rely on unconstrained optimization to satisfy desiderata on the state trajectory,
+rely on unconstrained optimization to satisfy desiderata on the state,
 such as achieving a desired gate fidelity, forbidding occupations of particular quantum states,
 and smoothing the controls below a threshold. The unconstrained approach relies
 on a careful choice of competing penalty weights, which is cumbersome and often intractable.
@@ -96,7 +97,7 @@ may hinder convergence to the optimal solution \cite{clarkson2010coresets,
   hauswirth2016projected}.
 The ALTRO solver delays projecting onto the constraint manifold until the ALM
 solve is already at a coarse tolerance, achieving machine-precision satisfaction
-for constraints on the controls and the state trajectory. These advantage are critical
+for constraints on the controls and the state. These advantages are critical
 for this work, where multiple constraints must be satisfied in addition
 to minimizing auxiliary metrics.
 

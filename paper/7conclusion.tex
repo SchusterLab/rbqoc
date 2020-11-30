@@ -1,26 +1,26 @@
 \section{Conclusion}
-In conclusion, we have demonstrated techniques for achieving robustness to systematic
-errors and mitigating decoherence on a quantum system using state-of-the-art trajectory
-optimization. We have proposed a scheme for mitigating longitudinal relaxation with time-optimal
-control and an efficient optimization metric that comes at a constant computational cost as
-opposed to integrating a master equation which scales quadratically with
+In conclusion, we have applied state-of-the-art trajectory
+optimization techniques to achieve robustness to parameter deviations
+and mitigate decoherence on a quantum system.
+We have proposed a scheme for mitigating
+longitudinal relaxation with time-optimal
+control and the probability of longitudinal relaxation metric,
+avoiding the optimal control problem for density matrices which scales quartically with
 the dimension of the Hilbert space.
 We have proposed the derivative method for robust control which achieves
-super-linear gate error reductions in the gate duration for the problem we studied here.
-We have shown that robust control techniques can be used to mitigate decoherence due
-to 1/$f$ flux noise, a dominant source of coherent errors for flux controlled qubits.
-The numerical techniques we have studied here can be used to perform phase gates in arbitrary times,
-which will be critical for synchronizing multi-qubit systems 
-\todo{it might be worth mentioning the scaling properties of your method
-here, since you suggest scaling it up to systems with more states. How may
-the different methods you suggest perform at scale? Maybe there will be an
-advantage to using the sampling-based methods as the problems grow? Also you
-don't mention the sampling methods in the conclusion? The derivative methods only
-outperformed the sampling methods on the simpler of your 2 test cases,
-so I'd be hesitant to imply that the derivative method is the better choice}. 
-Additionally, interleaving the error models with existing
-characterization methods will improve their effectiveness in experiments.
-These techniques will be employed to achieve the low gate errors
+super-linear gate error reductions in its gate time for the static parameter
+deviation problem we studied.
+We have shown that the derivative, sampling, and unscented sampling methods
+can mitigate 1/$f$ flux noise errors
+which dominate coherent errors for flux controlled qubits.
+The derivative and sampling methods scale cubically with
+the dimension of the Hilbert space, allowing for applications
+to larger quantum systems.
+The derivative, sampling, and unscented sampling
+methods will benefit from interleaving optimization with
+experimental characterization, while the sampling and unscented
+sampling methods can also be applied to error channels without models.
+These techniques will be used to achieve the low gate errors
 required for fault-tolerant quantum computing applications. Our
 implementation of the techniques described in this work is available
 at \url{https://github.com/SchusterLab/rbqoc}.

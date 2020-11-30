@@ -1,24 +1,39 @@
 \section{Computational Performance and Scaling \label{appendix:time}}
+We provide runtimes for our optimizations and comment on the scaling of the
+robustness methods. The runtimes for the base optimization in Section \ref{sec:fluxonium},
+longitudinally aware optimization in Section \ref{sec:longitude},
+and robust optimizations in Section \ref{sec:static} are presented
+in Table \ref{tab:time} for a $Z/2$ gate at multiples
+of the analytic gate time.
 \todo{timing table}
 
-\todo{make complexity analysis a coherent paragraph}
-(sampling) For the sampling method the number of sample states in the augmented state vector
-scales as $O(dn^{2})$
-because each of $n^{2}$ initial
-states is represented by $2d$ samples. $n$ is both the dimension of the Hilbert space
-and the size of a state vector. $d$ is the number of deviant parameters.
+\begin{table}[ht]
+  \begin{tabular} {c | c | c | c | c | c | c}
+    & \multicolumn{6}{c}{Wall Time ($\pm 0.001$ s)}\\
+    \hline
+    Gate Time (ns) & Base & Long. & S & SU & D1 & D2\\
+    \hline
+    $18$ & 0.155 & 1.688 & 1.773 & & 16.713 & 48.398\\ % 0.155049
+    $36$ & 7.014 & - & 48.213 & & 67.838 & 81.030\\
+    $72$ & 15.906 & - & & & &\\
+  \end{tabular}
+  \caption{Programs were executed on a single thread of an AMD Ryzen Threadripper 3970X 32-Core Processor.}
+  \label{tab:time}
+\end{table}
 
-(unscented) Each initial state from the operator basis
-is represented with a distribution of $4n + 2d$ samples. Hence,
-the number of states in the augmented state vector scales as $O(n^{3} + dn^{2})$.
-The gate error of each sample state is penalized as in the sampling method.
-
-
-(derivative) For this method $m$ state derivatives are associated with each
-initial state from the operator basis.
-So, the number of states in the augmented state vector scales as
-$O(dmn^{2})$. Additionally, we note that the number of initial
-states and samples we have employed for each of the three
-methods follows standard perscriptions. However, knowledge
-of the problem can typically be used to reduced the number
-of required samples.
+\todo{Ask Dave if we should keep complexity analysis in main text.}
+Now we present the problem size complexities for the robustness methods.
+For the sampling method, the size of the augmented state vector
+is $O(dn^{3})$. $d$ is the number of deviant parameters.
+$n$ is the dimension of the Hilbert space. There are $n^{2}$ initial states
+in the operator basis, $2d$ sample states per initial state,
+and each state has $2n$ elements.
+For the unscented sampling method, the size of the augmented state vector
+is $O(dn^{3} + n^{4})$.
+There are $n^{2}$ initial states in the operator basis,
+$2(2n + d)$ sample states per initial state,
+and each state has $2n$ elements.
+For the $m$\textsuperscript{th}-order derivative method, the size of the augmented state vector
+is $O(dmn^{3})$. There are $n^{2}$
+initial states in the operator basis, $dm$ state derivatives per initial state,
+and each state has $2n$ elements.

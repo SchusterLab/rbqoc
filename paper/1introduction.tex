@@ -1,4 +1,5 @@
 \section{Introduction}
+\todo{Ask Dave to review paragraph}
 Quantum optimal control (QOC) techniques are a class of optimization
 algorithms for accurately and efficiently manipulating quantum systems.
 Early techniques were proposed for nuclear magnetic resonance experiments
@@ -28,7 +29,7 @@ model uncertainties
 in optimization objectives, yielding performance
 guarantees over a range of parameters \cite{Zhou97,Morimoto00,Manchester18}.
 We adapt robust control techniques from the robotics community to mitigate
-realistic model uncertainties for
+parameter deviation errors for
 a superconducting fluxonium qubit.
 
 QOC techniques have had tremendous success in
@@ -47,7 +48,7 @@ include composite pulses \cite{cummins2000use, cummins2003tackling,
   kupce1995stretched, merrill2014progress},
 dynamic and geometric phase considerations
 \cite{han2020experimental, xu2020nonadiabatic},
-and the DRAG scheme \todo{DRAG citations}.
+and the DRAG scheme \cite{motzoi2009simple}.
 To mitigate decoherence, Floquet techniques have been employed
 \cite{huang2020engineering, mundada2020floquet}.
 Numerical techniques to mitigate parameter deviation errors
@@ -69,8 +70,8 @@ to static and time-dependent parameter deviations:
     state estimation community \cite{howell2020direct, julier2004unscented,
       lee2013sigma, manchester2016derivative}.
   \item A derivative-penalization method, which uses efficient mixed-mode differentiation
-    to compute derivative information of parameter deviations with respect to the 
-    quantum state trajectory.
+    to compute the sensitivity of the quantum state trajectory
+    to deviant parameters.
 \end{enumerate}
 We apply these techniques to the fluxonium qubit presented in \cite{zhang2020universal}.
 We also show that QOC can solve important problems for fluxonium-based qubits,
