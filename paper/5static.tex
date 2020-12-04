@@ -14,7 +14,8 @@ We consider three robust control techniques:
 the sampling method, the unscented sampling method,
 and the derivative method.
 
-\todo{Ask Brian to review this paragraph and next two}
+\todo{Ask Brian to review this paragraph and next two.
+Are the optimization setups clear?}
 The sampling method simultaneously optimizes over copies of a state,
 each of which evolves with a distinct deviant parameter value.
 We append four sets of two sample states $\psi^{\pm}$
@@ -31,7 +32,8 @@ The final state
 for each sample is the image of its initial state
 under the desired gate. The infidelity between
 the samples and their final states are penalized
-by adding a term $\sum_{k=1}^{N} q_{k} (1 - \braket{\psi^{\pm}_{N}}{\psi_{f}})$
+by adding a term
+$\sum_{k=1}^{N} q_{k} (1 - {\lvert \braket{\psi^{\pm}_{k}}{\psi_{f}} \rvert}^{2})$
 to the objective \eqref{eq:costfun}.
 
 For the unscented sampling method, we append $2(2n + d)$ samples
@@ -52,9 +54,9 @@ and then apply the unscented transformation to the ensemble
 of samples,
 accurately preserving the first and second moments
 of the distribution.
-As for the sampling method,
-we penalize the infidelity between the samples and their final states
-by adding an infidelity contribution to \eqref{eq:costfun}.
+We penalize the infidelity between the samples and their final states
+by adding an infidelity contribution to \eqref{eq:costfun}
+as in the sampling method.
 A detailed procedure for the unscented transformation is given
 in Appendix \ref{appendix:unscented}.
 
@@ -85,7 +87,7 @@ For example, the dynamics for the $1$\textsuperscript{st}-order derivative metho
 Exponential integrators that account for the non-linear
 term in \eqref{eq:d1dyn} are used to efficiently integrate the coupled dynamics,
 see Appendix \ref{appendix:derivative}. For runtimes
-and complexity analyses for the three methods,
+and complexity analyses for the three robust control methods,
 consult Appendix \ref{appendix:time}.
 
 We challenge these methods to achieve

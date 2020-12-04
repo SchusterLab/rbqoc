@@ -14,7 +14,6 @@
     \caption{\label{fig:longitudec}}
   \end{subfigure}
   \caption{
-    \todo{Ask Dave to okay figure color scheme}
     (a) Numerically optimized gates (dark) and analytically optimized gates (light).
     (b) $T_{1}$ interpolation function used in optimization. Markers
     denote the time-averaged, absolute amplitude of each gate.
@@ -36,8 +35,8 @@ relaxation time $T_{1}$--which represents the $1/e$ relaxation time
 of the quantum state.
 Typical approaches completely model the gate error due to longitudinal
 relaxation by performing optimal control on $n^{2}$
-density matrices of size $n \times n$ that evolve under master
-equation dynamics, rather than $n$ states vectors of size $n$
+density matrices of size $n \times n$ that evolve under a master
+equation, rather than $n$ state vectors of size $n$
 under the TDSE \eqref{eq:tdse}.
 We avoid this increase in computational complexity by
 penalizing the probability (integrated rate) of longitudinal relaxation.
@@ -53,7 +52,8 @@ longitudinal relaxation probability. Our scheme for time-optimal
 control is suitable for any time-optimal problem, not only
 the one we study here.
 
-\todo{Ask Brian to review this paragraph and next}
+\todo{Ask Brian to review this paragraph and next. Is the
+optimization setup clear?}
 The longitudinal relaxation probability is given by,
 \begin{equation}
   P_{1}(t) = \int_{0}^{t} T_{1}^{-1}(a(t^{\prime})) dt^{\prime}

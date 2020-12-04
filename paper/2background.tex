@@ -82,12 +82,14 @@ solution-polishing phase that takes 1-2 Newton steps on the active constraint se
 machine-precision constraint satisfaction. For more information on the details of the ALTRO
 solver, see \cite{howell2019altro, Jackson2020altroc}.
 
-\todo{Ask Dave to review paragraph}
+\todo{Ask Brian to review paragraph. Are there other advantages to using ALTRO
+  for quantum control that you would like to list in this paragraph? These are the reasons
+  why we think it is better than what we were using previously.}
 As opposed to standard QOC solvers, the ALTRO solver provides a unified framework
 for imposing arbitrary, simultaneous constraints
 on both the state and the controls and does not restrict
-optimization to the constraint manifold. First-order solvers like GRAPE
-rely on unconstrained optimization to satisfy desiderata on the state,
+optimization to the constraint manifold. First-order solvers such as GRAPE
+use unconstrained optimization to satisfy desiderata on the state,
 such as achieving a desired gate fidelity, forbidding occupations of particular quantum states,
 and smoothing the controls below a threshold. The unconstrained approach relies
 on a careful choice of competing penalty weights, which is cumbersome and often intractable.

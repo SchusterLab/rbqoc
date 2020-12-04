@@ -22,8 +22,9 @@ of concept. Future work will parallelize the robustness
 methods across the initial states in the operator basis and utilize GPUs
 \cite{leung2017speedup},
 allowing for fast optimization on large Hilbert spaces.
+\vspace*{\intextsep}
 
-\begin{table}[ht!]
+\begin{table}[H]
   \begin{tabular} {c | c | c | c | c | c | c}
     & \multicolumn{6}{c}{Wall Time ($\pm 0.001$ s)}\\
     \hline
@@ -41,7 +42,6 @@ allowing for fast optimization on large Hilbert spaces.
   \label{tab:time}
 \end{table}
 
-\todo{Ask Dave if we should keep complexity analysis in main text.}
 Now we present the problem size complexities for the robustness methods.
 For the sampling method, the size of the augmented state vector
 is $O(dn^{3})$. $d$ is the number of deviant parameters.
