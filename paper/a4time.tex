@@ -29,12 +29,11 @@ allowing for fast optimization on large Hilbert spaces.
     \hline
     $t_{N}$ (ns) & Base & Long. & S & SU & D1 & D2\\
     \hline
-    $18$ & 0.155 & 1.688 & 1.773 & & 16.713 & 48.398\\ % 0.155049
-    $36$ & 7.014 & - & 48.213 & & 67.838 & 81.030\\
-    $72$ & 15.906 & - & 281.372 & & 266.997 & 332.182\\
+    $18$ & 0.155 & 1.688 & 1.773 & 210.573 & 16.713 & 48.398\\ % 0.155049
+    $36$ & 7.014 & - & 48.213 & 4566.236 & 67.838 & 81.030\\
+    $72$ & 15.906 & - & 281.372 & 16575.308 & 266.997 & 332.182\\
   \end{tabular}
   \caption{
-    \todo{finish timing table}
     Runtimes for $Z/2$ optimizations.
     Programs were executed on a single thread of an
     AMD Ryzen Threadripper 3970X 32-Core Processor.
@@ -48,13 +47,13 @@ For the sampling method, the size of the augmented state vector
 is $O(dn^{3})$. $d$ is the number of deviant parameters.
 $n$ is the dimension of the Hilbert space. There are $n^{2}$ initial states
 in the operator basis, $2d$ sample states per initial state,
-and each state has $2n$ elements.
+and each state has $2n$ real numbers.
 For the unscented sampling method, the size of the augmented state vector
 is $O(dn^{3} + n^{4})$.
 There are $n^{2}$ initial states in the operator basis,
 $2(2n + d)$ sample states per initial state,
-and each state has $2n$ elements.
+and each state has $2n$ real numbers.
 For the $m$\textsuperscript{th}-order derivative method, the size of the augmented state vector
 is $O(dmn^{3})$. There are $n^{2}$
 initial states in the operator basis, $dm$ state derivatives per initial state,
-and each state has $2n$ elements.
+and each state has $2n$ real numbers.

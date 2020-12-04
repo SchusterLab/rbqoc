@@ -17,7 +17,7 @@ and the derivative method.
 \todo{Ask Brian to review this paragraph and next two}
 The sampling method simultaneously optimizes over copies of a state,
 each of which evolves with a distinct deviant parameter value.
-We append four sets of two sample states $\psi_{\pm}$
+We append four sets of two sample states $\psi^{\pm}$
 to the augmented state vector \eqref{eq:astatecontrols}.
 We initialize each pair of samples in the same state.
 The four initial states are chosen so that their outerproducts
@@ -29,8 +29,10 @@ samples evolve under the Hamiltonian given in \eqref{eq:hamiltonian}
 with $f_{q} \gets f_{q} \pm \sigma_{f_{q}}$ for a fixed $\sigma_{f_{q}}$.
 The final state
 for each sample is the image of its initial state
-under the desired gate. We penalize deviations
-from the final state in the objective \eqref{eq:costfun}.
+under the desired gate. The infidelity between
+the samples and their final states are penalized
+by adding a term $\sum_{k=1}^{N} q_{k} (1 - \braket{\psi^{\pm}_{N}}{\psi_{f}})$
+to the objective \eqref{eq:costfun}.
 
 For the unscented sampling method, we append $2(2n + d)$ samples
 to the augmented state vector \eqref{eq:astatecontrols}
@@ -50,8 +52,9 @@ and then apply the unscented transformation to the ensemble
 of samples,
 accurately preserving the first and second moments
 of the distribution.
-As in the sampling method,
-we penalize deviations from the final state according to \eqref{eq:costfun}.
+As for the sampling method,
+we penalize the infidelity between the samples and their final states
+by adding an infidelity contribution to \eqref{eq:costfun}.
 A detailed procedure for the unscented transformation is given
 in Appendix \ref{appendix:unscented}.
 
