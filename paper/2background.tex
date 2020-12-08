@@ -39,7 +39,7 @@ Trajectory optimization problems are typically of the following form:
     \label{opt:discrete_trajopt},
 \end{mini}
 where $\ell_f$ and $\ell$ are the final and stage cost functions, $x_k \in \R^l$ and
-$u_k \in \R^m$ are the augmented state and input augmented control variables,
+$u_k \in \R^m$ are the augmented state and control variables,
 $f(x_k,u_k)$ is the discrete dynamics function, and $g_k(x_k,u_k)$ and
 $h_k(x_k,u_k)$ are the inequality
 and equality constraints, potentially including initial and final conditions,
@@ -87,8 +87,11 @@ solver, see \cite{howell2019altro, Jackson2020altroc}.
   why we think it is better than what we were using previously.}
 As opposed to standard QOC solvers, the ALTRO solver provides a unified framework
 for imposing arbitrary, simultaneous constraints
-on both the state and the controls and does not restrict
-optimization to the constraint manifold. First-order solvers such as GRAPE
+on both the state and the controls that converge superlinearly to tight tolerances. 
+While the dynamics remain anytime dynamically feasible and can be integrated with high 
+accuracy, the arbitrary constraints on states and controls are not restricted to the 
+constraint manifold during the solve.
+First-order solvers such as GRAPE
 use unconstrained optimization to satisfy desiderata on the state,
 such as achieving a desired gate fidelity, forbidding occupations of particular quantum states,
 and smoothing the controls below a threshold. The unconstrained approach relies

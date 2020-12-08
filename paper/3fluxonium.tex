@@ -20,7 +20,7 @@ methods to the analytically constructed gates reported in
 \cite{zhang2020universal} for the same device.
 
 The optimization problem takes the form:
-\begin{mini!}[2]
+\begin{mini!}[2] 
   {x_{1:N}, u_{1:N\text{-}1}}{\sum_{k=1}^N \norm{x_k\text{-}x_f}_{Q_k}
     + \sum_{k=1}^{N-1} \norm{u_k}_{R_k}}{}{} \label{eq:costfun}
     \addConstraint{x_{k+1}}{= f(x_k, u_k)}  \label{eq:dyn_con}
@@ -69,7 +69,9 @@ we require $a_{1} = a_{N} = 0$.
 Furthermore, we require $\int a_{N} \ dt = 0$. This
 constraint ensures the pulse has zero net flux, mitigating
 the hysteresis ubiquitous in flux bias lines,
-\cite{battistel2019fast, krantz2019quantum, zhang2020universal}.
+\cite{battistel2019fast, krantz2019quantum, zhang2020universal}. 
+Since these terms are all included in the state \eqref{eq:astatecontrols},
+they are enforced via simple initial and final conditions.
 We require $-0.5 \textrm{GHz} \le a_{k} \le 0.5 \textrm{GHz}$
 to ensure the two-level approximation \eqref{eq:hamiltonian}
 remains valid. Additionally, we require
@@ -78,13 +80,18 @@ The zero net flux and final state constraints
 are satisfied if the final augmented state is
 reached $x_{N} = x_{f}$, the constraint function
 takes the form
-$c_{k} = (x_{k} - x_{f})^{T}(x_{k} - x_{f})$.
+$c_{k} = (x_{k} - x_{f})^{T}(x_{k} - x_{f})$ \todo{I'm not sure what you mean by this, 
+this looks like the cost term? Contraints should be of the form $c(x) = 0$ or $c(x) \leq 0$}.
 The inequality constraints on $a$ are handled
 with a bound constraint which takes the form
 $c_{k} = (x_{k} - b)^{T}(x_{k} - b)$ if $\lvert x_{k} \rvert \ge b$
-and $0$ otherwise.
+and $0$ otherwise \todo{This isn't a bound constraint, this is a piece-wise quadratic 
+constraint? Do you mean $c(x) = [a \leq b \l a \geq -b]$?}.
 In addition, the norm of the states
 are constrained to $1$ to ensure discretization error is not
-exploited $c_{k} = x_{k}^{T}x_{k} - 1$. The selection
-of subsets from $x_{k}$ is implied in
-the constraint equations.
+exploited $c_{k} = x_{k}^{T}x_{k} - 1$ \todo{Is this right? Why are you
+normalizing the entire state vector? Or are you just normalizing the qubit
+states?}. 
+The selection of subsets from $x_{k}$ is implied in
+the constraint equations. \todo{I think it would be cleaner if you just put the actual 
+constraints into \ref{eq:costfun} and then provide a brief explanation here.}

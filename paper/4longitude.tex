@@ -73,7 +73,7 @@ We allow the optimizer to tune the gate time by
 making the time step between each knot point $\Delta t_{k}$
 a decision variable. Promoting $\Delta t_{k}$ to a decision variable, rather
 than the number of knot points $N$, preserves the
-Markovian decision structure of the trajectory
+Markovianity of the trajectory
 optimization problem. The square root of the time step $\sqrt{\Delta t_{k}}$
 is appended to the augmented control vector \eqref{eq:astatecontrols}
 and the squared root
@@ -81,7 +81,7 @@ of the time step $\lvert \Delta t_{k} \rvert$ is used
 for integration in the discrete dynamics function \eqref{eq:dyn_con}.
 To ensure numerical
 integration accuracy is maintained we add a bound
-constraint on the time step at each knot point.
+constraint on the time step at each knot point. \todo{(Brian) the setup seems clear to me.} 
 
 %% F2
 \begin{figure*}[ht]
