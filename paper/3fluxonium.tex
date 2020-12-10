@@ -25,16 +25,16 @@ The optimization problem takes the form:
     + \sum_{k=1}^{N-1} \norm{u_k}_{R_k}}{}{} \label{eq:costfun}
   \addConstraint{x_{k+1}}{= f(x_k, u_k)}  \label{eq:dyn_con}
   \addConstraint{\ket{\psi^{0}_{1}} = \ket{0}, \ket{\psi^{1}_{1}} = \ket{1}} \label{eq:istate_con}
-  \addConstraint{\ket{\psi^{i}_{N}} = \ket{\psi^{i}_{f}}} \label{eq:tstate_con}
+  \addConstraint{\ket{\psi^{i}_{N}} = \ket{\psi^{i}_{f}}
+    \ \forall \  i \in \{0, 1\}} \label{eq:tstate_con}
   \addConstraint{{\lvert \braket{\psi^{i}_{k}}{\psi^{i}_{k}}
-      \rvert}^{2} = 1} \label{eq:statenorm_con}
+      \rvert}^{2} = 1 \ \forall \ i \in \{0, 1\}} \label{eq:statenorm_con}
   \addConstraint{{\textstyle \int^{t_{1}}_{0} a \ \mathrm{d}t} = \pdv*{a_{1}}{t} = 0}
   \label{eq:icintd_con}
   \addConstraint{{\textstyle \int^{t_{N}}_{0}} a \ \mathrm{d}t= 0} \label{eq:znf_con}
   \addConstraint{a_{1} = a_{N} = 0} \label{eq:concat_con}
   \addConstraint{|a_{k}| \leq 0.5 \ \textrm{GHz}} \label{eq:amp_con}
 \end{mini!}
-where $i \in \{0,1\}$ for \eqref{eq:tstate_con} and \eqref{eq:statenorm_con}.
 The augmented state and augmented controls are:
 \begin{equation}
   x = \begin{bmatrix} \psi^{0} \\ \psi^{1} \\ \int^{t}_{0} a \ \mathrm{d}t\\ a \\ \pdv*{a}{t} \end{bmatrix} \quad
