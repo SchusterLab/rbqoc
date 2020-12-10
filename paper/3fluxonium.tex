@@ -34,6 +34,7 @@ The optimization problem takes the form:
   \addConstraint{a_{1} = a_{N} = 0} \label{eq:concat_con}
   \addConstraint{|a_{k}| \leq 0.5 \ \textrm{GHz}} \label{eq:amp_con}
 \end{mini!}
+where $i \in \{0,1\}$ for \eqref{eq:tstate_con} and \eqref{eq:statenorm_con}.
 The augmented state and augmented controls are:
 \begin{equation}
   x = \begin{bmatrix} \psi^{0} \\ \psi^{1} \\ \int^{t}_{0} a \ \mathrm{d}t\\ a \\ \pdv*{a}{t} \end{bmatrix} \quad
@@ -48,9 +49,6 @@ We choose $Q$ to be diagonal because it is computationally efficient. This
 metric penalizes phase differences between the states, although
 phase-insensitive metrics such as infidelity may be employed.
 
-\todo{Ask Brian to review this paragraph and the constraints \eqref{eq:dyn_con}-\eqref{eq:amp_con}.
-  Is it okay if I have multiple constraints on the same line? The constraints that are on the same
-  line are imposed for similar reasons, which makes the list shorter and it easier to reference them here.}
 We impose constraints that
 reflect the physical limitations of the apparatus and 
 improve the experimental realization of the control pulse.
