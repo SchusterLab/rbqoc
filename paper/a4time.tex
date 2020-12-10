@@ -10,20 +10,20 @@ Compiler optimizations for statically-sized arrays were utilized
 for all methods except for the unscented sampling method.
 The unscented sampling method's augmented state vector size
 was too large to take advantage of these optimizations,
-adversely affecting its run time.
-For the robust methods, the runtime scales super-linearly with the
-gate time. We expect the runtime to scale linearly with the gate time
-for large gate times because
-the number of knot points scales linearly with the gate time.
-We observe this behavior for the base method, which has a smaller
+which adversely affected its run time.
+The runtimes of the robust methods scale
+super-linearly with the gate time.
+For large gate times, we expect the runtimes
+to scale linearly with the gate time
+because the number of knot points scales linearly with the gate time.
+We observe this trend for the base method, which has a smaller
 augmented state vector size than the robust methods.
 We performed optimizations on a single CPU thread in this work as a proof
 of concept. Future work will parallelize the robustness
 methods across the initial states in the operator basis and utilize GPUs
 \cite{leung2017speedup},
-allowing for fast optimization on large Hilbert spaces.
+which will enable fast optimizations on large Hilbert spaces.
 \vspace*{\intextsep}
-
 \begin{table}[H]
   \begin{tabular} {c | c | c | c | c | c | c}
     & \multicolumn{6}{c}{Wall Time ($\pm 0.001$ s)}\\

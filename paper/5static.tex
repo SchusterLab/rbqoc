@@ -14,8 +14,6 @@ We consider three robust control techniques:
 the sampling method, the unscented sampling method,
 and the derivative method.
 
-\todo{Ask Brian to review this paragraph and next two.
-Are the optimization setups clear?}
 The sampling method simultaneously optimizes over copies of a state,
 each of which evolves with a distinct deviant parameter value.
 We append four sets of two sample states $\psi^{\pm}$
@@ -88,8 +86,7 @@ Exponential integrators that account for the non-linear
 term in \eqref{eq:d1dyn} are used to efficiently integrate the coupled dynamics,
 see Appendix \ref{appendix:derivative}. For runtimes
 and complexity analyses for the three robust control methods,
-consult Appendix \ref{appendix:time}. \todo{(Brian) this is much better, and much 
-easier to follow. Looks good to me.}
+consult Appendix \ref{appendix:time}.
 
 We challenge these methods to achieve
 a $Z/2$ gate subject to a static qubit frequency detuning.

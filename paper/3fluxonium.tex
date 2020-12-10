@@ -23,38 +23,26 @@ The optimization problem takes the form:
 \begin{mini!}[2] 
   {x_{1:N}, u_{1:N\text{-}1}}{\sum_{k=1}^N \norm{x_k\text{-}x_f}_{Q_k}
     + \sum_{k=1}^{N-1} \norm{u_k}_{R_k}}{}{} \label{eq:costfun}
-    \addConstraint{x_{k+1}}{= f(x_k, u_k)}  \label{eq:dyn_con}
-    \addConstraint{(x_1 \; \textrm{given})}
-    \addConstraint{g_k(x_k,u_k)}{\leq 0}
-    \addConstraint{h_k(x_k,u_k)}{=0}
+  \addConstraint{x_{k+1}}{= f(x_k, u_k)}  \label{eq:dyn_con}
+  \addConstraint{\ket{\psi^{0}_{1}} = \ket{0}, \ket{\psi^{1}_{1}} = \ket{1}} \label{eq:istate_con}
+  \addConstraint{\ket{\psi^{i}_{N}} = \ket{\psi^{i}_{f}}} \label{eq:tstate_con}
+  \addConstraint{{\lvert \braket{\psi^{i}_{k}}{\psi^{i}_{k}}
+      \rvert}^{2} = 1} \label{eq:statenorm_con}
+  \addConstraint{{\textstyle \int^{t_{1}}_{0} a \ \mathrm{d}t} = \pdv*{a_{1}}{t} = 0}
+  \label{eq:icintd_con}
+  \addConstraint{{\textstyle \int^{t_{N}}_{0}} a \ \mathrm{d}t= 0} \label{eq:znf_con}
+  \addConstraint{a_{1} = a_{N} = 0} \label{eq:concat_con}
+  \addConstraint{|a_{k}| \leq 0.5 \ \textrm{GHz}} \label{eq:amp_con}
 \end{mini!}
 The augmented state and augmented controls are:
 \begin{equation}
-  x = \begin{bmatrix} \psi^{1} \\ \psi^{2} \\ \int a \ dt\\ a \\ \pdv*{a}{t} \end{bmatrix} \quad
+  x = \begin{bmatrix} \psi^{0} \\ \psi^{1} \\ \int^{t}_{0} a \ \mathrm{d}t\\ a \\ \pdv*{a}{t} \end{bmatrix} \quad
   u = \begin{bmatrix} \pdv*[2]{a}{t} \end{bmatrix}
   \label{eq:astatecontrols}
 \end{equation}
-The initial states $\psi^{1}_{1}$, $\psi^{2}_{1}$
-are basis vectors of the Hilbert space $\ket{0}, \ket{1}$.
-The final states $\psi^{1}_{f}$, $\psi^{2}_{f}$ are the image
-of the initial states under the desired gate.
-The ALTRO implementation we use does not currently support complex numbers so
-we compute in the isomorphism $\mathcal{H}(\mathbb{C}^{n}) \cong \mathcal{H}(\mathbb{R}^{2n})$
-given in \cite{leung2017speedup},
-\begin{equation}
-  H \psi \cong \begin{bmatrix} H_{\textrm{re}} & -H_{\textrm{im}} \\ H_{\textrm{im}} & H_{\textrm{re}}\end{bmatrix}
-  \begin{bmatrix} \psi_{\textrm{re}} \\ \psi_{\textrm{im}}\end{bmatrix}
-  \label{eq:isomorphism}
-\end{equation}
-The discrete dynamics function \eqref{eq:dyn_con} integrates the states
-using \eqref{eq:tdse} and \eqref{eq:hamiltonian}
-and integrates the moments of the flux amplitude.
-Exposing lower order moments of the flux amplitude allows us to penalize their norms
-in \eqref{eq:costfun}, smoothing the flux amplitude
-and mitigating AWG ringing due to high frequency transitions.
 The matrices $Q_{k}$ and $R_{k}$ define the penalty metric.
 Including objectives at each knot point smoothens the optimization landscape, though
-the importance of the final augmented state objective is encoded in the relative
+the importance of the final objective is encoded in the relative
 weight $Q_{N} \sim N \cdot Q_{k}$.
 We choose $Q$ to be diagonal because it is computationally efficient. This
 metric penalizes phase differences between the states, although
@@ -62,36 +50,42 @@ phase-insensitive metrics such as infidelity may be employed.
 
 We impose constraints that
 reflect the physical limitations of the apparatus and 
-constraints that improve the experimental realization of the control pulse.
-To ensure gates may be concatenated arbitrarily without
-inducing AWG ringing due to high-frequency transitions,
-we require $a_{1} = a_{N} = 0$.
-Furthermore, we require $\int a_{N} \ dt = 0$. This
-constraint ensures the pulse has zero net flux, mitigating
-the hysteresis ubiquitous in flux bias lines,
-\cite{battistel2019fast, krantz2019quantum, zhang2020universal}. 
-Since these terms are all included in the state \eqref{eq:astatecontrols},
-they are enforced via simple initial and final conditions.
-We require $-0.5 \textrm{GHz} \le a_{k} \le 0.5 \textrm{GHz}$
-to ensure the two-level approximation \eqref{eq:hamiltonian}
-remains valid. Additionally, we require
-$\psi_{N} = \psi_{f}$.
-The zero net flux and final state constraints
-are satisfied if the final augmented state is
-reached $x_{N} = x_{f}$, the constraint function
-takes the form
-$c_{k} = (x_{k} - x_{f})^{T}(x_{k} - x_{f})$ \todo{I'm not sure what you mean by this, 
-this looks like the cost term? Contraints should be of the form $c(x) = 0$ or $c(x) \leq 0$}.
-The inequality constraints on $a$ are handled
-with a bound constraint which takes the form
-$c_{k} = (x_{k} - b)^{T}(x_{k} - b)$ if $\lvert x_{k} \rvert \ge b$
-and $0$ otherwise \todo{This isn't a bound constraint, this is a piece-wise quadratic 
-constraint? Do you mean $c(x) = [a \leq b \l a \geq -b]$?}.
-In addition, the norm of the states
-are constrained to $1$ to ensure discretization error is not
-exploited $c_{k} = x_{k}^{T}x_{k} - 1$ \todo{Is this right? Why are you
-normalizing the entire state vector? Or are you just normalizing the qubit
-states?}. 
-The selection of subsets from $x_{k}$ is implied in
-the constraint equations. \todo{I think it would be cleaner if you just put the actual 
-constraints into \ref{eq:costfun} and then provide a brief explanation here.}
+improve the experimental realization of the control pulse.
+The discrete dynamics \eqref{eq:dyn_con} integrates the states
+according to the TDSE \eqref{eq:tdse} and the
+fluxonium Hamiltonian \eqref{eq:hamiltonian}
+and integrates the moments of the flux amplitude.
+Exposing lower order moments of the flux amplitude allows us to penalize their norms
+in \eqref{eq:costfun}, smoothing the flux amplitude
+and mitigating AWG ringing due to high frequency transitions.
+We ensure the desired gate is achieved by imposing the constraints
+\eqref{eq:istate_con} and \eqref{eq:tstate_con}.
+The initial states in \eqref{eq:istate_con}
+are chosen to span the Hilbert space.
+The final states in \eqref{eq:tstate_con} are the image
+of the initial states under the desired gate.
+The ALTRO implementation we use does not currently support complex numbers so
+we compute in the isomorphism $\mathcal{H}(\mathbb{C}^{n}) \cong \mathcal{H}(\mathbb{R}^{2n})$
+given in \cite{leung2017speedup},
+\begin{equation}
+  H \ket{\psi} \cong \begin{bmatrix} H_{\textrm{re}} & -H_{\textrm{im}}
+    \\ H_{\textrm{im}} & H_{\textrm{re}}\end{bmatrix}
+  \begin{bmatrix} \psi_{\textrm{re}} \\ \psi_{\textrm{im}}\end{bmatrix}
+  \label{eq:isomorphism}
+\end{equation}
+We ensure the solver does not take advantage of discretization
+error by imposing the normalization constraint \eqref{eq:statenorm_con}.
+The constraint \eqref{eq:icintd_con} is an initial condition.
+We ensure the pulse has zero net flux by imposing \eqref{eq:znf_con},
+which mitigates the hysteresis ubiquitous in flux bias lines
+\cite{battistel2019fast, krantz2019quantum, zhang2020universal}.
+We ensure gates may be concatenated arbitrarily without
+inducing AWG ringing due to high-frequency transitions by imposing
+the boundary condition \eqref{eq:concat_con}.
+Finally, we ensure the two-level
+approximation \eqref{eq:hamiltonian} remains valid
+by imposing the amplitude constraint \eqref{eq:amp_con}.
+All of the gates presented in this work achieve a maximum
+individual constraint violation of $10^{-8}$
+for \eqref{eq:dyn_con}--\eqref{eq:amp_con}.
+
