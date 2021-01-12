@@ -17,8 +17,8 @@ derivative method for future problems.
 
 \begin{table}[ht]
   \begin{tabular}{c | c | c}
-    Method & $\norm{\partial_{f_{q}} \psi_{N}}_{2}$ ($10^{3}$)
-    & $\norm*{\partial^{2}_{f_{q}} \psi_{N}}_{2}$ ($10^{6}$)\\
+    Method & $\norm*{\ket*{\partial_{f_{q}} \psi_{N}}}_{2}$ ($10^{3}$)
+    & $\norm*{\ket*{\partial^{2}_{f_{q}} \psi_{N}}}_{2}$ ($10^{6}$)\\
     \hline
     D1 & 0.436 & 57.817\\
     D2 & 1.702 & 9.030\\
@@ -30,8 +30,7 @@ derivative method for future problems.
   \label{tab:dnorm}
 \end{table}
 
-The dynamics for the derivative methods can be integrated efficiently using exponential integrators
-\cite{auer2018magnus, berland2005solving, einkemmer2017performance}.
+The dynamics for the derivative methods can be integrated efficiently using exponential integrators.
 General exponential integrators break the dynamics into a linear term and a non-linear term.
 For example, the dynamics of the first state derivative in
 units of $i\hbar = 1$ are $\frac{d}{dt} \ket{\partial_{\lambda} \psi} =

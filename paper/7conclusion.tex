@@ -1,26 +1,25 @@
 \section{Conclusion}
 In conclusion, we have applied state-of-the-art trajectory
-optimization techniques to achieve robustness to parameter deviations
-and mitigate decoherence on a quantum system.
-We have proposed a scheme for mitigating
-longitudinal relaxation with time-optimal
-control and the probability of longitudinal relaxation metric,
-avoiding the optimal control problem for density matrices which scales quartically with
-the dimension of the Hilbert space.
-We have proposed the derivative method for robust control which achieves
-super-linear gate error reductions in its gate time for the static parameter
-deviation problem we studied.
+optimization techniques to mitigate decoherence and
+achieve robustness to parameter uncertainty
+errors on a quantum system.
+We have proposed a scheme for supressing
+depolarization with time-optimal
+control and the depolarization probability model.
+The computational cost of this depolarization model is
+independent of the dimension of the Hilbert space, enabling
+inexpensive optimization on high-dimensional quantum systems.
+We have also proposed the derivative method for robust control which achieves
+super-linear gate error reductions in the gate time for the static parameter
+uncertainty problem we studied.
 We have shown that the derivative, sampling, and unscented sampling methods
 can mitigate 1/$f$ flux noise errors
 which dominate coherent errors for flux controlled qubits.
-The derivative and sampling methods scale cubically with
-the dimension of the Hilbert space, allowing for applications
-to larger quantum systems.
-The derivative, sampling, and unscented sampling
-methods will benefit from interleaving optimization with
-experimental characterization, while the sampling and unscented
-sampling methods can also be applied to error channels without models.
-These techniques will be used to achieve the low gate errors
+The robust control techniques can be applied
+to any Hamiltonian,
+allowing experimentalists in all disciplines to engineer robust
+operations on their quantum systems.
+These methods will be used to achieve the low gate errors
 required for fault-tolerant quantum computing applications. Our
 implementation of the techniques described in this work is available
 at \url{https://github.com/SchusterLab/rbqoc}.

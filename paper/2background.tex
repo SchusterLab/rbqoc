@@ -1,106 +1,146 @@
-\section{QOC + ALTRO \label{sec:background}}
-In this section we
+\section{Background \label{sec:background}}
+In this section, we
 review the QOC problem statement
-and introduce the ALTRO solver.
-QOC concerns the evolution of
-a (quantum) state $\ket{\psi(t)}$ governed by the time-dependent
+and reintroduce the ALTRO solver \cite{howell2019altro}.
+QOC concerns a vector of time-dependent control parameters $u(t)$
+that steer the evolution of a (quantum) state $\ket{\psi(t)}$.
+The evolution of the state is governed by the time-dependent
 Schr{\"o}dinger equation (TDSE),
 \begin{equation}
   i \hbar \frac{d}{dt} \ket{\psi(t)} = H(u(t), t) \ket{\psi(t)}
   \label{eq:tdse}
 \end{equation}
-The Hamiltonian has an arbitrary dependence on the possibly multi-valued controls $u(t)$.
-The controls are so-called because they are the means the experimentalist has to
-act on the system. To make the problem numerically tractable,
-the controls and quantum state are discretized into $N$ knot points (time steps).
-The optimization problem is to find the
-controls that minimize a functional $J(u)$.
-In the simplest case, the functional is
-the infidelity between the initial state evolved
-to the final knot point and the desired final state
-$J = 1 - {\lvert \braket{\psi_{f}}{\psi_{N}(u)} \rvert}^{2}$.
-In general, $J$ is a linear combination of cost functions on the state
+The Hamiltonian $H(u(t), t)$ is determined by the quantum system.
+The QOC problem is to find the
+controls that minimize a functional $J(u(t))$.
+To make the problem numerically tractable,
+the controls and state are discretized into $N$ knot points (time steps).
+In the case of a single state transfer problem, the functional is
+the infidelity of the desired final state and the initial state evolved
+to the final knot point,
+$J(u) = 1 - {\lvert \braket{\psi_{f}}{\psi_{N}(u)} \rvert}^{2}$.
+In general, $J(u)$ is a linear combination of cost functions on the state
 as well as cost functions on the controls \cite{leung2017speedup}.
-Standard QOC
-solvers employ automatic differentiation
-to compute gradients of the functional $\nabla_{u} J(u)$,
-which can easily be used to implement first-order optimization methods
-\cite{machnes2015gradient, khaneja2005optimal, leung2017speedup, goerz2019krotov}.
+Standard QOC solvers compute derivatives of the functional $\nabla_{u} J(u)$,
+which are used to implement first-order optimization methods
+\cite{machnes2015tunable, khaneja2005optimal, leung2017speedup, goerz2019krotov}.
 
 Alternatively, the QOC problem can be formulated as a trajectory optimization problem 
 and solved using a variety of specialized solvers developed by the robotics community
-\cite{Schulman13,Tedrake16,Hereid2017FROST,howell2019altro}.
-Trajectory optimization problems are typically of the following form: 
+\cite{Schulman13, Tedrake16, Hereid2017FROST, howell2019altro}.
+The functional $J(u)$ is divided into its constituent
+cost functions at each knot point $\ell_{k}(x_{k}, u_{k})$,
+where $k \in \{1, ..., N\}$ denotes the knot point,
+$x_{k}$ is the augmented state vector,
+and $u_{k}$ is the augmented control vector.
+The augmented state includes all variables of interest that are not decision variables.
+In the case of QOC, the state is a subset of the
+augmented state $\ket{\psi_{k}} \subseteq x_{k}$.
+The solver we use does not currently support complex numbers, so we employ the isomorphism
+$\mathcal{H}(\mathbb{C}^{n}) \cong \mathcal{H}(\mathbb{R}^{2n})$
+given in \cite{leung2017speedup},
+\begin{equation}
+  H \ket{\psi} \cong \begin{bmatrix} H_{\textrm{re}} & -H_{\textrm{im}}
+    \\ H_{\textrm{im}} & H_{\textrm{re}}\end{bmatrix}
+  \begin{bmatrix} \ket{\psi}_{\textrm{re}} \\ \ket{\psi}_{\textrm{im}}\end{bmatrix}
+  \label{eq:isomorphism}
+\end{equation}
+The augmented state trajectory obeys the physics of the system if
+the dynamics constraint is satisfied
+$x_{k + 1} = f(x_{k}, u_{k})$. For QOC, the discrete
+dynamics function $f(x_{k}, u_{k})$ propagates the state by
+integrating the TDSE \ref{eq:tdse} with Runge-Kutta methods \cite{jorgensen2011numerical}
+or exponential integrators \cite{auer2018magnus, berland2005solving, einkemmer2017performance}.
+
+Additional constraints on the augmented states and augmented controls
+are encoded in constraint functions.
+The constraint functions are put into a form such that, when the constraint is satisfied,
+inequality constraint functions obey $g_{k}(x_{k}, u_{k}) \leq 0$ and
+equality constraint functions obey $h_{k}(x_{k}, u_{k}) = 0$. The constraint
+functions may be vector-valued to encode multiple constraints of each type.
+If a constraint function takes a positive value, the
+value is called the constraint's violation and
+the constraint is said to be active.
+The trajectory optimization problem can be stated concisely,
 \begin{mini!}[2]
-    {x_{1:N},u_{1:N-1}}{\ell_f(x_N) + \sum_{k=1}^{N-1} \ell(x_k,u_k)}{}{} \label{eq:gcostfun}
+    {x_{1:N},u_{1:N-1}}{\ell_{N}(x_N) + \sum_{k=1}^{N-1} \ell_{k}(x_k,u_k)}{}{} \label{eq:gcostfun}
     \addConstraint{x_{k+1} = f(x_k,u_k)} \label{eq:gdyncon}
     \addConstraint{g_k(x_k,u_k)}{\leq 0} \label{eq:ineqcon}
     \addConstraint{h_k(x_k,u_k)}{=0} \label{eq:eqcon}
 \end{mini!}
-where $\ell_f$ and $\ell$ are the final and stage cost functions, $x_k \in \R^l$ and
-$u_k \in \R^m$ are the state and control variables,
-$f(x_k,u_k)$ is the discrete dynamics function, and $g_k(x_k,u_k)$ and
-$h_k(x_k,u_k)$ are the inequality
-and equality constraints, potentially including initial and final conditions,
-at time step $k$.
 
-Many techniques have been proposed for solving \eqref{eq:gcostfun}--\eqref{eq:eqcon}. Standard 
+Many techniques have been proposed for solving \eqref{eq:gcostfun}-\eqref{eq:eqcon}. Standard 
 methods include direction collocation \cite{Hargraves87} and differential-dynamic programming
-(DDP) \cite{Mayne1966a}. Recent state-of-the-art solvers, such as ALTRO \cite{howell2019altro},
-have combined principles from both of these approaches.
+(DDP) \cite{Mayne1966a}. Recent state-of-the-art solvers, such as ALTRO,
+have combined principles from both of these approaches. ALTRO uses iLQR
+\cite{Li2004a} as the internal solver of an augmented Lagrangian method (ALM)
+\cite{lantoine2012hybrid, plancher2017constrained}
+and employs a projected Newton method \cite{bertsekas1982projected, rao1998application}
+in its final solving stage.
 
-ALTRO uses iterative LQR (iLQR) \cite{Li2004a} as the internal solver of an augmented 
-Lagrangian method (ALM). iLQR solves an unconstrained trajectory optimization problem 
-using a backward Riccati recursion to derive a closed-loop linear feedback law about the current 
-trajectory. By simulating the system forward with the feedback law, the trajectory is 
-brought closer to the (locally) optimal trajectory. DDP-based solvers such as iLQR
-are popular since they are very computationally efficient, are always dynamically feasible,
-and provide a locally stabilizing closed-loop control policy about the optimal trajectory. However,
-standard implementations have no ability to deal with nonlinear equality and inequality 
-constraints. ALM handles constraints by successively solving unconstrained minimization 
+iLQR simulates the augmented state forward
+using the discrete dynamics function 
+and computes derivatives of the cost functions
+to update the augmented controls. This procedure is known as
+indirect shooting, and iLQR shares this approach with GOAT \cite{machnes2015tunable},
+GRAPE \cite{khaneja2005optimal, leung2017speedup}, and Krotov's method \cite{goerz2019krotov}.
+iLQR differs from these solvers
+in its update procedure. iLQR computes the locally optimal update for the augmented
+controls using a dynamic programming algorithm, and a line search is performed
+in the direction of this update to ensure a decrease in the sum of the cost functions.
+
+Indirect shooting solvers such as iLQR are popular
+for solving unconstrained trajectory optimization problems \eqref{eq:gcostfun}-\eqref{eq:gdyncon},
+but standard implementations have no ability to handle nonlinear equality and inequality
+constraints \eqref{eq:ineqcon}-\eqref{eq:eqcon}.
+One way to handle constraints is to employ a projected gradient
+method \cite{clarkson2010coresets, hauswirth2016projected}.
+However, within the indirect shooting framework,
+projected gradient methods can
+only handle constraints on the augmented controls,
+not the augmented states.
+Another technique is to promote the constraint functions to cost functions \cite{leung2017speedup}.
+A simple implementation of this approach does not garauntee that the constraints
+are satisfied, as the solver trades
+minimization of the cost functions and constraint functions against each other.
+ALM promotes the constraint functions to cost functions, and adaptively
+adjusts a Lagrange multiplier estimate for each constraint function to ensure
+the constraints are satisfied. ALM considers a decision variable $z \in \R^{s}$ with $s$ given,
+a cost function $f(z) : \R^{s} \mapsto \R$, and a constraint function
+$c(z) : \R^{s} \mapsto \R^{p}$ encoding $p$ constraints.
+For ALTRO, $z$ is the vector concatenation of the augmented states and augmented controls across
+all knot points, $f(z)$ is the sum of the trajectory optimization
+cost functions \eqref{eq:gcostfun},
+and $c(z)$ is the vector concatenation of the trajectory
+optimization constraint functions \eqref{eq:ineqcon}-\eqref{eq:eqcon}.
+ALM successively solves unconstrained minimization 
 problems of the form:
 \begin{mini}[2]
-    {z}{f(z) + \lambda^T c(z) + \half c(z)^T I_\mu c(z)}{}{}
+    {z} {f(z) + \lambda^T c(z) + \half c(z)^T I_\mu c(z)}{}{}
     \label{opt:alm}
 \end{mini}
-where $f(z)$ is the objective function, $c(z) : \R^{l + m} \mapsto \R^p$ is the constraint 
-function, $\lambda \in \R^p$ is a Lagrange multiplier estimate, and $I_\mu$ is a diagonal matrix
-of penalty weights, $\mu$, whose magnitudes depend on whether
+$\lambda \in \R^p$ is a Lagrange multiplier estimate, and $I_\mu$ is a diagonal matrix
+of penalty weights, $\mu \in \R^{p}$, whose magnitudes depend on whether
 the corresponding constraint is active or inactive.
-For ALTRO, $f(z)$ is \eqref{eq:gcostfun}, $c(z)$ is the 
-concatenation of $g_k$ and $h_k$, and $z$ is the concatenation of the states and controls 
-across all time steps. After minimizing \eqref{opt:alm} using iLQR,
+After minimizing \eqref{opt:alm} using iLQR,
 the Lagrange multiplier estimates are updated according to,
 \begin{equation}
-	\lambda \gets \lambda + \mu c(z)
+  \lambda \gets \lambda + I_\mu c(z)
+  \label{eq:almupdate}
 \end{equation}
-the penalty terms are updated, and the process repeats until convergence.
+the penalty weight is updated, and the process repeats until convergence.
 
-ALM converges superlinearly but tends to exhibit slow constraint convergence near the optimal 
-solution due to poor numerical conditioning. To address this shortcoming, ALTRO provides a 
-solution-polishing phase that takes 1-2 Newton steps on the active constraint set to provide 
-machine-precision constraint satisfaction. For more information on the details of the ALTRO
+ALM converges superlinearly, but poor numerical conditioning may lead
+to small decreases in the constraint violations near the locally optimal solution
+\cite{bertsekas1996constrained}. To address this shortcoming, ALTRO
+projects the solution from the ALM solving stage onto the constraint manifold using
+a projected Newton method, achieving ultra-low
+constraint violations $\sim 1 \cdot 10^{-8}$.
+For more information on the details of the ALTRO
 solver, see \cite{howell2019altro, Jackson2020altroc}.
 
-As opposed to standard QOC solvers, the ALTRO solver provides a unified framework
-for imposing arbitrary, simultaneous constraints
-on both the states and the controls that converge superlinearly to tight tolerances. 
-First-order solvers such as GRAPE
-use unconstrained optimization to satisfy desiderata on the states,
-such as achieving a desired gate fidelity, forbidding occupations of particular quantum states,
-and smoothing the controls below a threshold. The unconstrained approach relies
-on a careful choice of competing penalty weights, which is cumbersome and often intractable.
-To impose constraints on the controls, such as amplitude restrictions, first-order solvers
-employ projected gradient descent methods which restrict
-optimization to the constraint manifold and
-may hinder convergence to the optimal solution \cite{clarkson2010coresets,
-  hauswirth2016projected}.
-Conversely,
-the ALTRO solver delays projecting onto the constraint manifold defined by
-\eqref{eq:ineqcon} and \eqref{eq:eqcon} until the ALM
-solve is already at a coarse tolerance, achieving machine-precision satisfaction
-for constraints on the controls and the states. These advantages are critical
-for this work, where multiple constraints must be satisfied in addition
-to minimizing auxiliary metrics.
-
-
+As opposed to standard QOC solvers, ALTRO
+is able to satisfy constraints
+on both the augmented states and the augmented controls to tight tolerances.
+This advantage is crucial for this work, where multiple medium-priority cost functions
+are minimized subject to many high-priority constraints.
