@@ -15,10 +15,17 @@ uncertainty problem we studied.
 We have shown that the derivative, sampling, and unscented sampling methods
 can mitigate 1/$f$ flux noise errors
 which dominate coherent errors for flux controlled qubits.
-The robust control techniques can be applied
+\myrem{The derivative and sampling methods scale cubically with
+the dimension of the Hilbert space, allowing for applications
+to larger quantum systems.
+The derivative, sampling, and unscented sampling
+methods will benefit from interleaving optimization with
+experimental characterization, while the sampling and unscented
+sampling methods can also be applied to error channels without models.}
+\myadd{The robust control techniques can be applied
 to any Hamiltonian,
-allowing experimentalists in all disciplines to engineer robust
-operations on their quantum systems.
+allowing experimentalists in all domains to engineer robust
+operations on their quantum systems.}
 These methods will be used to achieve the low gate errors
 required for fault-tolerant quantum computing applications. Our
 implementation of the techniques described in this work is available
