@@ -1,78 +1,121 @@
-\section{Robustness to Static Parameter Deviations \label{sec:static}}
-\todo{standardize gate time vs gate duration} We have formulated the quantum optimal control
-problem as an open loop optimization problem, i.e.
-feedback from the experiment is not incorporated in optimization.
+%% F2
+\begin{figure*}[ht]
+  \begin{subfigure}{.315\textwidth}
+    \includegraphics[width=\linewidth]{assets/f2a.png}
+    \caption{\label{fig:statica}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{.4\textwidth}
+    \includegraphics[width=\linewidth]{assets/f2b.png}
+    \caption{\label{fig:staticb}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{.23\textwidth}
+    \includegraphics[width=\linewidth]{assets/f2c.png}
+    \caption{\label{fig:staticc}}
+  \end{subfigure}
+  \caption{
+    (a) $Z/2$ gates robust to qubit frequency detunings constructed with the
+    analytic (A), sampling (S), unscented sampling (SU), and the 1\textsuperscript{st}-
+    and 2\textsuperscript{nd}-order derivative methods (D1, D2). The numerical gates shown
+    are optimized for twice the gate time of the analytic gate.
+    (b) Single gate error at a one-percent qubit frequency detuning as
+    a function of the gate time. Missing
+    data points represent solutions with a gate error greater than $5 \cdot 10^{-5}$.
+    (c) Single gate error as a function of the qubit frequency detuning.
+    The gate errors for the analytic and 1\textsuperscript{st}-order derivative
+    methods are shown for gate times which are multiples of $1 / 4 f_{q} \sim 18 \textrm{ns}$.
+    The performance of the two methods is
+    indistinguishable at the gate time $18 \textrm{ns}$.
+  }
+  \label{fig:static}
+\end{figure*}
+
+\section{Robustness to Static Parameter Uncertainty \label{sec:static}}
+We have formulated the QOC
+problem as an open-loop optimization problem, equivalently,
+we do not incorporate feedback from the experiment in optimization.
 However, the device typically deviates from the Hamiltonian we use in optimization,
 leading to poor experimental performance. We combat errors
 of this form using robust control techniques,
 making the state evolution insensitive
-to Hamiltonian parameter deviations. As an example,
+to Hamiltonian parameter uncertainty. As an example,
 we mitigate errors arising from the drift and finite measurement
-precision of the qubit frequency which modifies \eqref{eq:hamiltonian}
-by $f_{q} \gets f_{q} + \delta f_{q}$.
-We consider three robust control techniques:
+precision of the qubit frequency which modifies the fluxonium Hamiltonian
+\eqref{eq:hamiltonian} by $f_{q} \gets f_{q} + \delta f_{q}$.
+We consider three robust control techniques to accomplish this task:
 the sampling method, the unscented sampling method,
 and the derivative method.
 
-The sampling method simultaneously optimizes over copies of a state,
-each of which evolves with a distinct deviant parameter value.
-A pair of two sample states $\psi_{\pm}$
-is appended to the augmented state vector \eqref{eq:astatecontrols}
-. The samples are initialized in the same state.
-Four pairs
-are appended in total corresponding to the initial states
+The sampling method incentivizes the optimizer
+to ensure multiple copies of a state, each of which evolves
+with a distinct value of the uncertain parameter, achieve
+the same state transfer. For each initial state,
+we add two sample states $\ket{\psi^{\pm}}$
+to the augmented state \eqref{eq:astatecontrols}, and the discrete dynamics
+function \eqref{eq:dyn_con} is modified
+so the sample states evolve under the fluxonium Hamiltonian \eqref{eq:hamiltonian}
+with $f_{q} \gets f_{q} \pm \sigma_{f_{q}}$ for a fixed hyperparameter
+$\sigma_{f_{q}}$ which is the standard deviation of the qubit frequency.
+For this method, the standard orthonormal basis states are an insufficient choice
+for the initial states. As an example, a $Z/2$ gate achieved by idling
+at the flux frustration point $a_{k} = 0 \ \forall \ k$
+will be robust to qubit frequency detunings for the initial states $\ket{0}$
+or $\ket{1}$ because the fidelity metric is insensitive to global phases,
+but this gate will not be robust for any other initial states.
+Thus, we choose four initial states
+so that their outer products
+span the operators on the Hilbert space
 $\{\ket{0}, \ket{1}, (\ket{0} + i\ket{1}) / \sqrt{2},
-(\ket{0} - \ket{1}) / \sqrt{2}\}$.
-The initial states are chosen
-so that their outer products span the operators on the
-Hilbert space  \cite{chow2009randomized}.
-The discrete dynamics \eqref{eq:dyn_con} is modified so that the
-samples evolve under the Hamiltonian given in \eqref{eq:hamiltonian}
-with $f_{q} \gets f_{q} \pm \sigma_{f_{q}}$ for a fixed $\sigma_{f_{q}}$.
-The final state
-for each sample is the image of its initial state
-under the desired gate. Deviations from the final state are
-penalized in the objective \eqref{eq:costfun}.
+(\ket{0} - \ket{1}) / \sqrt{2}\}$ \cite{chow2009randomized}.
+The infidelities between the sample states and the images of their
+initial states under the desired gate are penalized
+by adding a cost function
+$\sum_{k, \pm} q_{k} (1 - {\lvert \braket{\psi^{\pm}_{k}}{U \psi^{\pm}_{1}} \rvert}^{2})$
+to the objective \eqref{eq:costfun} for a constant $q_{k}$ we supply.
 
-For the unscented sampling method, $2(2n + d)$ samples
-are appended to the augmented state vector \eqref{eq:astatecontrols}
-for each initial state from the operator basis. Here $2n = 4$ is twice the
+For the unscented sampling method, we append $2(2n + d)$ sample
+states to the augmented state vector \eqref{eq:astatecontrols}
+for each initial state used in the sampling method. $2n = 4$ is twice the
 dimension of the Hilbert space, resulting from the isomorphism \eqref{eq:isomorphism},
-and $d = 1$ is the number of deviant parameters. The samples
-are used to represent a Gaussian distribution over all $2n$
-elements of the initial state, modeling
-the uncertainty in the state as a result of the uncertainty in
-the deviant parameter. Each sample evolves under the Hamiltonian
-given in \eqref{eq:hamiltonian} with $f_{q} \gets f_{q} + \delta f_{q}$.
-The qubit frequency detuning $\delta f_{q}$ is determined by the statistics
-of the ensemble of samples at each knot point.
-The discrete dynamics \eqref{eq:dyn_con} is modified to 
-evolve the samples under the deviant Hamiltonian
-and then apply the unscented transformation to the ensemble,
-accurately preserving the first and second moments
-of the distribution.
-As in the sampling method,
-deviations from the final state are penalized according to \eqref{eq:costfun}.
+and $d = 1$ is the number of uncertain parameters. The sample states
+encode a unimodal distribution over the $2n$
+elements of the evolving initial state, modeling
+the uncertainty in the state due to the uncertainty in the parameter.
+The discrete dynamics function \eqref{eq:dyn_con} is modified
+so each sample state evolves under the fluxonium Hamiltonian
+\eqref{eq:hamiltonian} where $f_{q} \gets f_{q} + \delta f_{q}$
+and $\delta f_{q}$ is sampled at each knot point from a distribution
+with fixed standard deviation $\sigma_{f_{q}}$.
+After propagating the sample states to each knot point, we apply the unscented
+transformation to the states, which
+preserves the first and second moments of the distribution the states encode.
+This procedure makes the unscented sampling method more resistant to sample
+states collapsing towards the mean than in the sampling method.
+We add a contribution to the objective \eqref{eq:costfun} for the infidelity
+of the sample states and their target states
+as in the sampling method.
 A detailed procedure for the unscented transformation is given
 in Appendix \ref{appendix:unscented}.
 
 The derivative method penalizes the sensitivty of the state
-to the deviant parameter, which is encoded in the ($l$\textsuperscript{th}-order)
-derivative $\partial_{f_{q}}^{l} \psi$. In the $m$\textsuperscript{th}-order
-derivative method, all state derivatives of order $1, \dots, m$
-are appended to the augmented state vector \eqref{eq:astatecontrols}
-for each initial state in the operator basis.
-The norms of the state derivatives are penalized
-in \eqref{eq:costfun} by setting the corresponding final states to zero.
-The state derivatives could be obtained in the discrete dynamics \eqref{eq:dyn_con}
-with backwards mode differentiation.
-Naive automatic differentiation
-would differentiate all dynamics at knot points
-$1, \dots, k - 1$ to obtain the state derivative at knot point $k$, requiring
+to the uncertain parameter, which is encoded in the $l$\textsuperscript{th}-order
+state derivative $\partial_{f_{q}}^{l} \ket{\psi}$. In the $m$\textsuperscript{th}-order
+derivative method, we append all state derivatives of order $1, \dots, m$
+to the augmented state vector \eqref{eq:astatecontrols}
+for each initial state used in the sampling method.
+We penalize the norms of the state derivatives
+in the objective \eqref{eq:costfun} by setting the corresponding elements
+of the final augmented state $x_{f}$ to $0$.
+We could obtain the state derivatives at each knot point
+with backward-mode differentiation.
+In a naive automatic differentiation scheme,
+the discrete dynamics function at knot points
+$1, \dots, k - 1$ would be differentiated to obtain the state
+derivative at knot point $k$, requiring
 $O(N^{2})$ matrix multiplications. Instead, we 
-employ forwards mode differentiation on the TDSE to obtain coupled dynamics
+employ forward-mode differentiation on the TDSE \eqref{eq:tdse}
+to obtain coupled, first-order ODEs
 which require $O(N)$ matrix multiplications to integrate.
-For example, the dynamics for the $1$\textsuperscript{st}-order derivative method are,
+For example, the dynamics for the $1$\textsuperscript{st}-order derivative method are:
 \begin{align}
   i \hbar \frac{d}{dt} \ket{\psi} &= H \ket{\psi}\\
   i \hbar \frac{d}{dt} \ket{\partial_{f_{q}}\psi} &=
@@ -80,61 +123,76 @@ For example, the dynamics for the $1$\textsuperscript{st}-order derivative metho
   (\partial_{f_{q}} H) \ket{\psi}
   \label{eq:d1dyn}
 \end{align}
-Exponential integrators that account for the non-linear
-term in \eqref{eq:d1dyn} may be used to efficiently integrate the coupled dynamics,
-see Appendix \ref{appendix:derivative}. For timing results
-and an analysis of how the three robust methods scale to larger Hilbert spaces
-and more deviant parameters,
+We integrate the coupled ODEs with exponential
+integrators, see Appendix \ref{appendix:derivative},
+in the discrete dynamics function \eqref{eq:dyn_con}. For runtimes
+and complexity analyses for the three robust control techniques,
 consult Appendix \ref{appendix:time}.
 
-We task these methods with achieving
-a $Z/2$ gate subject to a static qubit frequency detuning.
-We take $\sigma_{f_{q}} / f_{q} = 1\%$ to be one standard devation, and equip
-the sampling methods accordingly. We compute gate errors for each method
-by evolving the optimized trajectory under the Hamiltonian in \eqref{eq:hamiltonain}
-with $f_{q} \gets f_{q} + \delta f_{q}$ at the stated qubit frequency detuning.
+We compare the gate errors due to a static qubit frequency
+detuning for $Z/2$ gates obtained with the robust control techniques
+and the analytic method.
+To compute the gate error,
+an initial state is evolved
+under the fluxonium Hamiltonian \eqref{eq:hamiltonian}
+two separate times with the transformations
+$f_{q} \rightarrow f_{q} \pm \delta f_{q}$
+at the stated qubit frequency detuning.
+The reported gate error is the infidelity of
+the evolved state and the target state averaged over
+the two transformations and $1000$ initial states.
+We set $\sigma_{f_{q}}/f_{q} = 1\%$
+for the sampling and unscented sampling
+methods.
 
-We compare the numerical methods
-to an analytically derived $Z/2$ gate, see Figure \ref{fig:statica}. 
 The analytic gate corresponds to
-idling at the flux frustration point $a = 0$. It
-is at the device's speed limit for a $Z/2$ gate $t_{Z/2} = 1 / 4 f_{q}$ and
-is simple to derive. Its erroneous rotation angle $2 \pi t_{Z/2} \delta f_{q}$ is linearly sensitive to
-the qubit frequency detuning, resulting in a gate error that is quadratically sensitive
-to the qubit frequency detutning.
+idling at the flux frustration point $a_{k} = 0 \ \forall \ k$, see Figure
+\ref{fig:statica}. Its gate time $1 / 4 f_{q} \sim 18\textrm{ns}$
+is the shortest possible for a $Z/2$ gate on the device.
+The gate's erroneous rotation angle
+$\pi \delta f_{q} / 2 f_{q}$ is linear in the
+qubit frequency detuning, resulting in a gate error that is quadratic
+in the detuning.
 At a one-percent
-qubit frequency detuning ($\delta f_{q} / f_{q} = 1\%$)
-the analytic gate achieves a gate error $\sim 4.5 \cdot 10^{-5}$,
+qubit frequency detuning ($\lvert \delta f_{q} \rvert / f_{q} = 1\%$),
+the gate error is $\sim 4.5 \cdot 10^{-5}$,
 which is sufficient for quantum error correction.
-Although the analytic $Z/2$ gate performs well, it
-only works at the gate time $t_{Z/2}$. The ability to perform $Z$ rotations in arbitrary times is critical
-for multi-qubit experiments, where the qubits operate at different frequencies $f_{q, i} \neq f_{q, j}$.
-Each numerical method is able to find solutions at
-all gate times above $t_{Z/2}$, see Figure \ref{fig:staticb}.
+Although the gate performs well, the method used to derive
+it can not be employed to achieve a $Z/2$ gate at gate times other than
+$1 / 4 f_{q}$. The ability to perform
+phase gates in any given time is critical
+for multi-qubit experiments, where the qubits operate at different
+frequencies $f_{q, i} \neq f_{q, j}$.
+We can find solutions using the numerical methods at
+all gate times above $18$ns, see Figure \ref{fig:staticb}.
 These numerical methods offer an effective scheme for synchronizing
 multi-qubit experiments.
 
-The sampling and unscented sampling methods combine idling periods
-with time-anti-symmetric ramps.
-The gate error at $\delta f_{q} / f_{q} = 1\%$ for the sampling method
+The solution for the unscented sampling method combines idling periods
+with fast ramps to the maximum amplitude, whereas that for the sampling method
+does not reach high amplitudes.
+The gate error at a one-percent qubit frequency detuning for the sampling method
 does not improve substantially over the
-range of gate durations. The unscented sampling method
-achieves linear decreases in its gate error at $\delta f_{q} / f_{q} = 1\%$ with longer gate durations
-until half the larmor period $1 / 2 f_{q}$ after which it achieves a consistent
+range of gate times. Conversely, the gate error at a one-percent detuning
+for the unscented sampling method decreases linearly in the gate time
+until half the Larmor period $1 / 2 f_{q}$ after which it has a consistent
 gate error $\sim 3.5 \cdot 10^{-5}$.
 
 The derivative methods converge on qualitatively similar solutions that
-use fast traingle pulses at the boundaries and balance time
-on either side of the flux-frustration point symmetrically at low amplitudes.
-Both methods achieve a super-linear scaling in their gate error as
-a function of the gate duration. The gate error for the 1\textsuperscript{st}-order
-derivative method approaches zero at the larmor period $1 / f_{q}$, see Figure \ref{fig:staticc}.
-We believe the 1\textsuperscript{st}-order method outperforms the 2\textsuperscript{nd}-order
-method due to the low contribution of second-order
-terms to the gate error in this deviation regime, see Appendix \ref{appendix:derivative}.
-The vanishing gate error at longer gate durations exhibited by the derivative methods
-is reminiscent of the
-ability of composite pulses to mitigate parameter deviation errors to arbitrary
+use fast triangle pulses at the boundaries and idle at low amplitudes.
+The gate errors at a one-percent qubit frequency detuning
+for both methods decrease super-linearly in their gate times.
+The 1\textsuperscript{st}-order derivative method
+consistently achieves lower gate errors than the
+2\textsuperscript{nd}-order derivative method,
+which we believe is related to the greater importance
+of minimizing the 1\textsuperscript{st}-order state
+derivative norm than the 2\textsuperscript{nd}-order
+state derivative norm for this problem, see Appendix \ref{appendix:derivative}.
+The gate error at a one-percent detuning for the 1\textsuperscript{st}-order
+derivative method approaches zero at the Larmor period $1 / f_{q}$, see Figure \ref{fig:staticc}.
+This result mimics the
+ability of composite pulses to mitigate parameter uncertainty errors to arbitrary
 order with sufficiently many pulses \cite{merrill2014progress}.
 It is difficult to choose an appropriate composite pulse
 for the problem studied here due to our Hamiltonian and experimental constraints.
@@ -147,21 +205,18 @@ for future work.
     \includegraphics[width=\linewidth]{assets/f3a.png}
     \caption{}
     \label{fig:stochastica}
-  \end{subfigure}\hspace{0.025\textwidth}
+  \end{subfigure}\hspace{0.05\textwidth}
   \begin{subfigure}{.4\textwidth}
     \includegraphics[width=\linewidth]{assets/f3b.png}
         \caption{}
     \label{fig:stochasticb}
   \end{subfigure}
   \caption{
-    \todo{fix the size of the images and where are x axis labels?}
-    (a) $X/2$ gates robust to flux offsets constructed with the analytic,
-    sampling, unscented sampling, and the 1\textsuperscript{st}-
-    and 2\textsuperscript{nd}-order derivative methods. The gates shown
-    are the solutions at the analytic gate time.
-    (b) Simulation of stochastic 1/$f$ flux noise for
-    successive gate applications. The cumulative
-    gate error is computed after each gate application.
+    (a) $X/2$ gates robust to flux amplitude offsets constructed with the analytic (A),
+    sampling (S), unscented sampling (SU), and the 1\textsuperscript{st}-
+    and 2\textsuperscript{nd}-order derivative methods (D1, D2).
+    (b) Cumulative gate error due to 1/$f$ flux noise for
+    successive gate applications.
   }
   \label{fig:stochastic}
 \end{figure*}

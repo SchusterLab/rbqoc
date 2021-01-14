@@ -1,5 +1,5 @@
 \section{Introduction}
-Quantum optimal control (QOC) techniques are a class of optimization
+Quantum optimal control (QOC) is a class of optimization
 algorithms for accurately and efficiently manipulating quantum systems.
 Early techniques were proposed for nuclear magnetic resonance experiments
 \cite{vandersypen2005nmr, kehlet2004improving, khaneja2005optimal,
@@ -15,87 +15,89 @@ neutral atoms and ions \cite{brouzos2015quantum,
 nitrogen-vacancy centers in diamond \cite{chou2015optimal,
   dolde2014high, geng2016experimental,
   nobauer2015smooth, poggiali2018optimal, rembold2020introduction, tian2019optimal},
-and Bose-Einstien condensates \cite{amri2019optimal, sorensen2018quantum}.
+and Bose-Einstein condensates \cite{amri2019optimal, sorensen2018quantum}.
 For quantum computation,
-optimal control techniques are employed to achieve high fidelity gates
+optimal control is employed to achieve high-fidelity gates
 while adhering to experimental constraints.
 Experimental errors may cause the system to deviate
 from the model used in optimization, leading
 to poor experimental performance.
-Robust control techniques improve upon
-standard optimal control techniques by encoding
-model uncertainties
+Robust control improves upon
+standard optimal control by encoding
+model parameter uncertainties
 in optimization objectives, yielding performance
-guarantees over a range of parameters \cite{Zhou97,Morimoto00,Manchester18}.
+guarantees over a range of parameter values \cite{Zhou97,Morimoto00,Manchester18}.
 We adapt robust control techniques from the robotics community to mitigate
-realistic model uncertainties for
+parameter uncertainty errors for
 a superconducting fluxonium qubit.
 
-QOC techniques have had tremendous success in
-engineering high fidelity quantum gates \cite{
+QOC has had tremendous success in
+engineering high-fidelity quantum gates \cite{
   chou2015optimal, dolde2014high, egger2013optimized, egger2014adaptive,
   grace2007optimal, heeres2017implementing, huang2014optimal,
   kelly2014optimal, leng2019robust, liebermann2016optimal,
   nebendahl2009optimal, rebentrost2009optimal, rebentrost2009optimal2,
   spiteri2018quantum, sporl2007optimal}. 
-While standard QOC techniques can predict system behavior
-with high accuracy, they are sensitive to experimental
-errors such as parameter drift, noise, finite control 
-resolution, and decoherence. Multiple techniques have been developed to address
-these shortcomings. Analytic techniques to mitigate parameter deviation errors
-include composite pulses \cite{cummins2000use, cummins2003tackling,
+However, the system often
+deviates from the model used in optimization
+due to experimental errors such as parameter drift, noise, finite control 
+resolution, and decoherence. Multiple techniques have been
+developed to address this shortcoming.
+Analytically-derived control pulses that
+mitigate parameter uncertainty errors include
+composite pulses \cite{cummins2000use, cummins2003tackling,
   kupce1995stretched, merrill2014progress},
-dynamic and geometric phase considerations
-\cite{han2020experimental, xu2020nonadiabatic},
-and the DRAG scheme \todo{DRAG citations}.
-To mitigate decoherence, Floquet techniques have been employed
+pulses designed by considering dynamic and geometric phases
+\cite{han2020experimental, xu2020nonadiabatic}, and
+pulses obtained with the DRAG scheme \cite{motzoi2009simple}.
+To suppress decoherence, Floquet techniques have been employed
 \cite{huang2020engineering, mundada2020floquet}.
-Numerical techniques to mitigate parameter deviation errors
-include closed-loop methods \cite{egger2014adaptive, feng2018gradient, huang2020engineering,
+Numerical schemes to mitigate parameter uncertainty errors
+include closed-loop methods \cite{egger2014adaptive, feng2018gradient,
   wittler2020integrated} and open-loop methods \cite{
   allen2019robust, carvalho2020error, reinhold2019controlling,
   rembold2020introduction, kosut2013robust}.
-Numerical techniques to mitigate decoherence include
-modeling master equations \cite{rembold2020introduction} and employing
-Monte Carlo style quantum trajectories \cite{abdelhafez2019gradient}.
+To model decoherence, numerical techniques typically employ
+master equations \cite{rembold2020introduction, schulteherbruggen2011optimal} or
+Monte Carlo-style quantum trajectories \cite{abdelhafez2019gradient}.
 
 In this work, we study three robust control techniques that
-make the system's state trajectory less sensitive
-to static and time-dependent parameter deviations:
+make the system's quantum state trajectory less sensitive
+to static and time-dependent parameter uncertainty:
 \begin{enumerate}
   \item A sampling method, similar to the work of \cite{allen2019robust,
-    carvalho2020error, reinhold2019controlling, rembold2020introduction}.
-  \item An unscented sampling method adapted from the unscented transform used in the 
-    state estimation community \cite{howell2020direct, julier2004unscented,
+    carvalho2020error, khaneja2005optimal, reinhold2019controlling, rembold2020introduction}.
+  \item An unscented sampling method adapted from the unscented transform used in
+    state estimation \cite{howell2020direct, julier2004unscented,
       lee2013sigma, manchester2016derivative}.
-  \item A derivative-penalization method, which uses efficient mixed-mode differentiation
-    to compute derivative information of parameter deviations with respect to the 
-    quantum state trajectory.
+  \item A derivative method, which penalizes the sensitivity of the quantum state trajectory
+    to uncertain parameters.
 \end{enumerate}
 We apply these techniques to the fluxonium qubit presented in \cite{zhang2020universal}.
-We also show that QOC can solve important problems for fluxonium-based qubits,
-in particular, taking advantage of the $T_{1}$-dependence of the controls
-to mitigate longitudinal relaxation type decoherence and
-performing phase gates in arbitrary times.
-To mitigate errors due to longitudinal
-relaxation, we perform time-optimal control and
-utilize an efficient optimization objective that does
-not pay the increased computational cost of integrating a master equation.
+We also show that QOC can solve important problems associated with
+fluxonium-based qubits: mitigating
+depolarization by taking advantage of the $T_{1}$-dependence of the controls
+and synchronizing qubits with distinct frequencies
+by performing phase gates in arbitrary times.
+To mitigate depolarization,
+we perform time-optimal control and
+employ an efficient depolarization model that 
+is significantly less expensive to compute than integrating a master equation.
 Leveraging recent advances in trajectory optimization within the field of robotics, we
-solve these optimization problems using the ALTRO solver, which uses iterative LQR 
-(iLQR)---a differential-dynamic programming (DDP)-based indirect method similar to shooting
-methods such as GOAT \cite{machnes2015gradient}, GRAPE
-\cite{khaneja2005optimal, leung2017speedup}, and Krotov's \cite{goerz2019krotov}---within 
-an augmented Lagrangian framework to handle nonlinear equality and inequality constraints at 
-each time step \cite{howell2019altro}. 
+solve these optimization problems using ALTRO (Augmented Lagrangian TRajectory Optimizer)
+\cite{howell2019altro}, which uses the iterative linear quadratic regulator (iLQR) method
+\cite{Li2004a} within an augmented Lagrangian framework \cite{lantoine2012hybrid,
+  plancher2017constrained}
+to handle nonlinear equality and inequality constraints at 
+each time step.
 
 This paper is organized as follows.
-First, we introduce the ALTRO method in the context of QOC
+First, we reintroduce ALTRO in the context of QOC
 in Section \ref{sec:background}.
-We describe realistic constraints for the fluxonium and
-map them to the ALTRO method in Section \ref{sec:fluxonium}. Then, we
-outline a method for making the optimization aware of longitudinal
-relaxation in Section \ref{sec:longitude}. Next, we outline three methods for achieving
-robustness to static parameter deviations in Section \ref{sec:static}. Finally,
-we employ the robust control techniques to mitigate 1/$f$ flux noise
+We describe realistic constraints for operating the fluxonium and
+define the associated QOC problem in Section \ref{sec:fluxonium}.
+Then, we outline a method for making the optimization aware of depolarization
+in Section \ref{sec:longitude}. Next, we outline three techniques for achieving
+robustness to static parameter uncertainties in Section \ref{sec:static}. We
+adapt the same techniques to mitigate 1/$f$ flux noise
 in Section \ref{sec:stochastic}.

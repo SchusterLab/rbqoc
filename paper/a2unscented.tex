@@ -1,20 +1,21 @@
 \section{Unscented Transformation}
 \label{appendix:unscented}
-In this section we outline the full unscented sampling procedure.
-The unscented sampling method concerns a quantum state $\psi \in \mathbb{R}^{2n}$ with
-deviant parameters $\lambda \in \mathbb{R}^{d}$ and dynamics $\psi_{k + 1} = f(\psi_{k}, \lambda_{k})$.
-The nominal initial quantum state is given by $\psi_{0}$ with an associated
-positive-definite covariance matrix $P_{0} \in \mathbb{R}_{++}^{n \times n}$
+In this section, we outline the full unscented sampling procedure.
+We consider a state $\psi \in \mathbb{R}^{2n}$ with
+a deviant parameter $\lambda \in \mathbb{R}^{d}$ and discrete dynamics
+$\psi_{k + 1} = f(\psi_{k}, \lambda_{k})$.
+The nominal initial state is given by $\psi_{0}$ with an associated
+positive-definite covariance matrix $P_{0} \in \mathbb{R}_{++}^{2n \times 2n}$
 which describes the uncertainty in the initial state.
-$P_{0}$ is typically chosen to be non-zero even if the state preparation error is negligible.
+$P_{0}$ is typically non-zero even if the state preparation error is negligible.
 The deviant parameter
-is assumed to have zero mean and its distribution is given by the covariance matrix
+has zero-mean and its distribution is given by the covariance matrix
 $L_{k} \in \mathbb{R}_{++}^{d \times d}$ at knot point $k$. The zero mean assumption
 is convenient for deriving the update procedure. A non-zero mean can be encoded
-in the dynamics $f$.
+in the discrete dynamics.
 
 The initial $4n + 2d$ sigma points and initial $4n + 2d$ deviant parameters are sampled
-from the initial distributions
+from the initial distributions,
 \begin{equation}\label{eq:uupdate}
   \begin{bmatrix} \Psi_{0}^{i} \\ \Lambda_{0}^{i} \end{bmatrix} =
   \begin{bmatrix} \bar{\Psi}_{0} \\ 0\end{bmatrix}
@@ -29,15 +30,15 @@ joint covariance matrix, though other methods
 such as the principal square root may be employed.
 The superscript on the matrix square root indicates the $i$\textsuperscript{th}
 column (mod $2n + d$) of the lower triangular Cholesky factor.
-Then, the sigma points are normalized
+Then, the sigma points are normalized,
 \begin{equation}\label{eq:unormalize}
   \Psi_{0}^{i} \gets \frac{\Psi_{0}^{i}}{\sqrt{\Psi_{0}^{i^{T}} \Psi_{0}^{i}}}
 \end{equation}
-The sigma points are propagated to the next knot point
+The sigma points are propagated to the next knot point,
 \begin{equation}\label{eq:upropagate}
   \Psi_{1} = f(\Psi_{0}, \Lambda_{0})
 \end{equation}
-The mean and covariance of the sigma points are computed
+The mean and covariance of the sigma points are computed,
 \begin{align}
   \bar{\Psi}_{1} &= \frac{1}{4n + 2d} \sum_{i = 1}^{4n + 2d} \Psi_{1}^{i}\\
   P_{1} &= \frac{1}{2 \beta^{2}} \sum_{i = 1}^{4n + 2d}
@@ -46,7 +47,7 @@ The mean and covariance of the sigma points are computed
 The sigma points are then resampled and propagated to the next knot point using
 \eqref{eq:uupdate}, \eqref{eq:unormalize}, and \eqref{eq:upropagate}. Our
 choice of sigma points follows the prescription in equation 11 of \cite{julier2004unscented}.
-Other prescriptions may be chosen to reduce the number of required sigma points \cite{julier2002reduced}.
+Prescriptions that require fewer sigma points exist \cite{julier2002reduced}.
 
 
 

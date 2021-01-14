@@ -509,6 +509,7 @@ function gen_3b(;use_previous=true)
     pulse_type_count = size(F3B_PT_LIST)[1]
     save_file_paths = Array{String, 1}(undef, pulse_type_count)
     gate_errors = ones(pulse_type_count, F3B_GATE_COUNT + 1, F3B_AVG_COUNT)
+    rho2_traces = ones(pulse_type_count, F3B_GATE_COUNT + 1, F3B_AVG_COUNT)
 
     # check for previous computation
     if use_previous
@@ -517,7 +518,7 @@ function gen_3b(;use_previous=true)
         data_file_path_old = nothing
     end
     if !isnothing(data_file_path_old)
-        (save_file_paths_old, gate_errors_old, avg_count_old
+        (save_file_paths_old, gate_errors_old, avg_count_old, rho2_traces_old
          ) = h5open(data_file_path_old, "r") do data_file_old
              gate_count_old = read(data_file_old, "gate_count")
              pulse_types_integer_old = read(data_file_old, "pulse_types")
@@ -525,13 +526,14 @@ function gen_3b(;use_previous=true)
                  save_file_paths_old = read(data_file_old, "save_file_paths")
                  gate_errors_old = read(data_file_old, "gate_errors")
                  avg_count_old = read(data_file_old, "avg_count")
+                 rho2_traces_old = read(data_file_old, "rho2_traces")
              else
-                 save_file_paths_old = gate_errors_old = avg_count_old = nothing
+                 save_file_paths_old = gate_errors_old = avg_count_old = rho2_traces_old = nothing
              end
-             return (save_file_paths_old, gate_errors_old, avg_count_old)
+             return (save_file_paths_old, gate_errors_old, avg_count_old, rho2_traces_old)
          end
     else
-        save_file_paths_old = gate_errors_old = avg_count_old = nothing
+        save_file_paths_old = gate_errors_old = avg_count_old = rho2_traces_old = nothing
     end
     
 
@@ -551,11 +553,13 @@ function gen_3b(;use_previous=true)
             if (!isnothing(save_file_path_old) && save_file_path == save_file_path_old
                 && j <= avg_count_old)
                 gate_errors[i, :, j] = gate_errors_old[i, :, j]
+                rho2_traces[i, :, j] = rho2_traces_old[i, :, j]
                 print("s")
             else
                 res = run_sim_prop(F3B_GATE_COUNT, gate_type; dynamics_type=dynamics_type,
                                    save_file_path=save_file_path_sim, seed=j, save=false)
                 gate_errors[i, :, j] = 1 .- res["fidelities"]
+                rho2_traces[i, :, j] = res["rho2_traces"]
                 print(".")
             end
         end
@@ -567,6 +571,7 @@ function gen_3b(;use_previous=true)
         write(data_file, "save_file_paths", save_file_paths)
         write(data_file, "pulse_types", pulse_types_integer)
         write(data_file, "gate_errors", gate_errors)
+        write(data_file, "rho2_traces", rho2_traces)
         write(data_file, "avg_count", F3B_AVG_COUNT)
         write(data_file, "gate_count", F3B_GATE_COUNT)
     end

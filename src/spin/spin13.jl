@@ -63,7 +63,8 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
                   sqrtbp=false, integrator_type=rk3, smoke_test=false,
                   dt_inv=Int64(1e1), constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5),
-                  max_cost_value=1e8, qs=[1e0, 1e0, 1e0, 1e-1, 1e-1])
+                  max_cost_value=1e8, qs=[1e0, 1e0, 1e0, 1e-1, 1e-1],
+                  benchmark=false,)
     # model configuration
     model = Model()
     n = state_dim(model)
@@ -76,7 +77,7 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
     x0[STATE2_IDX] = IS2_ISO_
     x0 = SVector{n}(x0)
 
-    # target state
+    # final state
     if gate_type == xpiby2
         target_state1 = Array(XPIBY2_ISO_1)
         target_state2 = Array(XPIBY2_ISO_2)
@@ -140,7 +141,8 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
     # must reach target state, must have zero net flux
     target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
     # must obey unit norm
-    norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idx) for idx in [STATE1_IDX, STATE2_IDX]]
+    norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idx)
+                        for idx in [STATE1_IDX, STATE2_IDX]]
     
     constraints = ConstraintList(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)
@@ -151,7 +153,8 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
     end
 
     # solve problem
-    prob = Problem{IT_RDI[integrator_type]}(model, objective, constraints, x0, xf, Z, N, t0, evolution_time)
+    prob = Problem{IT_RDI[integrator_type]}(model, objective, constraints,
+                                            x0, xf, Z, N, t0, evolution_time)
     solver = ALTROSolver(prob)
     verbose_pn = verbose ? true : false
     verbose_ = verbose ? 2 : 0
@@ -166,7 +169,12 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
                  projected_newton=projected_newton, iterations_inner=iterations_inner,
                  iterations_outer=iterations_outer, iterations=max_iterations,
                  max_cost_value=max_cost_value)
-    Altro.solve!(solver)
+    if benchmark
+        benchmark_result = Altro.benchmark_solve!(solver)
+    else
+        benchmark_result = nothing
+        Altro.solve!(solver)
+    end
 
     # post-process
     acontrols_raw = TO.controls(solver)
@@ -209,6 +217,7 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
         "max_iterations" => max_iterations,
         "pn_steps" => pn_steps,
         "max_cost_value" => max_cost_value,
+        "benchmark_result" => benchmark_result,
     )
     
     # save
@@ -223,5 +232,7 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
         result["save_file_path"] = save_file_path
     end
 
+    result = benchmark ? benchmark_result : result
+    
     return result
 end

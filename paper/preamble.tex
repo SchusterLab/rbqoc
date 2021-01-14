@@ -1,24 +1,24 @@
 % imports
 \usepackage{appendix}[titletoc]
 \usepackage[english]{babel}
-\usepackage{braket}
 \usepackage[justification=centering]{caption}
 \usepackage{float}
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage[utf8]{inputenc}
 \usepackage{layouts}
+\usepackage{optidef}
+\usepackage{physics}
 \usepackage{setspace}
 \usepackage{subcaption}
 \usepackage{xcolor}
-\usepackage{optidef}
-\usepackage{physics}
-
 
 % configure imports
 \DeclareMathOperator*{\argmin}{arg\,min}
-\newcommand{\todo}[1]{\textcolor{red}{TODO: #1}} 
+\newcommand{\todo}[1]{\textcolor{blue}{TODO: #1}}
+\newcommand{\add}[1]{\textcolor{green}{ADD: #1}}
+\newcommand{\rem}[1]{\textcolor{rem}{REM: #1}} 
 \newcommand{\half}{\frac{1}{2}}
 \newcommand{\R}{\mathbb{R}}
 \captionsetup[subfigure]{labelformat=empty, skip=0pt}
-
+\restylefloat{table}
