@@ -397,7 +397,7 @@ F1C_GT_LS = {
     GateType.xpiby2: "dashdot",
 }
 F1C_LB = 1.1
-F1C_ALPHA = np.array([[1, 0.4], [1, 0.4], [1, 1]])
+F1C_ALPHA = np.array([[1, 1], [1, 1], [1, 1]])
 def make_figure1c():
     """
     Refs:
