@@ -2,7 +2,7 @@
 \label{appendix:unscented}
 In this section, we outline the full unscented sampling procedure.
 We consider a state $\psi \in \mathbb{R}^{2n}$ with
-a deviant parameter $\lambda \in \mathbb{R}^{d}$ and dynamics
+a deviant parameter $\lambda \in \mathbb{R}^{d}$ and discrete dynamics
 $\psi_{k + 1} = f(\psi_{k}, \lambda_{k})$.
 The nominal initial state is given by $\psi_{0}$ with an associated
 positive-definite covariance matrix $P_{0} \in \mathbb{R}_{++}^{2n \times 2n}$
@@ -12,7 +12,7 @@ The deviant parameter
 has zero-mean and its distribution is given by the covariance matrix
 $L_{k} \in \mathbb{R}_{++}^{d \times d}$ at knot point $k$. The zero mean assumption
 is convenient for deriving the update procedure. A non-zero mean can be encoded
-in the dynamics.
+in the discrete dynamics.
 
 The initial $4n + 2d$ sigma points and initial $4n + 2d$ deviant parameters are sampled
 from the initial distributions,

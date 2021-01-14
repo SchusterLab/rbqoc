@@ -1,13 +1,13 @@
-\section{Longitudinal Relaxation \label{appendix:longitude}}
-We comment on the longitudinal relaxation metrics and then give
+\section{Depolarization \label{appendix:longitude}}
+We comment on the depolarization metrics and then give
 our procedure for integrating the Lindblad master equation.
-The longitudinal relaxation probability and the gate error due to longitudinal
-relaxation metrics are compared in Table \ref{tab:longitude} for the
+The depolarization probability and the gate error due to
+depolarization metrics are compared in Table \ref{tab:longitude} for the
 numerical experiment described in Section \ref{sec:longitude}.
 The relative performance of the analytic and numerical techniques
 is similar across the two metrics.
 
-\begin{table}[h!]
+\begin{table}[ht]
   \begin{tabular}{c | c | c | c | c | c | c}
          & $P_{1\textrm{A}}$ & $P_{1\textrm{N}}$ & & GE$_{\textrm{A}}$ & GE$_{\textrm{N}}$ &\\
     Gate & $(10^{-5})$ & $(10^{-5})$ & $P_{1\textrm{A}}/ P_{1\textrm{N}}$ & $(10^{-5})$ &
@@ -18,14 +18,14 @@ is similar across the two metrics.
     X/2 & 16.251 & 2.660 & 6.109 & 5.347 & 0.863 & 6.196\\
   \end{tabular}
   \caption{
-    Single gate longitudinal relaxation probability (P) ratios
-    and single gate error due to longitudinal relaxation (GE) ratios.
+    Single gate depolarization probability (P) ratios
+    and single gate error due to depolarization (GE) ratios.
     Values are reported for the analytic (A) and numerical (N) techniques.
   }
   \label{tab:longitude}
 \end{table}
 
-To compute the gate error due to longitudinal relaxation
+To compute the gate error due to depolarization
 we employ the Lindblad master equation. This equation takes the form:
 \begin{equation}
   \frac{d}{dt} \rho = \frac{-i}{\hbar} [H, \rho]
@@ -36,7 +36,7 @@ where $\rho = \ket{\psi}\bra{\psi}$ is the density matrix, $n$ is the
 dimension of the Hilbert space,
 $[\cdot, \cdot]$ is the algebraic commutator, and $\{\cdot, \cdot \}$ is the algebraic
 anti-commutator.
-For longitudinal relaxation $\gamma_{\uparrow} = T_{1, \uparrow}^{-1}$,
+For depolarization $\gamma_{\uparrow} = T_{1, \uparrow}^{-1}$,
 $\gamma_{\downarrow} = T_{1, \downarrow}^{-1}$,
 $L_{\uparrow} = \sigma^{+}/2$, and
 $L_{\downarrow} = \sigma^{-}/2$ where $\sigma^{\pm} = \sigma_{x} \pm i \sigma_{y}$.
@@ -70,4 +70,3 @@ multiplications. For small $n$ and zero-order hold on the controls, we find that
 faster to use an exponential integrator on the vectorized equation than to perform
 Runge-Kutta on the unvectorized equation. The latter requires decreasing the integration
 time step to maintain accuracy, resulting in more knot points.
-
