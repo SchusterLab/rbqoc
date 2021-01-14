@@ -1234,6 +1234,29 @@ end
 
 
 """
+Given an array of states, compute their
+"""
+function compute_rho2_traces(states)
+    state_type = length(size(states)) == 2 ? st_state : st_density
+    if state_type == st_state
+        (state_count, _) = size(states)
+        rho2_traces = zeros(state_count)
+        for i = 1:state_count
+            state = states[i, :]
+            state_uniso = get_vec_uniso(state) 
+            density = state_uniso * state_uniso'
+            rho2_trace = real(tr(density * density))
+            rho2_traces[i] = rho2_trace
+        end
+    else
+        (state_count, _, _) = size(states)
+        rho2_traces = zeros(state_count)
+    end
+    return rho2_traces
+end
+
+
+"""
 run_sim_deqjl - Apply a gate multiple times and measure the fidelity
 after each application. Save the output.
 
@@ -1557,6 +1580,8 @@ function run_sim_prop(
     integrator(gate_count, states, state, params)
     # compute fidelities
     fidelities = compute_fidelities(gate_count, gate_type, states)
+    # compute traces
+    rho2_traces = compute_rho2_traces(states)
 
     # report
     result = Dict(
@@ -1570,7 +1595,8 @@ function run_sim_prop(
         "namp" => namp,
         "ndist" => string(ndist),
         "noise_dt_inv" => noise_dt_inv,
-        "save_file_path" => save_file_path
+        "rho2_traces" => rho2_traces,
+        "save_file_path" => save_file_path,
     )
 
     return result
