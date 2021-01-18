@@ -431,7 +431,8 @@ function dynamics_schroed_deqjl(state::SVector, params::SimParams, time::Float64
 end
 
 
-function integrate_prop_schroed!(gate_count::Int, states::Array{T, 2}, state::SVector, params::SimParams) where {T}
+function integrate_prop_schroed!(gate_count::Int, states::Array{T, 2},
+                                 state::SVector, params::SimParams) where {T}
     states[1, :] = state
     dt = params.controls_dt_inv^(-1)
     prop = I(HDIM_ISO)
@@ -461,7 +462,8 @@ function dynamics_schroedda_deqjl(state::SVector, params::SimParams, time::Float
 end
 
 
-function integrate_prop_schroedda!(gate_count::Int, states::Array{T, 2}, state::SVector, params::SimParams) where {T}
+function integrate_prop_schroedda!(gate_count::Int, states::Array{T, 2},
+                                   state::SVector, params::SimParams) where {T}
     dt = params.controls_dt_inv^(-1)
     time = 0.
     states[1, :] = state
@@ -810,7 +812,8 @@ end
 """
 this function assumes noise_dt_inv = 1e1
 """
-function integrate_prop_xpiby2da!(gate_count::Int, states::Array{T, 2}, state::SVector, params::SimParams) where {T}
+function integrate_prop_xpiby2da!(gate_count::Int, states::Array{T, 2},
+                                  state::SVector, params::SimParams) where {T}
     dt = 1e-1
     states[1, :] = state
     for i = 1:gate_count
@@ -1581,7 +1584,7 @@ function run_sim_prop(
     # compute fidelities
     fidelities = compute_fidelities(gate_count, gate_type, states)
     # compute traces
-    rho2_traces = compute_rho2_traces(states)
+    # rho2_traces = compute_rho2_traces(states)
 
     # report
     result = Dict(
@@ -1595,7 +1598,7 @@ function run_sim_prop(
         "namp" => namp,
         "ndist" => string(ndist),
         "noise_dt_inv" => noise_dt_inv,
-        "rho2_traces" => rho2_traces,
+        # "rho2_traces" => rho2_traces,
         "save_file_path" => save_file_path,
     )
 
