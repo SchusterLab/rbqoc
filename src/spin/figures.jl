@@ -224,8 +224,8 @@ const F2A_DATA_ZPIBY2 = Dict(
     analytic => joinpath(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
     s2 => joinpath(SPIN_OUT_PATH, "spin12/00808_spin12.h5"),
     sut8 => joinpath(SPIN_OUT_PATH, "spin23/00293_spin23.h5"),
-    d1 => joinpath(SPIN_OUT_PATH, "spin11/00691_spin11.h5"),
-    d2 => joinpath(SPIN_OUT_PATH, "spin11/00685_spin11.h5"),
+    d1 => joinpath(SPIN_OUT_PATH, "spin11/00539_spin11.h5"),
+    d2 => joinpath(SPIN_OUT_PATH, "spin11/00542_spin11.h5"),
 )
 const F2A_PT_LIST = [analytic, s2, sut8, d1, d2]
 function gen_2a(;gate_type=zpiby2)
@@ -252,9 +252,9 @@ end
 
 const F2B_DATA_ZPIBY2 = Dict(
     analytic => joinpath(SPIN_OUT_PATH, "spin14/00000_spin14.h5"),
-    d1 => joinpath(SPIN_OUT_PATH, "spin11/00612_spin11.h5"),
-    d1b => joinpath(SPIN_OUT_PATH, "spin11/00691_spin11.h5"),
-    d1bb => joinpath(SPIN_OUT_PATH, "spin11/00632_spin11.h5"),
+    d1 => joinpath(SPIN_OUT_PATH, "spin11/00468_spin11.h5"),
+    d1b => joinpath(SPIN_OUT_PATH, "spin11/00539_spin11.h5"),
+    d1bb => joinpath(SPIN_OUT_PATH, "spin11/00556_spin11.h5"),
     d1bbb => joinpath(SPIN_OUT_PATH, "spin11/00585_spin11.h5"),
 )
 const F2B_TRIAL_COUNT = Integer(1e2)
@@ -371,14 +371,14 @@ const F2C_DATA_ZPIBY2 = Dict(
         301, 304, 302, 305, 307, 306, 308, 309,
     ]],
     d1 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
-        612, 614, 617, 616, 618, 619, 620, 621, 622, 691,
-        628, 624, 625, 627, 629, 630, 609, 631, 632, 633,
-        634, 635, 636, 637, 638, 639, 610, 585,
+        468, 471, 472, 474, 475, 476, 477, 478, 480, 539,
+        541, 542, 543, 544, 545, 551, 553, 554, 556, 569,
+        570, 571, 572, 573, 574, 576, 567, 585
     ]],
     d2 => [joinpath(SPIN_OUT_PATH, "spin11/$(lpad(index, 5, '0'))_spin11.h5") for index in [
-        647, 643, 644, 645, 648, 649, 650, 651, 653, 685,
-        654, 659, 656, 657, 658, 660, 671, 662, 675, 673,
-        670, 676, 677, 678, 679, 680, 681, 682,
+        487, 488, 489, 491, 492, 493, 494, 498, 499, 547,
+        549, 552, 558, 560, 561, 562, 563, 564, 565, 575,
+        577, 588, 597, 590, 591, 592, 600, 598
     ]],
 )
 const F2C_PT_LIST = [analytic, s2, sut8, d1, d2]
@@ -501,7 +501,7 @@ end
 
 
 const F3B_PT_LIST = [analytic, s2, sut8, d1, d2]
-const F3B_AVG_COUNT = 10
+const F3B_AVG_COUNT = 1000
 const F3B_GATE_COUNT = 200
 function gen_3b(;use_previous=true)
     gate_type = xpiby2
@@ -509,7 +509,7 @@ function gen_3b(;use_previous=true)
     pulse_type_count = size(F3B_PT_LIST)[1]
     save_file_paths = Array{String, 1}(undef, pulse_type_count)
     gate_errors = ones(pulse_type_count, F3B_GATE_COUNT + 1, F3B_AVG_COUNT)
-    rho2_traces = ones(pulse_type_count, F3B_GATE_COUNT + 1, F3B_AVG_COUNT)
+    # rho2_traces = ones(pulse_type_count, F3B_GATE_COUNT + 1, F3B_AVG_COUNT)
 
     # check for previous computation
     if use_previous
@@ -518,7 +518,7 @@ function gen_3b(;use_previous=true)
         data_file_path_old = nothing
     end
     if !isnothing(data_file_path_old)
-        (save_file_paths_old, gate_errors_old, avg_count_old, rho2_traces_old
+        (save_file_paths_old, gate_errors_old, avg_count_old, #rho2_traces_old
          ) = h5open(data_file_path_old, "r") do data_file_old
              gate_count_old = read(data_file_old, "gate_count")
              pulse_types_integer_old = read(data_file_old, "pulse_types")
@@ -526,14 +526,14 @@ function gen_3b(;use_previous=true)
                  save_file_paths_old = read(data_file_old, "save_file_paths")
                  gate_errors_old = read(data_file_old, "gate_errors")
                  avg_count_old = read(data_file_old, "avg_count")
-                 rho2_traces_old = read(data_file_old, "rho2_traces")
+                 # rho2_traces_old = read(data_file_old, "rho2_traces")
              else
-                 save_file_paths_old = gate_errors_old = avg_count_old = rho2_traces_old = nothing
+                 save_file_paths_old = gate_errors_old = avg_count_old = nothing # rho2_traces_old
              end
-             return (save_file_paths_old, gate_errors_old, avg_count_old, rho2_traces_old)
+             return (save_file_paths_old, gate_errors_old, avg_count_old) # rho2_traces_old
          end
     else
-        save_file_paths_old = gate_errors_old = avg_count_old = rho2_traces_old = nothing
+        save_file_paths_old = gate_errors_old = avg_count_old = nothing # rho2_traces_old
     end
     
 
@@ -553,14 +553,12 @@ function gen_3b(;use_previous=true)
             if (!isnothing(save_file_path_old) && save_file_path == save_file_path_old
                 && j <= avg_count_old)
                 gate_errors[i, :, j] = gate_errors_old[i, :, j]
-                rho2_traces[i, :, j] = rho2_traces_old[i, :, j]
-                print("s")
+                # rho2_traces[i, :, j] = rho2_traces_old[i, :, j]
             else
                 res = run_sim_prop(F3B_GATE_COUNT, gate_type; dynamics_type=dynamics_type,
                                    save_file_path=save_file_path_sim, seed=j, save=false)
                 gate_errors[i, :, j] = 1 .- res["fidelities"]
-                rho2_traces[i, :, j] = res["rho2_traces"]
-                print(".")
+                # rho2_traces[i, :, j] = res["rho2_traces"]
             end
         end
         println("")
@@ -571,7 +569,7 @@ function gen_3b(;use_previous=true)
         write(data_file, "save_file_paths", save_file_paths)
         write(data_file, "pulse_types", pulse_types_integer)
         write(data_file, "gate_errors", gate_errors)
-        write(data_file, "rho2_traces", rho2_traces)
+        # write(data_file, "rho2_traces", rho2_traces)
         write(data_file, "avg_count", F3B_AVG_COUNT)
         write(data_file, "gate_count", F3B_GATE_COUNT)
     end

@@ -28,26 +28,12 @@ const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 const CONTROL_COUNT = 1
 const STATE_COUNT = 2
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
-const INITIAL_STATE1 = [1., 0, 0, 0]
-const INITIAL_STATE2 = [0., 1, 0, 0]
-const INITIAL_STATE3 = [1., 0, 0, 1] ./ sqrt(2)
-const INITIAL_STATE4 = [1., -1, 0, 0] ./ sqrt(2)
 # state indices
 const STATE1_IDX = 1:HDIM_ISO
 const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
 const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
 const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
 const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
-const S1_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO
-const S2_IDX = S1_IDX[end] + 1:S1_IDX[end] + HDIM_ISO
-const S3_IDX = S2_IDX[end] + 1:S2_IDX[end] + HDIM_ISO
-const S4_IDX = S3_IDX[end] + 1:S3_IDX[end] + HDIM_ISO
-const S5_IDX = S4_IDX[end] + 1:S4_IDX[end] + HDIM_ISO
-const S6_IDX = S5_IDX[end] + 1:S5_IDX[end] + HDIM_ISO
-const S7_IDX = S6_IDX[end] + 1:S6_IDX[end] + HDIM_ISO
-const S8_IDX = S7_IDX[end] + 1:S7_IDX[end] + HDIM_ISO
-const S9_IDX = S8_IDX[end] + 1:S8_IDX[end] + HDIM_ISO
-const S10_IDX = S9_IDX[end] + 1:S9_IDX[end] + HDIM_ISO
 const PFIRX_IDX = S10_IDX[end] + 1:S10_IDX[end] + 3
 const PFIRY_IDX = PFIRX_IDX[end] + 1:PFIRX_IDX[end] + 3
 const SAMPLE_COUNT = 10
@@ -57,6 +43,18 @@ const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO + PFIR_SIZE
 const ACONTROL_SIZE = CONTROL_COUNT
 # control indices
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
+# sample indices
+const S1_IDX = SVector{HDIM_ISO}(HDIM_ISO * 0 + 1:HDIM_ISO * 1)
+const S2_IDX = SVector{HDIM_ISO}(HDIM_ISO * 1 + 1:HDIM_ISO * 2)
+const S3_IDX = SVector{HDIM_ISO}(HDIM_ISO * 2 + 1:HDIM_ISO * 3)
+const S4_IDX = SVector{HDIM_ISO}(HDIM_ISO * 3 + 1:HDIM_ISO * 4)
+const S5_IDX = SVector{HDIM_ISO}(HDIM_ISO * 4 + 1:HDIM_ISO * 5)
+const S6_IDX = SVector{HDIM_ISO}(HDIM_ISO * 5 + 1:HDIM_ISO * 6)
+const S7_IDX = SVector{HDIM_ISO}(HDIM_ISO * 6 + 1:HDIM_ISO * 7)
+const S8_IDX = SVector{HDIM_ISO}(HDIM_ISO * 7 + 1:HDIM_ISO * 8)
+const S9_IDX = SVector{HDIM_ISO}(HDIM_ISO * 8 + 1:HDIM_ISO * 9)
+const S10_IDX = SVector{HDIM_ISO}(HDIM_ISO * 9 + 1:HDIM_ISO * 10)
+
 
 # model
 module Data
