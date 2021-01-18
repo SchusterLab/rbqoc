@@ -24,23 +24,26 @@ const CONTROL_COUNT = 1
 const STATE_COUNT = 2
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
 const ACONTROL_SIZE = CONTROL_COUNT
-const SAMPLE_COUNT = 4
+const SAMPLE_COUNT = 1
+# const SAMPLE_COUNT = 4
 # state indices
-const STATE1_IDX = 1:HDIM_ISO
-const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
+const STATE1_IDX = SVector{HDIM_ISO}(1:HDIM_ISO)
+const STATE2_IDX = SVector{HDIM_ISO}(STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO)
 const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
 const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
 const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
-const STATE3_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO
-const STATE4_IDX = STATE3_IDX[end] + 1:STATE3_IDX[end] + HDIM_ISO
-const DSTATE1_IDX = STATE4_IDX[end] + 1:STATE4_IDX[end] + HDIM_ISO
-const DSTATE2_IDX = DSTATE1_IDX[end] + 1:DSTATE1_IDX[end] + HDIM_ISO
-const DSTATE3_IDX = DSTATE2_IDX[end] + 1:DSTATE2_IDX[end] + HDIM_ISO
-const DSTATE4_IDX = DSTATE3_IDX[end] + 1:DSTATE3_IDX[end] + HDIM_ISO
-const D2STATE1_IDX = DSTATE4_IDX[end] + 1:DSTATE4_IDX[end] + HDIM_ISO
-const D2STATE2_IDX = D2STATE1_IDX[end] + 1:D2STATE1_IDX[end] + HDIM_ISO
-const D2STATE3_IDX = D2STATE2_IDX[end] + 1:D2STATE2_IDX[end] + HDIM_ISO
-const D2STATE4_IDX = D2STATE3_IDX[end] + 1:D2STATE3_IDX[end] + HDIM_ISO
+const DSTATE1_IDX = SVector{HDIM_ISO}(DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO)
+const D2STATE1_IDX = SVector{HDIM_ISO}(DSTATE1_IDX[end] + 1:DSTATE1_IDX[end] + HDIM_ISO)
+# const STATE3_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO
+# const STATE4_IDX = STATE3_IDX[end] + 1:STATE3_IDX[end] + HDIM_ISO
+# const DSTATE1_IDX = STATE4_IDX[end] + 1:STATE4_IDX[end] + HDIM_ISO
+# const DSTATE2_IDX = DSTATE1_IDX[end] + 1:DSTATE1_IDX[end] + HDIM_ISO
+# const DSTATE3_IDX = DSTATE2_IDX[end] + 1:DSTATE2_IDX[end] + HDIM_ISO
+# const DSTATE4_IDX = DSTATE3_IDX[end] + 1:DSTATE3_IDX[end] + HDIM_ISO
+# const D2STATE1_IDX = DSTATE4_IDX[end] + 1:DSTATE4_IDX[end] + HDIM_ISO
+# const D2STATE2_IDX = D2STATE1_IDX[end] + 1:D2STATE1_IDX[end] + HDIM_ISO
+# const D2STATE3_IDX = D2STATE2_IDX[end] + 1:D2STATE2_IDX[end] + HDIM_ISO
+# const D2STATE4_IDX = D2STATE3_IDX[end] + 1:D2STATE3_IDX[end] + HDIM_ISO
 # control indices
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
 
@@ -48,8 +51,11 @@ const D2CONTROLS_IDX = 1:CONTROL_COUNT
 struct Model{DO} <: AbstractModel
 end
 @inline RD.state_dim(::Model{DO}) where {DO} = (
-    ASTATE_SIZE_BASE + (SAMPLE_COUNT - STATE_COUNT) * HDIM_ISO + DO * SAMPLE_COUNT * HDIM_ISO
+    ASTATE_SIZE_BASE + DO * SAMPLE_COUNT * HDIM_ISO
 )
+# @inline RD.state_dim(::Model{DO}) where {DO} = (
+#     ASTATE_SIZE_BASE + (SAMPLE_COUNT - STATE_COUNT) * HDIM_ISO + DO * SAMPLE_COUNT * HDIM_ISO
+# )
 @inline RD.control_dim(::Model) = ACONTROL_SIZE
 
 # dynamics
@@ -75,30 +81,36 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model{DO}, astate::SVector,
     ]
 
     if DO >= 1
-        state3_ = astate[STATE3_IDX]
-        state3 = h_prop * state3_
-        state4_ = astate[STATE4_IDX]
-        state4 = h_prop * state4_
         dstate1_ = astate[DSTATE1_IDX]
         dstate1 = h_prop * (dstate1_ + dt * NEGI_H0_ISO * state1_)
-        dstate2_ = astate[DSTATE2_IDX]
-        dstate2 = h_prop * (dstate2_ + dt * NEGI_H0_ISO * state2_)
-        dstate3_ = astate[DSTATE3_IDX]
-        dstate3 = h_prop * (dstate3_ + dt * NEGI_H0_ISO * state3_)
-        dstate4_ = astate[DSTATE4_IDX]
-        dstate4 = h_prop * (dstate4_ + dt * NEGI_H0_ISO * state4_)
-        append!(astate_, [state3; state4; dstate1; dstate2; dstate3; dstate4])
+        append!(astate_, dstate1)
+        # state3_ = astate[STATE3_IDX]
+        # state3 = h_prop * state3_
+        # state4_ = astate[STATE4_IDX]
+        # state4 = h_prop * state4_
+        # dstate1_ = astate[DSTATE1_IDX]
+        # dstate1 = h_prop * (dstate1_ + dt * NEGI_H0_ISO * state1_)
+        # dstate2_ = astate[DSTATE2_IDX]
+        # dstate2 = h_prop * (dstate2_ + dt * NEGI_H0_ISO * state2_)
+        # dstate3_ = astate[DSTATE3_IDX]
+        # dstate3 = h_prop * (dstate3_ + dt * NEGI_H0_ISO * state3_)
+        # dstate4_ = astate[DSTATE4_IDX]
+        # dstate4 = h_prop * (dstate4_ + dt * NEGI_H0_ISO * state4_)
+        # append!(astate_, [state3; state4; dstate1; dstate2; dstate3; dstate4])
     end
     if DO >= 2
         d2state1_ = astate[D2STATE1_IDX]
         d2state1 = h_prop * (d2state1_ + dt * NEGI2_H0_ISO * dstate1_)
-        d2state2_ = astate[D2STATE2_IDX]
-        d2state2 = h_prop * (d2state2_ + dt * NEGI2_H0_ISO * dstate2_)
-        d2state3_ = astate[D2STATE3_IDX]
-        d2state3 = h_prop * (d2state3_ + dt * NEGI2_H0_ISO * dstate3_)
-        d2state4_ = astate[D2STATE4_IDX]
-        d2state4 = h_prop * (d2state4_ + dt * NEGI2_H0_ISO * dstate4_)
-        append!(astate_, [d2state1; d2state2; d2state3; d2state4])
+        append!(astate_, d2state1)
+        # d2state1_ = astate[D2STATE1_IDX]
+        # d2state1 = h_prop * (d2state1_ + dt * NEGI2_H0_ISO * dstate1_)
+        # d2state2_ = astate[D2STATE2_IDX]
+        # d2state2 = h_prop * (d2state2_ + dt * NEGI2_H0_ISO * dstate2_)
+        # d2state3_ = astate[D2STATE3_IDX]
+        # d2state3 = h_prop * (d2state3_ + dt * NEGI2_H0_ISO * dstate3_)
+        # d2state4_ = astate[D2STATE4_IDX]
+        # d2state4 = h_prop * (d2state4_ + dt * NEGI2_H0_ISO * dstate4_)
+        # append!(astate_, [d2state1; d2state2; d2state3; d2state4])
     end
 
     return astate_
@@ -122,8 +134,8 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
     x0_ = zeros(n)
     x0_[STATE1_IDX] = IS1_ISO_
     x0_[STATE2_IDX] = IS2_ISO_
-    x0_[STATE3_IDX] = IS3_ISO_
-    x0_[STATE4_IDX] = IS4_ISO_
+    # x0_[STATE3_IDX] = IS3_ISO_
+    # x0_[STATE4_IDX] = IS4_ISO_
     x0 = SVector{n}(x0_)
 
     # target state
@@ -141,8 +153,8 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
     xf_ = zeros(n)
     xf_[STATE1_IDX] = target_state1
     xf_[STATE2_IDX] = target_state2
-    xf_[STATE3_IDX] = gate * IS3_ISO_
-    xf_[STATE4_IDX] = gate * IS4_ISO_
+    # xf_[STATE3_IDX] = gate * IS3_ISO_
+    # xf_[STATE4_IDX] = gate * IS4_ISO_
     xf = SVector{n}(xf_)
     
     # control amplitude constraint
@@ -178,8 +190,8 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
         fill(qs[2], 1); # ∫a
         fill(qs[3], 1); # a
         fill(qs[4], 1); # ∂a
-        fill(0, eval(:($derivative_order >= 1 ? ($SAMPLE_COUNT - $STATE_COUNT)
-                       * $HDIM_ISO : 0))) # ψ3, ψ4
+        # fill(0, eval(:($derivative_order >= 1 ? ($SAMPLE_COUNT - $STATE_COUNT)
+        #                * $HDIM_ISO : 0))) # ψ3, ψ4
         fill(qs[5], eval(:($derivative_order >= 1 ? $SAMPLE_COUNT * $HDIM_ISO : 0))); # ∂ψ
         fill(qs[6], eval(:($derivative_order >= 2 ? $SAMPLE_COUNT * $HDIM_ISO : 0))); # ∂2ψ
     ]))
@@ -197,10 +209,10 @@ function run_traj(;gate_type=zpiby2, evolution_time=18., solver_type=altro,
     target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
     # must obey unit norm
     nidxs = [STATE1_IDX, STATE2_IDX]
-    if derivative_order >= 1
-        push!(nidxs, STATE3_IDX)
-        push!(nidxs, STATE4_IDX)
-    end
+    # if derivative_order >= 1
+    #     push!(nidxs, STATE3_IDX)
+    #     push!(nidxs, STATE4_IDX)
+    # end
     norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idx) for idx in nidxs]
     
     constraints = ConstraintList(n, m, N)
