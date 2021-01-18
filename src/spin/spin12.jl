@@ -25,8 +25,10 @@ const SAVE_PATH = abspath(joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME
 # problem
 const CONTROL_COUNT = 1
 const STATE_COUNT = 2
-const SAMPLE_COUNT = 8
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
+const SAMPLE_STATE_COUNT = 4
+const SAMPLES_PER_STATE = 2
+const SAMPLE_COUNT = SAMPLE_STATE_COUNT * SAMPLES_PER_STATE
 const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
 const ACONTROL_SIZE = CONTROL_COUNT
 # state indices
@@ -179,7 +181,7 @@ function RD.discrete_dynamics(::Type{RD.RK3}, model::Model, astate::StaticVector
     s5 = hn_prop * astate[S5_IDX]
     s6 = hn_prop * astate[S6_IDX]
     s7 = hn_prop * astate[S7_IDX]
-    s8 = hn_prop * astate[S8_IDX]
+p    s8 = hn_prop * astate[S8_IDX]
 
     astate_ = [
         state1; state2; intcontrols; controls; dcontrols;

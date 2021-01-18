@@ -325,11 +325,11 @@ const XPI_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(XPI[:,2]))
 const IS1_ISO_ = [1., 0, 0, 0]
 const IS1_ISO = SVector{HDIM_ISO}(IS1_ISO_)
 const IS2_ISO_ = [0., 1, 0, 0]
-const IS2_ISO = SVector{HDIM_ISO}(IS1_ISO_)
+const IS2_ISO = SVector{HDIM_ISO}(IS2_ISO_)
 const IS3_ISO_ = [1., 0, 0, 1] ./ sqrt(2)
-const IS3_ISO = SVector{HDIM_ISO}(IS1_ISO_)
+const IS3_ISO = SVector{HDIM_ISO}(IS3_ISO_)
 const IS4_ISO_ = [1., -1, 0, 0] ./ sqrt(2)
-const IS4_ISO = SVector{HDIM_ISO}(IS1_ISO_)
+const IS4_ISO = SVector{HDIM_ISO}(IS4_ISO_)
 
 const GT_GATE = Dict(
     xpiby2 => XPIBY2,
