@@ -30,34 +30,34 @@ const INITIAL_STATE2 = [0., 1, 0, 0]
 const INITIAL_STATE3 = [1., 0, 0, 1] ./ sqrt(2)
 const INITIAL_STATE4 = [1., -1, 0, 0] ./ sqrt(2)
 # state indices
-const STATE1_IDX = 1:HDIM_ISO
-const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
+const STATE1_IDX = SVector{HDIM_ISO}(1:HDIM_ISO)
+const STATE2_IDX = SVector{HDIM_ISO}(STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO)
 const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
 const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
 const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
-const S1_IDX = DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO
-const S2_IDX = S1_IDX[end] + 1:S1_IDX[end] + HDIM_ISO
-const S3_IDX = S2_IDX[end] + 1:S2_IDX[end] + HDIM_ISO
-const S4_IDX = S3_IDX[end] + 1:S3_IDX[end] + HDIM_ISO
-const S5_IDX = S4_IDX[end] + 1:S4_IDX[end] + HDIM_ISO
-const S6_IDX = S5_IDX[end] + 1:S5_IDX[end] + HDIM_ISO
-const S7_IDX = S6_IDX[end] + 1:S6_IDX[end] + HDIM_ISO
-const S8_IDX = S7_IDX[end] + 1:S7_IDX[end] + HDIM_ISO
-const S9_IDX = S8_IDX[end] + 1:S8_IDX[end] + HDIM_ISO
-const S10_IDX = S9_IDX[end] + 1:S9_IDX[end] + HDIM_ISO
-const SAMPLE_COUNT = 10
-const SAMPLE_COUNT_INV = 1//10
-const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
-const ACONTROL_SIZE = CONTROL_COUNT
+const S1_IDX = SVector{HDIM_ISO}(DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + HDIM_ISO)
+const S2_IDX = SVector{HDIM_ISO}(S1_IDX[end] + 1:S1_IDX[end] + HDIM_ISO)
+const S3_IDX = SVector{HDIM_ISO}(S2_IDX[end] + 1:S2_IDX[end] + HDIM_ISO)
+const S4_IDX = SVector{HDIM_ISO}(S3_IDX[end] + 1:S3_IDX[end] + HDIM_ISO)
+const S5_IDX = SVector{HDIM_ISO}(S4_IDX[end] + 1:S4_IDX[end] + HDIM_ISO)
+const S6_IDX = SVector{HDIM_ISO}(S5_IDX[end] + 1:S5_IDX[end] + HDIM_ISO)
+const S7_IDX = SVector{HDIM_ISO}(S6_IDX[end] + 1:S6_IDX[end] + HDIM_ISO)
+const S8_IDX = SVector{HDIM_ISO}(S7_IDX[end] + 1:S7_IDX[end] + HDIM_ISO)
+const S9_IDX = SVector{HDIM_ISO}(S8_IDX[end] + 1:S8_IDX[end] + HDIM_ISO)
+const S10_IDX = SVector{HDIM_ISO}(S9_IDX[end] + 1:S9_IDX[end] + HDIM_ISO)
 # control indices
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
+# misc
+const SAMPLE_STATE_COUNT = 1
+const SAMPLES_PER_STATE = 10
+const SAMPLE_COUNT = SAMPLE_STATE_COUNT * SAMPLES_PER_STATE
+const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
+const ACONTROL_SIZE = CONTROL_COUNT
 
 # model
 module Data
 using RobotDynamics
-using StaticArrays
 const RD = RobotDynamics
-const HDIM_ISO = 4
 mutable struct Model <: RD.AbstractModel
     fq_cov::Float64
     alpha::Float64
@@ -66,6 +66,17 @@ end
 Model = Data.Model
 @inline RD.state_dim(model::Model) = ASTATE_SIZE
 @inline RD.control_dim(model::Model) = ACONTROL_SIZE
+@inline astate_sample_inds(sample_state_index::Int, sample_index::Int) = (
+    SVector{HDIM_ISO}((
+        ASTATE_SIZE_BASE + (sample_state_index - 1) * SAMPLES_PER_STATE * HDIM_ISO
+        + (sample_index - 1) * HDIM_ISO + 1
+    ):(
+        ASTATE_SIZE_BASE + (sample_state_index - 1) * SAMPLES_PER_STATE * HDIM_ISO
+        + sample_index * HDIM_ISO
+    ))
+)
+const SAMPLE_IDXS = [astate_sample_inds(i, j)
+                     for i = 1:SAMPLE_STATE_COUNT for j = 1:SAMPLES_PER_STATE]
 
 # dynamics
 function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector{ASTATE_SIZE},
@@ -80,18 +91,18 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector{ASTATE_
     dcontrols = astate[DCONTROLS_IDX[1]] + dt * acontrol[D2CONTROLS_IDX[1]]
 
     # unscented transform
-    s1 = SVector{HDIM_ISO}(astate[S1_IDX])
-    s2 = SVector{HDIM_ISO}(astate[S2_IDX])
-    s3 = SVector{HDIM_ISO}(astate[S3_IDX])
-    s4 = SVector{HDIM_ISO}(astate[S4_IDX])
-    s5 = SVector{HDIM_ISO}(astate[S5_IDX])
-    s6 = SVector{HDIM_ISO}(astate[S6_IDX])
-    s7 = SVector{HDIM_ISO}(astate[S7_IDX])
-    s8 = SVector{HDIM_ISO}(astate[S8_IDX])
-    s9 = SVector{HDIM_ISO}(astate[S9_IDX])
-    s10 = SVector{HDIM_ISO}(astate[S10_IDX])
+    s1 = astate[S1_IDX]
+    s2 = astate[S2_IDX]
+    s3 = astate[S3_IDX]
+    s4 = astate[S4_IDX]
+    s5 = astate[S5_IDX]
+    s6 = astate[S6_IDX]
+    s7 = astate[S7_IDX]
+    s8 = astate[S8_IDX]
+    s9 = astate[S9_IDX]
+    s10 = astate[S10_IDX]
     # compute state mean
-    sm = SAMPLE_COUNT_INV .* (
+    sm = 1//SAMPLES_PER_STATE .* (
         s1 + s2 + s3 + s4 + s5
         + s6 + s7 + s8 + s9 + s10
     )
@@ -112,7 +123,7 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector{ASTATE_
         + d9 * d9' + d10 * d10'
     )
     # perform cholesky decomposition on joint covariance
-    cov = @MMatrix zeros(eltype(s_cov), HDIM_ISO + 1, HDIM_ISO + 1)
+    cov = zeros(eltype(s_cov), HDIM_ISO + 1, HDIM_ISO + 1)
     cov[1:HDIM_ISO, 1:HDIM_ISO] .= s_cov
     cov[HDIM_ISO + 1, HDIM_ISO + 1] = model.fq_cov
     # TOOD: cholesky! requires writing zeros in upper triangle
@@ -282,7 +293,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     state_dist = Distributions.Normal(0., state_cov)
     sample_state = INITIAL_STATE3
     target_sample_state = GT_GATE_ISO[gate_type] * sample_state
-    for i = 1:SAMPLE_COUNT
+    for i = 1:SAMPLES_PER_STATE
         sample = sample_state .+ rand(state_dist, HDIM_ISO)
         append!(x0_, sample ./ sqrt(sample'sample))
     end
@@ -303,40 +314,25 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         target_state1;
         target_state2;
         zeros(3 * CONTROL_COUNT);
-        repeat(target_sample_state, SAMPLE_COUNT);
-    ])
-    
-    # control amplitude constraint
-    x_max = SVector{n}([
-        fill(Inf, STATE_COUNT * HDIM_ISO);
-        fill(Inf, CONTROL_COUNT);
-        fill(MAX_CONTROL_NORM_0, 1); # a
-        fill(Inf, CONTROL_COUNT);
-        fill(Inf, SAMPLE_COUNT * HDIM_ISO);
-    ])
-    x_min = SVector{n}([
-        fill(-Inf, STATE_COUNT * HDIM_ISO);
-        fill(-Inf, CONTROL_COUNT);
-        fill(-MAX_CONTROL_NORM_0, 1); # a
-        fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, SAMPLE_COUNT * HDIM_ISO);
-    ])
-    # control amplitude constraint at boundary
-    x_max_boundary = SVector{n}([
-        fill(Inf, STATE_COUNT * HDIM_ISO);
-        fill(Inf, CONTROL_COUNT);
-        fill(0, 1); # a
-        fill(Inf, CONTROL_COUNT);
-        fill(Inf, SAMPLE_COUNT * HDIM_ISO);
-    ])
-    x_min_boundary = SVector{n}([
-        fill(-Inf, STATE_COUNT * HDIM_ISO);
-        fill(-Inf, CONTROL_COUNT);
-        fill(0, 1); # a
-        fill(-Inf, CONTROL_COUNT);
-        fill(-Inf, SAMPLE_COUNT * HDIM_ISO);
+        repeat(target_sample_state, SAMPLES_PER_STATE);
     ])
 
+    # control amplitude constraint
+    x_max = fill(Inf, n)
+    x_max[CONTROLS_IDX] .= MAX_CONTROL_NORM_0
+    x_max = SVector{n}(x_max)
+    x_min = fill(-Inf, n)
+    x_min[CONTROLS_IDX] .= -MAX_CONTROL_NORM_0
+    x_min = SVector{n}(x_min)
+    
+    # control amplitude constraint at boundary
+    x_max_boundary = fill(Inf, n)
+    x_max_boundary[CONTROLS_IDX] .= 0
+    x_max_boundary = SVector{n}(x_max_boundary)
+    x_min_boundary = fill(-Inf, n)
+    x_min_boundary[CONTROLS_IDX] .= 0
+    x_min_boundary = SVector{n}(x_min_boundary)
+    
     # initial trajectory
     dt = dt_inv^(-1)
     N = Int(floor(evolution_time * dt_inv)) + 1
@@ -355,7 +351,6 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         fill(qs[3], CONTROL_COUNT); # a
         fill(qs[4], CONTROL_COUNT); # ∂a
         fill(0, SAMPLE_COUNT * HDIM_ISO);
-        # fill(qs[5], SAMPLE_COUNT * HDIM_ISO);
     ]))
     Qf = Q * N
     R = Diagonal(SVector{m}([
@@ -374,10 +369,10 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     # must reach target state, must have zero net flux
     target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
     # must obey unit norm
-    norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idxs) for idxs in (
-        STATE1_IDX, STATE2_IDX, S1_IDX, S2_IDX, S3_IDX, S4_IDX, S5_IDX, S6_IDX,
-        S7_IDX, S8_IDX, S9_IDX, S10_IDX,
-    )]
+    norm_idxs = copy(SAMPLE_IDXS)
+    push!(norm_idxs, STATE1_IDX)
+    push!(norm_idxs, STATE2_IDX)
+    norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idx) for idx in norm_idxs]
     constraints = ConstraintList(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
@@ -387,7 +382,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     end
 
     # solve problem
-    prob = Problem{IT_RDI[integrator_type]}(model, objective, constraints, x0, xf, Z, N, t0, evolution_time)
+    prob = Problem{IT_RDI[integrator_type]}(model, objective, constraints,
+                                            x0, xf, Z, N, t0, evolution_time)
     solver = ALTROSolver(prob)
     verbose_pn = verbose ? true : false
     verbose_ = verbose ? 2 : 0
