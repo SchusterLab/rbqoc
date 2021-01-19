@@ -1656,3 +1656,19 @@ function evaluate_fqdev(;fq_cov=FQ * 1e-2, trial_count=1000,
 
     return result
 end
+
+
+function evaluate_adev(;gate_count=100, gate_type=xpiby2, dynamics_type=schroedda,
+                       save_file_path=nothing, trial_count=100)
+    gate_errors = zeros(trial_count)
+    for seed = 1:trial_count
+        res = run_sim_prop(gate_count, gate_type; dynamics_type=dynamics_type,
+                           save_file_path=save_file_path, seed=seed, save=false)
+        gate_error = 1 - res["fidelities"][end]
+        gate_errors[seed] = gate_error
+    end
+    
+    result = Dict(
+        "gate_errors" => gate_errors,
+    )
+end

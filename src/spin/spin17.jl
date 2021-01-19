@@ -191,13 +191,13 @@ function run_traj(;gate_type=xpiby2, evolution_time=56.8, solver_type=altro,
     # must statisfy conrols start and end at 0
     control_bnd_boundary = BoundConstraint(n, m, x_max=x_max_boundary, x_min=x_min_boundary)
     # must reach target state, must have zero net flux
-    target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; ]) # INTCONTROLS_IDX])
+    target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX]) # ; INTCONTROLS_IDX])
     # must obey unit norm.
     norm_idxs = [STATE1_IDX, STATE2_IDX]
     norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idx) for idx in norm_idxs]
     
     constraints = ConstraintList(n, m, N)
-    add_constraint!(constraints, control_bnd, 2:N-2)
+    # add_constraint!(constraints, control_bnd, 2:N-2)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
     add_constraint!(constraints, target_astate_constraint, N:N);
     for norm_constraint in norm_constraints
