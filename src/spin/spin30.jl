@@ -23,16 +23,24 @@ const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
 # problem
 const CONTROL_COUNT = 1
-const STATE_COUNT = 2
+const ACONTROL_SIZE = CONTROL_COUNT
+const STATE_COUNT = 4
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
+const SAMPLES_PER_STATE = 10
+const PENALTY_SIZE = 1
+const CHUNK_SIZE = SAMPLES_PER_STATE * HDIM_ISO + PENALTY_SIZE
 # state indices
 const STATE1_IDX = SVector{HDIM_ISO}(1:HDIM_ISO)
 const STATE2_IDX = SVector{HDIM_ISO}(STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO)
-const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
-const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
-const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
+const STATE3_IDX = SVector{HDIM_ISO}(STATE2_IDX[end] + 1:STATE2_IDX[end] + HDIM_ISO)
+const STATE4_IDX = SVector{HDIM_ISO}(STATE3_IDX[end] + 1:STATE3_IDX[end] + HDIM_ISO)
+const INTCONTROLS_IDX = SVector{CONTROL_COUNT}(STATE4_IDX[end] + 1:STATE4_IDX[end] + CONTROL_COUNT)
+const CONTROLS_IDX = SVector{CONTROL_COUNT}(INTCONTROLS_IDX[end] + 1:
+                                            INTCONTROLS_IDX[end] + CONTROL_COUNT)
+const DCONTROLS_IDX = SVector{CONTROL_COUNT}(CONTROLS_IDX[end] + 1:
+                                             CONTROLS_IDX[end] + CONTROL_COUNT)
 # control indices
-const D2CONTROLS_IDX = 1:CONTROL_COUNT
+const D2CONTROLS_IDX = SVector{CONTROL_COUNT}(1:CONTROL_COUNT)
 # sample indices
 const S1_IDX = SVector{HDIM_ISO}(HDIM_ISO * 0 + 1:HDIM_ISO * 1)
 const S2_IDX = SVector{HDIM_ISO}(HDIM_ISO * 1 + 1:HDIM_ISO * 2)
@@ -44,41 +52,38 @@ const S7_IDX = SVector{HDIM_ISO}(HDIM_ISO * 6 + 1:HDIM_ISO * 7)
 const S8_IDX = SVector{HDIM_ISO}(HDIM_ISO * 7 + 1:HDIM_ISO * 8)
 const S9_IDX = SVector{HDIM_ISO}(HDIM_ISO * 8 + 1:HDIM_ISO * 9)
 const S10_IDX = SVector{HDIM_ISO}(HDIM_ISO * 9 + 1:HDIM_ISO * 10)
-# misc
-const SAMPLE_STATES = [IS3_ISO]
-const SAMPLE_STATE_COUNT = 1
-const SAMPLES_PER_STATE = 10
-const SAMPLE_COUNT = SAMPLE_STATE_COUNT * SAMPLES_PER_STATE
 const STATE_IDX = SVector{HDIM_ISO}(1:HDIM_ISO)
-const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
-const ACONTROL_SIZE = CONTROL_COUNT
 
 # model
-module Data
-using RobotDynamics
-const RD = RobotDynamics
-mutable struct Model <: RD.AbstractModel
+struct Model <: RD.AbstractModel
+    S::Diagonal{Float64,SVector{HDIM_ISO,Float64}}
+    nominal_idxs::Array{SVector{HDIM_ISO,Int},1}
     fq_cov::Float64
     alpha::Float64
+    sample_state_count::Int
 end
-end
-Model = Data.Model
-@inline RD.state_dim(model::Model) = ASTATE_SIZE
+@inline RD.state_dim(model::Model) = (
+    ASTATE_SIZE_BASE + model.sample_state_count * CHUNK_SIZE
+)
 @inline RD.control_dim(model::Model) = ACONTROL_SIZE
 @inline astate_sample_inds(sample_state_index::Int, sample_index::Int) = (
     SVector{HDIM_ISO}((
-        ASTATE_SIZE_BASE + (sample_state_index - 1) * SAMPLES_PER_STATE * HDIM_ISO
+        ASTATE_SIZE_BASE + (sample_state_index - 1) * CHUNK_SIZE
         + (sample_index - 1) * HDIM_ISO + 1
     ):(
-        ASTATE_SIZE_BASE + (sample_state_index - 1) * SAMPLES_PER_STATE * HDIM_ISO
+        ASTATE_SIZE_BASE + (sample_state_index - 1) * CHUNK_SIZE
         + sample_index * HDIM_ISO
     ))
 )
-const SAMPLE_IDXS = [astate_sample_inds(i, j)
-                     for i = 1:SAMPLE_STATE_COUNT for j = 1:SAMPLES_PER_STATE]
+@inline sample_idxs(model::Model) = [
+    astate_sample_inds(i, j)
+    for i = 1:model.sample_state_count
+    for j = 1:SAMPLES_PER_STATE
+]
 
 function unscented_transform(model::Model, astate::AbstractVector,
-                             negi_hc::AbstractMatrix, dt::Real, i::Int)
+                             negi_hc::AbstractMatrix, h_prop::AbstractMatrix,
+                             dt::Real, i::Int)
     # get states
     offset = ASTATE_SIZE_BASE + (i - 1) * SAMPLES_PER_STATE * HDIM_ISO
     s1 = astate[offset + S1_IDX]
@@ -92,18 +97,17 @@ function unscented_transform(model::Model, astate::AbstractVector,
     s9 = astate[offset + S9_IDX]
     s10 = astate[offset + S10_IDX]
     # grab chol info
-    fq_chol1 = fq_chol2 = fq_chol3 = fq_chol4 = 0
     fq_chol5 = sqrt(model.fq_cov)
     # propagate states
-    s1 = exp(dt * ((FQ + fq_chol1) * NEGI_H0_ISO + negi_hc)) * s1
-    s2 = exp(dt * ((FQ + fq_chol2) * NEGI_H0_ISO + negi_hc)) * s2
-    s3 = exp(dt * ((FQ + fq_chol3) * NEGI_H0_ISO + negi_hc)) * s3
-    s4 = exp(dt * ((FQ + fq_chol4) * NEGI_H0_ISO + negi_hc)) * s4
+    s1 = h_prop * s1
+    s2 = h_prop * s2
+    s3 = h_prop * s3
+    s4 = h_prop * s4
     s5 = exp(dt * ((FQ + fq_chol5) * NEGI_H0_ISO + negi_hc)) * s5
-    s6 = exp(dt * ((FQ - fq_chol1) * NEGI_H0_ISO + negi_hc)) * s6
-    s7 = exp(dt * ((FQ - fq_chol2) * NEGI_H0_ISO + negi_hc)) * s7
-    s8 = exp(dt * ((FQ - fq_chol3) * NEGI_H0_ISO + negi_hc)) * s8
-    s9 = exp(dt * ((FQ - fq_chol4) * NEGI_H0_ISO + negi_hc)) * s9
+    s6 = h_prop * s6
+    s7 = h_prop * s7
+    s8 = h_prop * s8
+    s9 = h_prop * s9
     s10 = exp(dt * ((FQ - fq_chol5) * NEGI_H0_ISO + negi_hc)) * s10
     # compute state mean
     sm = 1//SAMPLES_PER_STATE .* (
@@ -137,17 +141,16 @@ function unscented_transform(model::Model, astate::AbstractVector,
     s_chol2 = cov_chol[STATE_IDX, 2]
     s_chol3 = cov_chol[STATE_IDX, 3]
     s_chol4 = cov_chol[STATE_IDX, 4]
-    # s_chol5 = cov_chol[STATE_IDX, 5]
     s1 = sm + s_chol1
     s2 = sm + s_chol2
     s3 = sm + s_chol3
     s4 = sm + s_chol4
-    s5 = sm # + s_chol5
+    s5 = sm
     s6 = sm - s_chol1
     s7 = sm - s_chol2
     s8 = sm - s_chol3
     s9 = sm - s_chol4
-    s10 = sm # - s_chol5
+    s10 = sm
     # normalize
     s1 = s1 ./sqrt(s1's1)
     s2 = s2 ./sqrt(s2's2)
@@ -159,132 +162,41 @@ function unscented_transform(model::Model, astate::AbstractVector,
     s8 = s8 ./sqrt(s8's8)
     s9 = s9 ./sqrt(s9's9)
     s10 = s10 ./sqrt(s10's10)
+    # compute penalty
+    dnom = sm - astate[model.nominal_idxs[i]]
+    penalty = SVector{1}(tr(s_cov * model.S) + dnom' * model.S * dnom)
 
-    samples = [s1; s2; s3; s4; s5; s6; s7; s8; s9; s10]
+    samples = [s1; s2; s3; s4; s5; s6; s7; s8; s9; s10; penalty]
 
     return samples
 end
 
 # dynamics
-function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector{ASTATE_SIZE},
-                              acontrol::SVector{ACONTROL_SIZE}, time::Real, dt::Real)
+function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector{n},
+                              acontrol::SVector{ACONTROL_SIZE}, time::Real, dt::Real) where {n}
     # base dynamics
     negi_hc = astate[CONTROLS_IDX[1]] * NEGI_H1_ISO
     h_prop = exp(dt * (FQ_NEGI_H0_ISO + negi_hc))
     state1 = h_prop * astate[STATE1_IDX]
     state2 = h_prop * astate[STATE2_IDX]
-    intcontrols = astate[INTCONTROLS_IDX[1]] + dt * astate[CONTROLS_IDX[1]]
-    controls = astate[CONTROLS_IDX[1]] + dt * astate[DCONTROLS_IDX[1]]
-    dcontrols = astate[DCONTROLS_IDX[1]] + dt * acontrol[D2CONTROLS_IDX[1]]
+    state3 = h_prop * astate[STATE3_IDX]
+    state4 = h_prop * astate[STATE4_IDX]
+    intcontrols = astate[INTCONTROLS_IDX] + dt * astate[CONTROLS_IDX]
+    controls = astate[CONTROLS_IDX] + dt * astate[DCONTROLS_IDX]
+    dcontrols = astate[DCONTROLS_IDX] + dt * acontrol[D2CONTROLS_IDX]
     
     astate_ = [
-        state1; state2; intcontrols; controls; dcontrols;
+        state1; state2; state3; state4; intcontrols; controls; dcontrols;
     ]
 
     # unscented transform
-    for i = 1:SAMPLE_STATE_COUNT
-        sample_states = unscented_transform(model, astate, negi_hc, dt, i)
-        append!(astate_, sample_states)
+    for i = 1:model.sample_state_count
+        sample_states = unscented_transform(model, astate, negi_hc, h_prop, dt, i)
+        astate_ = [astate_; sample_states]
     end
     
     return astate_
 end
-
-# This cost puts a gate error cost on
-# the sample states and a LQR cost on the other terms.
-# The hessian w.r.t the state and controls is constant.
-struct Cost{N,M,T} <: TO.CostFunction
-    Q::Diagonal{T, SVector{N,T}}
-    R::Diagonal{T, SVector{M,T}}
-    q::SVector{N, T}
-    c::T
-    target_states::Array{SVector{HDIM_ISO,T},1}
-    q_ss::Array{T,1}
-    active_samples::Array{Int,1}
-end
-
-function Cost(Q::Diagonal{T,SVector{N,T}}, R::Diagonal{T,SVector{M,T}},
-              xf::SVector{N,T}, target_states::Array{SVector{HDIM_ISO,T},1},
-              q_ss::Array{T,1}, active_samples::Array{Int,1}) where {N,M,T}
-    q = -Q * xf
-    c = 0.5 * xf' * Q * xf
-    return Cost{N,M,T}(Q, R, q, c, target_states, q_ss, active_samples)
-end
-
-@inline TO.state_dim(cost::Cost{N,M,T}) where {N,M,T} = N
-@inline TO.control_dim(cost::Cost{N,M,T}) where {N,M,T} = M
-@inline Base.copy(cost::Cost{N,M,T}) where {N,M,T} = Cost{N,M,T}(
-    cost.Q, cost.R, cost.q, cost.c, cost.target_states, cost.q_ss,
-    cost.active_samples
-)
-
-function TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N}) where {N,M,T}
-    cost_ = 0.5 * astate' * cost.Q * astate + cost.q'astate + cost.c
-    for i = 1:SAMPLE_STATE_COUNT
-        q_ss = cost.q_ss[i]
-        target_state = cost.target_states[i]
-        for j in cost.active_samples
-            sample_idx = astate_sample_inds(i, j)
-            cost_ = cost_ + q_ss * gate_error_iso2(astate, target_state;
-                                                   s1o=sample_idx[1] - 1)
-        end
-    end
-    return cost_
-end
-
-@inline TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N}, acontrol::SVector{M}) where {N,M,T} = (
-    TO.stage_cost(cost, astate) + 0.5 * acontrol' * cost.R * acontrol
-)
-
-function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T},
-                      astate::SVector{N,T}) where {N,M,T}
-    E.q = cost.Q * astate + cost.q
-    for i = 1:SAMPLE_STATE_COUNT
-        q_ss = cost.q_ss[i]
-        target_state = cost.target_states[i]
-        for j in cost.active_samples
-            sample_idx = astate_sample_inds(i, j)
-            E.q[sample_idx] = q_ss * jacobian_gate_error_iso2(astate, target_state;
-                                                              s1o=sample_idx[1] - 1);
-        end
-    end
-    return false
-end
-
-function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T},
-                      acontrol::SVector{M,T}) where {N,M,T}
-    TO.gradient!(E, cost, astate)
-    E.r = cost.R * acontrol
-    E.c = 0
-    return false
-end
-
-function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T},
-                     astate::SVector{N,T}) where {N,M,T}
-    hess_astate = zeros(N, N)
-    for i = 1:SAMPLE_STATE_COUNT
-        q_ss = cost.q_ss[i]
-        target_state = cost.target_states[i]
-        hess_sample = -1 * q_ss * hessian_gate_error_iso2(target_state)
-        for j in cost.active_samples
-            sample_idx = astate_sample_inds(i, j)
-            hess_astate[sample_idx, sample_idx] = hess_sample
-        end
-    end
-    hess_astate = hess_astate + cost.Q
-    hess_astate = Symmetric(SMatrix{N, N}(hess_astate))
-    E.Q = hess_astate
-    return true
-end
-
-function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T},
-                     acontrol::SVector{M,T}) where {N,M,T}
-    TO.hessian!(E, cost, astate)
-    E.R = cost.R
-    E.H .= 0
-    return true
-end
-
 
 # main
 function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
@@ -292,9 +204,12 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
                   dt_inv=Int64(1e1), smoke_test=false, constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true,
                   fq_cov=FQ * 1e-2, max_iterations=Int64(2e5), gradient_tol_int=1,
-                  dJ_counter_limit=Int(1e2), state_cov=1e-2, seed=0, alpha=1.,)
+                  dJ_counter_limit=Int(1e2), state_cov=1e-2, seed=0, alpha=1.,
+                  sample_states=[IS1_ISO_], nominal_idxs=[STATE1_IDX], static=true)
     Random.seed!(seed)
-    model = Model(fq_cov, alpha)
+    (sample_state_count,) = size(sample_states)
+    S = Diagonal(SVector{HDIM_ISO}(fill(qs[5], HDIM_ISO)))
+    model = Model(S, nominal_idxs, fq_cov, alpha, sample_state_count)
     n = RD.state_dim(model)
     m = RD.control_dim(model)
     t0 = 0.
@@ -302,75 +217,80 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     # initial state, target state
     x0 = zeros(n)
     xf = zeros(n)
-    target_states = Array{SVector{HDIM_ISO,Float64},1}(undef, SAMPLE_STATE_COUNT)
     gate = GT_GATE_ISO[gate_type]
     x0[STATE1_IDX] = IS1_ISO_
     x0[STATE2_IDX] = IS2_ISO_
+    x0[STATE3_IDX] = IS3_ISO_
+    x0[STATE4_IDX] = IS4_ISO_
     xf[STATE1_IDX] = gate * IS1_ISO_
-    xf[STATE2_IDX]= gate * IS2_ISO_
+    xf[STATE2_IDX] = gate * IS2_ISO_
     state_dist = Distributions.Normal(0., state_cov)
-    for i = 1:SAMPLE_STATE_COUNT
-        sample_state = SAMPLE_STATES[i]
-        target_state = gate * sample_state
-        target_states[i] = target_state
+    for i = 1:sample_state_count
+        sample_state = sample_states[i]
         for j = 1:SAMPLES_PER_STATE
             sample_idx = astate_sample_inds(i, j)
             sample = sample_state .+ rand(state_dist, HDIM_ISO)
             x0[sample_idx] = sample ./ sqrt(sample'sample)
-            xf[sample_idx] = target_state
         end
     end
-    x0 = SVector{n}(x0)
-    xf = SVector{n}(xf)
+    if static
+        x0 = SVector{n}(x0)
+        xf = SVector{n}(xf)
+    end
 
     # control amplitude constraint
     x_max = fill(Inf, n)
     x_max[CONTROLS_IDX] .= MAX_CONTROL_NORM_0
-    x_max = SVector{n}(x_max)
     x_min = fill(-Inf, n)
     x_min[CONTROLS_IDX] .= -MAX_CONTROL_NORM_0
-    x_min = SVector{n}(x_min)
+    if static
+        x_max = SVector{n}(x_max)
+        x_min = SVector{n}(x_min)
+    end
     
     # control amplitude constraint at boundary
     x_max_boundary = fill(Inf, n)
     x_max_boundary[CONTROLS_IDX] .= 0
-    x_max_boundary = SVector{n}(x_max_boundary)
     x_min_boundary = fill(-Inf, n)
     x_min_boundary[CONTROLS_IDX] .= 0
-    x_min_boundary = SVector{n}(x_min_boundary)
+    if static
+        x_max_boundary = SVector{n}(x_max_boundary)
+        x_min_boundary = SVector{n}(x_min_boundary)
+    end
     
     # initial trajectory
     dt = dt_inv^(-1)
     N = Int(floor(evolution_time * dt_inv)) + 1
-    U0 = [SVector{m}([
-        fill(1e-4, CONTROL_COUNT);
-    ]) for k = 1:N-1]
-    X0 = [SVector{n}([
-        fill(NaN, n);
-    ]) for k = 1:N]
+    if static
+        U0 = [fill(1e-4, CONTROL_COUNT) for k = 1:N-1]
+        X0 = [fill(NaN, n) for k = 1:N-1]
+    else
+        U0 = [SVector{m}(fill(1e-4, CONTROL_COUNT)) for k = 1:N-1]
+        X0 = [SVector{n}(fill(NaN, n)) for k = 1:N-1]
+    end
     Z = Traj(X0, U0, dt * ones(N))
 
     # cost function
-    Q = Diagonal(SVector{n}([
-        fill(qs[1], STATE_COUNT * HDIM_ISO); # ψ1, ψ2
-        fill(qs[2], CONTROL_COUNT); # ∫a
-        fill(qs[3], CONTROL_COUNT); # a
-        fill(qs[4], CONTROL_COUNT); # ∂a
-        fill(0, SAMPLE_COUNT * HDIM_ISO);
-    ]))
+    Q = zeros(n)
+    Q[STATE1_IDX] = Q[STATE2_IDX] = fill(qs[1], HDIM_ISO)
+    Q[INTCONTROLS_IDX] = fill(qs[2], CONTROL_COUNT)
+    Q[CONTROLS_IDX] = fill(qs[3], CONTROL_COUNT)
+    Q[DCONTROLS_IDX] = fill(qs[4], CONTROL_COUNT)
+    # penalty has unit value, its cost can be increased through qs[5],
+    # which modifies the model.S matrix
+    for i = 1:sample_state_count
+        Q[ASTATE_SIZE_BASE + i * CHUNK_SIZE] = 1
+    end
+    R = zeros(m)
+    R[D2CONTROLS_IDX] = fill(qs[6], CONTROL_COUNT)
+    if static
+        Q = SVector{n}(Q)
+        R = SVector{m}(R)
+    end
+    Q = Diagonal(Q)
     Qf = Q * N
-    R = Diagonal(SVector{m}([
-        fill(qs[6], CONTROL_COUNT); # ∂2a
-    ]))
-    # objective = LQRObjective(Q, R, Qf, xf, N)
-    active_samples = Array(1:SAMPLES_PER_STATE)
-    # active_samples = [10]
-    q_ss = repeat([qs[5]], SAMPLE_STATE_COUNT)
-    cost_k = Cost(Q, R, xf, target_states, q_ss, active_samples)
-    cost_f = Cost(Qf, R, xf, target_states, N * q_ss, active_samples)
-    # cost_k = Cost(Q, R, xf, gate * IS1_ISO_, qs[5], active_samples)
-    # cost_f = Cost(Qf, R, xf, gate * IS1_ISO_, N * qs[5], active_samples)
-    objective = TO.Objective(cost_k, cost_f, N)
+    R = Diagonal(R)
+    objective = LQRObjective(Q, R, Qf, xf, N)
 
     # constraints
     # must satisfy control amplitude bound
@@ -380,7 +300,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     # must reach target state, must have zero net flux
     target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
     # must obey unit norm
-    norm_idxs = copy(SAMPLE_IDXS)
+    norm_idxs = sample_idxs(model)
     push!(norm_idxs, STATE1_IDX)
     push!(norm_idxs, STATE2_IDX)
     norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idx) for idx in norm_idxs]
@@ -403,6 +323,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     iterations_inner = smoke_test ? 1 : 300
     iterations_outer = smoke_test ? 1 : 30
     n_steps = smoke_test ? 1 : pn_steps
+    static_bp = static ? true : false
     set_options!(
         solver, square_root=sqrtbp, constraint_tolerance=constraint_tolerance,
         projected_newton_tolerance=al_tol, n_steps=n_steps,
@@ -410,7 +331,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         projected_newton=projected_newton, iterations_inner=iterations_inner,
         iterations_outer=iterations_outer, iterations=max_iterations,
         gradient_tolerance_intermediate=gradient_tol_int,
-        dJ_counter_limit=dJ_counter_limit,
+        dJ_counter_limit=dJ_counter_limit, static_bp=static_bp
     )
     Altro.solve!(solver)
 

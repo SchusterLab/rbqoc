@@ -1515,7 +1515,8 @@ function sample_controls(save_file_path; dt=DT_PREF, dt_inv=DT_PREF_INV,
     # Plot.
     if plot
         fig = Plots.plot(dpi=DPI)
-        Plots.scatter!(time_axis, controls[:, 1], label="controls data", markersize=MS_SMALL, alpha=ALPHA)
+        Plots.scatter!(time_axis, controls[:, 1], label="controls data",
+                       markersize=MS_SMALL, alpha=ALPHA)
         Plots.scatter!(time_axis_sample, controls_sample[:, 1], label="controls fit",
                        markersize=MS_SMALL, alpha=ALPHA)
         Plots.scatter!(time_axis, d2controls_dt2[:, 1], label="d2_controls_dt2 data")
