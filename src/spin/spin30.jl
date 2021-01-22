@@ -24,7 +24,7 @@ const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 # problem
 const CONTROL_COUNT = 1
 const ACONTROL_SIZE = CONTROL_COUNT
-const STATE_COUNT = 2
+const STATE_COUNT = 3
 # const STATE_COUNT = 4
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
 const SAMPLES_PER_STATE = 10
@@ -33,10 +33,10 @@ const CHUNK_SIZE = SAMPLES_PER_STATE * HDIM_ISO + PENALTY_SIZE
 # state indices
 const STATE1_IDX = SVector{HDIM_ISO}(1:HDIM_ISO)
 const STATE2_IDX = SVector{HDIM_ISO}(STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO)
-# const STATE3_IDX = SVector{HDIM_ISO}(STATE2_IDX[end] + 1:STATE2_IDX[end] + HDIM_ISO)
+const STATE3_IDX = SVector{HDIM_ISO}(STATE2_IDX[end] + 1:STATE2_IDX[end] + HDIM_ISO)
 # const STATE4_IDX = SVector{HDIM_ISO}(STATE3_IDX[end] + 1:STATE3_IDX[end] + HDIM_ISO)
 # const INTCONTROLS_IDX = SVector{CONTROL_COUNT}(STATE4_IDX[end] + 1:STATE4_IDX[end] + CONTROL_COUNT)
-const INTCONTROLS_IDX = SVector{CONTROL_COUNT}(STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT)
+const INTCONTROLS_IDX = SVector{CONTROL_COUNT}(STATE3_IDX[end] + 1:STATE3_IDX[end] + CONTROL_COUNT)
 const CONTROLS_IDX = SVector{CONTROL_COUNT}(INTCONTROLS_IDX[end] + 1:
                                             INTCONTROLS_IDX[end] + CONTROL_COUNT)
 const DCONTROLS_IDX = SVector{CONTROL_COUNT}(CONTROLS_IDX[end] + 1:
@@ -181,7 +181,7 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::StaticVector,
     h_prop = exp(dt * (FQ_NEGI_H0_ISO + negi_hc))
     state1 = h_prop * astate[STATE1_IDX]
     state2 = h_prop * astate[STATE2_IDX]
-    # state3 = h_prop * astate[STATE3_IDX]
+    state3 = h_prop * astate[STATE3_IDX]
     # state4 = h_prop * astate[STATE4_IDX]
     intcontrols = astate[INTCONTROLS_IDX] + dt * astate[CONTROLS_IDX]
     controls = astate[CONTROLS_IDX] + dt * astate[DCONTROLS_IDX]
@@ -189,7 +189,7 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::StaticVector,
     
     astate_ = [
         # state1; state2; state3; state4; intcontrols; controls; dcontrols;
-        state1; state2; intcontrols; controls; dcontrols;
+        state1; state2; state3; intcontrols; controls; dcontrols;
     ]
 
     # unscented transform
@@ -223,7 +223,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     gate = GT_GATE_ISO[gate_type]
     x0[STATE1_IDX] = IS1_ISO_
     x0[STATE2_IDX] = IS2_ISO_
-    # x0[STATE3_IDX] = IS3_ISO_
+    x0[STATE3_IDX] = IS3_ISO_
     # x0[STATE4_IDX] = IS4_ISO_
     xf[STATE1_IDX] = gate * IS1_ISO_
     xf[STATE2_IDX] = gate * IS2_ISO_
@@ -306,7 +306,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     norm_idxs = sample_idxs(model)
     push!(norm_idxs, STATE1_IDX)
     push!(norm_idxs, STATE2_IDX)
-    # push!(norm_idxs, STATE3_IDX)
+    push!(norm_idxs, STATE3_IDX)
     # push!(norm_idxs, STATE4_IDX)
     norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idx) for idx in norm_idxs]
     constraints = ConstraintList(n, m, N)
