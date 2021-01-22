@@ -10,13 +10,10 @@ using Altro
 using Debugger
 using Distributions
 using HDF5
-using Hyperopt
-using ForwardDiff
 using LinearAlgebra
 using Random
 using RobotDynamics
 using StaticArrays
-using Zygote
 using TrajectoryOptimization
 const RD = RobotDynamics
 const TO = TrajectoryOptimization
@@ -28,14 +25,19 @@ const SAVE_PATH = abspath(joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME
 
 # problem
 const CONTROL_COUNT = 1
-const STATE_COUNT = 4
+const STATE_COUNT = 2
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
+const SAMPLE_STATES = [IS1_ISO, IS2_ISO, IS3_ISO, IS4_ISO]
+const SAMPLE_STATE_COUNT = 4
+const SAMPLES_PER_STATE = 10
+const SAMPLE_COUNT = SAMPLE_STATE_COUNT * SAMPLES_PER_STATE
+const PENALTY_SIZE = 1
+const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO + SAMPLES_PER_STATE * PENALTY_SIZE
+const ACONTROL_SIZE = CONTROL_COUNT
 # state indices
 const STATE1_IDX = 1:HDIM_ISO
 const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
-const STATE3_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + HDIM_ISO
-const STATE4_IDX = STATE3_IDX[end] + 1:STATE3_IDX[end] + HDIM_ISO
-const INTCONTROLS_IDX = STATE4_IDX[end] + 1:STATE4_IDX[end] + CONTROL_COUNT
+const INTCONTROLS_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT
 const CONTROLS_IDX = INTCONTROLS_IDX[end] + 1:INTCONTROLS_IDX[end] + CONTROL_COUNT
 const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
 # control indices
@@ -51,41 +53,30 @@ const S7_IDX = SVector{HDIM_ISO}(HDIM_ISO * 6 + 1:HDIM_ISO * 7)
 const S8_IDX = SVector{HDIM_ISO}(HDIM_ISO * 7 + 1:HDIM_ISO * 8)
 const S9_IDX = SVector{HDIM_ISO}(HDIM_ISO * 8 + 1:HDIM_ISO * 9)
 const S10_IDX = SVector{HDIM_ISO}(HDIM_ISO * 9 + 1:HDIM_ISO * 10)
-# misc
-const STATE_IDXS = [STATE1_IDX, STATE2_IDX, STATE3_IDX, STATE4_IDX]
-const SAMPLE_STATE_COUNT = 4
-const SAMPLES_PER_STATE = 10
-const SAMPLES_PER_STATE_INV = 1//10
-const SAMPLE_COUNT = SAMPLE_STATE_COUNT * SAMPLES_PER_STATE
-const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
-const ACONTROL_SIZE = CONTROL_COUNT
 
 # model
-module Data
-using RobotDynamics
-const RD = RobotDynamics
 mutable struct Model <: RD.AbstractModel
     fq_cov::Float64
     alpha::Float64
+    S::SMatrix{HDIM_ISO, HDIM_ISO}
 end
-end
-Model = Data.Model
 @inline RD.state_dim(model::Model) = ASTATE_SIZE
 @inline RD.control_dim(model::Model) = ACONTROL_SIZE
 @inline astate_sample_inds(sample_state_index::Int, sample_index::Int) = (
-    (
+    SVector{HDIM_ISO}((
         ASTATE_SIZE_BASE + (sample_state_index - 1) * SAMPLES_PER_STATE * HDIM_ISO
         + (sample_index - 1) * HDIM_ISO + 1
     ):(
         ASTATE_SIZE_BASE + (sample_state_index - 1) * SAMPLES_PER_STATE * HDIM_ISO
         + sample_index * HDIM_ISO
-    )
+    ))
 )
 const SAMPLE_INDICES = [astate_sample_inds(i, j)
                         for i = 1:SAMPLE_STATE_COUNT for j = 1:SAMPLES_PER_STATE]
 
 function unscented_transform(model::Model, astate::AbstractVector,
                              negi_hc::AbstractMatrix, dt::Real, i::Int)
+    # get states
     offset = ASTATE_SIZE_BASE + (i - 1) * SAMPLES_PER_STATE * HDIM_ISO
     s1 = astate[offset + S1_IDX]
     s2 = astate[offset + S2_IDX]
@@ -97,8 +88,22 @@ function unscented_transform(model::Model, astate::AbstractVector,
     s8 = astate[offset + S8_IDX]
     s9 = astate[offset + S9_IDX]
     s10 = astate[offset + S10_IDX]
+    # grab chol info
+    fq_chol1 = fq_chol2 = fq_chol3 = fq_chol4 = 0
+    fq_chol5 = sqrt(model.fq_cov)
+    # propagate states
+    s1 = exp(dt * ((FQ + fq_chol1) * NEGI_H0_ISO + negi_hc)) * s1
+    s2 = exp(dt * ((FQ + fq_chol2) * NEGI_H0_ISO + negi_hc)) * s2
+    s3 = exp(dt * ((FQ + fq_chol3) * NEGI_H0_ISO + negi_hc)) * s3
+    s4 = exp(dt * ((FQ + fq_chol4) * NEGI_H0_ISO + negi_hc)) * s4
+    s5 = exp(dt * ((FQ + fq_chol5) * NEGI_H0_ISO + negi_hc)) * s5
+    s6 = exp(dt * ((FQ - fq_chol1) * NEGI_H0_ISO + negi_hc)) * s6
+    s7 = exp(dt * ((FQ - fq_chol2) * NEGI_H0_ISO + negi_hc)) * s7
+    s8 = exp(dt * ((FQ - fq_chol3) * NEGI_H0_ISO + negi_hc)) * s8
+    s9 = exp(dt * ((FQ - fq_chol4) * NEGI_H0_ISO + negi_hc)) * s9
+    s10 = exp(dt * ((FQ - fq_chol5) * NEGI_H0_ISO + negi_hc)) * s10
     # compute state mean
-    sm = SAMPLES_PER_STATE_INV .* (
+    sm = 1//SAMPLES_PER_STATE .* (
         s1 + s2 + s3 + s4 + s5
         + s6 + s7 + s8 + s9 + s10
     )
@@ -124,26 +129,22 @@ function unscented_transform(model::Model, astate::AbstractVector,
     cov[HDIM_ISO + 1, HDIM_ISO + 1] = model.fq_cov
     # TOOD: cholesky! requires writing zeros in upper triangle
     cov_chol = model.alpha * cholesky(Symmetric(cov)).L
-    s_chol1 = cov_chol[1:HDIM_ISO, 1]
-    s_chol2 = cov_chol[1:HDIM_ISO, 2]
-    s_chol3 = cov_chol[1:HDIM_ISO, 3]
-    s_chol4 = cov_chol[1:HDIM_ISO, 4]
-    fq_chol1 = cov_chol[HDIM_ISO + 1, 1]
-    fq_chol2 = cov_chol[HDIM_ISO + 1, 2]
-    fq_chol3 = cov_chol[HDIM_ISO + 1, 3]
-    fq_chol4 = cov_chol[HDIM_ISO + 1, 4]
-    fq_chol5 = cov_chol[HDIM_ISO + 1, 5]
-    # propagate transformed states
-    s1 = exp(dt * ((FQ + fq_chol1) * NEGI_H0_ISO + negi_hc)) * (sm + s_chol1)
-    s2 = exp(dt * ((FQ + fq_chol2) * NEGI_H0_ISO + negi_hc)) * (sm + s_chol2)
-    s3 = exp(dt * ((FQ + fq_chol3) * NEGI_H0_ISO + negi_hc)) * (sm + s_chol3)
-    s4 = exp(dt * ((FQ + fq_chol4) * NEGI_H0_ISO + negi_hc)) * (sm + s_chol4)
-    s5 = exp(dt * ((FQ + fq_chol5) * NEGI_H0_ISO + negi_hc)) * sm
-    s6 = exp(dt * ((FQ - fq_chol1) * NEGI_H0_ISO + negi_hc)) * (sm - s_chol1)
-    s7 = exp(dt * ((FQ - fq_chol2) * NEGI_H0_ISO + negi_hc)) * (sm - s_chol2)
-    s8 = exp(dt * ((FQ - fq_chol3) * NEGI_H0_ISO + negi_hc)) * (sm - s_chol3)
-    s9 = exp(dt * ((FQ - fq_chol4) * NEGI_H0_ISO + negi_hc)) * (sm - s_chol4)
-    s10 = exp(dt * ((FQ - fq_chol5) * NEGI_H0_ISO + negi_hc)) * sm
+    # resample states
+    s_chol1 = cov_chol[STATE_IDX, 1]
+    s_chol2 = cov_chol[STATE_IDX, 2]
+    s_chol3 = cov_chol[STATE_IDX, 3]
+    s_chol4 = cov_chol[STATE_IDX, 4]
+    # s_chol5 = cov_chol[STATE_IDX, 5]
+    s1 = sm + s_chol1
+    s2 = sm + s_chol2
+    s3 = sm + s_chol3
+    s4 = sm + s_chol4
+    s5 = sm + s_chol5
+    s6 = sm - s_chol1
+    s7 = sm - s_chol2
+    s8 = sm - s_chol3
+    s9 = sm - s_chol4
+    s10 = sm - s_chol5
     # normalize
     s1 = s1 ./sqrt(s1's1)
     s2 = s2 ./sqrt(s2's2)
@@ -155,8 +156,10 @@ function unscented_transform(model::Model, astate::AbstractVector,
     s8 = s8 ./sqrt(s8's8)
     s9 = s9 ./sqrt(s9's9)
     s10 = s10 ./sqrt(s10's10)
+    # compute penalty
+    penalty = tr(s_cov * model.S)
 
-    samples = [s1; s2; s3; s4; s5; s6; s7; s8; s9; s10]
+    samples = [s1; s2; s3; s4; s5; s6; s7; s8; s9; s10; penalty]
 
     return samples
 end
@@ -193,34 +196,6 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, z::AbstractKnotPoint)
     return RD.discrete_dynamics(RK3, model, RD.state(z), RD.control(z), z.t, z.dt)
 end
 
-
-module Data2
-using LinearAlgebra
-using TrajectoryOptimization
-const TO = TrajectoryOptimization
-
-const SAMPLE_STATE_COUNT = 4
-const SAMPLES_PER_STATE = 10
-const SAMPLE_COUNT = SAMPLE_STATE_COUNT * SAMPLES_PER_STATE
-const HDIM_ISO = 4
-const ASTATE_SIZE_BASE = 4 * HDIM_ISO + 3 * 1
-const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
-const ACONTROL_SIZE = 1
-const STATE1_IDX = 1:HDIM_ISO
-const STATE2_IDX = STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO
-const STATE3_IDX = STATE2_IDX[end] + 1:STATE2_IDX[end] + HDIM_ISO
-const STATE4_IDX = STATE3_IDX[end] + 1:STATE3_IDX[end] + HDIM_ISO
-const STATE_IDXS = [STATE1_IDX, STATE2_IDX, STATE3_IDX, STATE4_IDX]
-
-@inline astate_sample_inds(sample_state_index::Int, sample_index::Int) = (
-    (
-        ASTATE_SIZE_BASE + (sample_state_index - 1) * SAMPLES_PER_STATE * HDIM_ISO
-        + (sample_index - 1) * HDIM_ISO + 1
-    ):(
-        ASTATE_SIZE_BASE + (sample_state_index - 1) * SAMPLES_PER_STATE * HDIM_ISO
-        + sample_index * HDIM_ISO
-    )
-)
 
 struct Cost{N,M,T} <: TO.CostFunction
     Q::Diagonal{T,Array{T,1}}
@@ -292,7 +267,7 @@ function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T},
                      astate::Array{T,1}) where {N,M,T}
     hess_astate = zeros(N,N)
     for i = 1:SAMPLE_STATE_COUNT
-        state_idx = STATE_IDXS[i]
+        mean_idx
         for j = 1:SAMPLES_PER_STATE
             sample_idx = astate_sample_inds(i, j)
             hess_astate[sample_idx, state_idx] = hess_astate[state_idx, sample_idx] = -cost.S2
@@ -313,8 +288,6 @@ function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::Arr
     E.H .= 0
     return true
 end
-end
-Cost = Data2.Cost
 
 
 # main

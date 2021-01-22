@@ -30,6 +30,15 @@ const SAVE_PATH = abspath(joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME
 const CONTROL_COUNT = 1
 const STATE_COUNT = 2
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
+const SAMPLE_STATES = [IS3_ISO]
+const SAMPLE_STATE_COUNT = 1
+const SAMPLES_PER_STATE = 10
+const SAMPLES_PER_STATE_INV = 1//10
+const SAMPLE_COUNT = SAMPLE_STATE_COUNT * SAMPLES_PER_STATE
+const PENALTY_SIZE = 1
+const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO + SAMPLE_STATE_COUNT * PENALTY_SIZE
+const ACONTROL_SIZE = CONTROL_COUNT
+const STATE_IDX = SVector{HDIM_ISO}(1:HDIM_ISO)
 # state indices
 const STATE1_IDX = SVector{HDIM_ISO}(1:HDIM_ISO)
 const STATE2_IDX = SVector{HDIM_ISO}(STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO)
@@ -49,36 +58,21 @@ const S7_IDX = SVector{HDIM_ISO}(HDIM_ISO * 6 + 1:HDIM_ISO * 7)
 const S8_IDX = SVector{HDIM_ISO}(HDIM_ISO * 7 + 1:HDIM_ISO * 8)
 const S9_IDX = SVector{HDIM_ISO}(HDIM_ISO * 8 + 1:HDIM_ISO * 9)
 const S10_IDX = SVector{HDIM_ISO}(HDIM_ISO * 9 + 1:HDIM_ISO * 10)
-# misc
-const NOMINAL_STATE_IDXS = [STATE1_IDX]
-const NOMINAL_STATES = [IS1_ISO]
-const SAMPLE_STATE_COUNT = 2
-const SAMPLES_PER_STATE = 10
-const SAMPLES_PER_STATE_INV = 1//10
-const SAMPLE_COUNT = SAMPLE_STATE_COUNT * SAMPLES_PER_STATE
-const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
-const ACONTROL_SIZE = CONTROL_COUNT
-const STATE_IDX = SVector{HDIM_ISO}(1:HDIM_ISO)
 
 # model
-module Data
-using RobotDynamics
-RD = RobotDynamics
 mutable struct Model <:RD.AbstractModel
-    fq_cov_chol::AbstractArray
+    S::Diagonal{T,SVector{HDIM_ISO,T}} where {T}
     fq_cov::Float64
     alpha::Float64
 end
-end
-Model = Data.Model
 @inline RD.state_dim(model::Model) = ASTATE_SIZE
 @inline RD.control_dim(model::Model) = ACONTROL_SIZE
 @inline astate_sample_inds(sample_state_index::Int, sample_index::Int) = (
     SVector{HDIM_ISO}((
-        ASTATE_SIZE_BASE + (sample_state_index - 1) * SAMPLES_PER_STATE * HDIM_ISO
+        ASTATE_SIZE_BASE + (sample_state_index - 1) * (SAMPLES_PER_STATE * HDIM_ISO + PENALTY_SIZE)
         + (sample_index - 1) * HDIM_ISO + 1
     ):(
-        ASTATE_SIZE_BASE + (sample_state_index - 1) * SAMPLES_PER_STATE * HDIM_ISO
+        ASTATE_SIZE_BASE + (sample_state_index - 1) * (SAMPLES_PER_STATE * HDIM_ISO + PENALTY_SIZE)
         + sample_index * HDIM_ISO
     ))
 )
@@ -167,8 +161,10 @@ function unscented_transform(model::Model, astate::AbstractVector,
     s8 = s8 ./sqrt(s8's8)
     s9 = s9 ./sqrt(s9's9)
     s10 = s10 ./sqrt(s10's10)
+    # compute penalty
+    penalty = tr(s_cov * model.S)
 
-    samples = [s1; s2; s3; s4; s5; s6; s7; s8; s9; s10]
+    samples = [s1; s2; s3; s4; s5; s6; s7; s8; s9; s10; penalty]
 
     return samples
 end
@@ -311,9 +307,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
                   dJ_counter_limit=Int(1e2), state_cov=1e-2, seed=0, alpha=1.,
                   benchmark=false)
     Random.seed!(seed)
-    fq_cov_chol = zeros(5)
-    fq_cov_chol[5] = sqrt(fq_cov)
-    model = Model(fq_cov_chol, fq_cov, alpha)
+    S = Digonal(SVector{HDIM_ISO}(repeat(qs[5:5], HDIM_ISO)))
+    model = Model(S, fq_cov, alpha)
     n = RD.state_dim(model)
     m = RD.control_dim(model)
     t0 = 0.
