@@ -225,7 +225,7 @@ const F2A_DATA_ZPIBY2 = Dict(
     s2 => joinpath(SPIN_OUT_PATH, "spin12/00808_spin12.h5"),
     sut8 => joinpath(SPIN_OUT_PATH, "spin30/lanthanum/00062_spin30.h5"),
     d1 => joinpath(SPIN_OUT_PATH, "spin11/00539_spin11.h5"),
-    d2 => joinpath(SPIN_OUT_PATH, "spin11/00542_spin11.h5"),
+    d2 => joinpath(SPIN_OUT_PATH, "spin11/00547_spin11.h5"),
 )
 const F2A_PT_LIST = [analytic, s2, sut8, d1, d2]
 function gen_2a(;gate_type=zpiby2)
