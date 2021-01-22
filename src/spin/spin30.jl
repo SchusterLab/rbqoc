@@ -208,7 +208,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true,
                   fq_cov=FQ * 1e-2, max_iterations=Int64(2e5), gradient_tol_int=1,
                   dJ_counter_limit=Int(1e2), state_cov=1e-2, seed=0, alpha=1.,
-                  sample_states=[IS1_ISO_], nominal_idxs=[STATE1_IDX], static=true)
+                  sample_states=[IS1_ISO_], nominal_idxs=[STATE1_IDX], static=true,
+                  benchmark=false)
     Random.seed!(seed)
     (sample_state_count,) = size(sample_states)
     S = Diagonal(SVector{HDIM_ISO}(fill(qs[5], HDIM_ISO)))
@@ -338,7 +339,12 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         gradient_tolerance_intermediate=gradient_tol_int,
         dJ_counter_limit=dJ_counter_limit, static_bp=static_bp
     )
-    Altro.solve!(solver)
+    if benchmark
+        benchmark_result = Altro.benchmark_solve!(solver)
+    else
+        benchmark_result = nothing
+        Altro.solve!(solver)
+    end
 
     # Post-process.
     acontrols_raw = TO.controls(solver)
@@ -388,6 +394,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         end
         result["save_file_path"] = save_file_path
     end
+
+    result = benchmark ? benchmark_result : result
 
     return result
 end
