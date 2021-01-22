@@ -1515,7 +1515,8 @@ function sample_controls(save_file_path; dt=DT_PREF, dt_inv=DT_PREF_INV,
     # Plot.
     if plot
         fig = Plots.plot(dpi=DPI)
-        Plots.scatter!(time_axis, controls[:, 1], label="controls data", markersize=MS_SMALL, alpha=ALPHA)
+        Plots.scatter!(time_axis, controls[:, 1], label="controls data",
+                       markersize=MS_SMALL, alpha=ALPHA)
         Plots.scatter!(time_axis_sample, controls_sample[:, 1], label="controls fit",
                        markersize=MS_SMALL, alpha=ALPHA)
         Plots.scatter!(time_axis, d2controls_dt2[:, 1], label="d2_controls_dt2 data")
@@ -1587,8 +1588,6 @@ function run_sim_prop(
     integrator(gate_count, states, state, params)
     # compute fidelities
     fidelities = compute_fidelities(gate_count, gate_type, states)
-    # compute traces
-    # rho2_traces = compute_rho2_traces(states)
 
     # report
     result = Dict(
@@ -1602,7 +1601,6 @@ function run_sim_prop(
         "namp" => namp,
         "ndist" => string(ndist),
         "noise_dt_inv" => noise_dt_inv,
-        # "rho2_traces" => rho2_traces,
         "save_file_path" => save_file_path,
     )
 
