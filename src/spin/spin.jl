@@ -1588,8 +1588,6 @@ function run_sim_prop(
     integrator(gate_count, states, state, params)
     # compute fidelities
     fidelities = compute_fidelities(gate_count, gate_type, states)
-    # compute traces
-    # rho2_traces = compute_rho2_traces(states)
 
     # report
     result = Dict(
@@ -1603,7 +1601,6 @@ function run_sim_prop(
         "namp" => namp,
         "ndist" => string(ndist),
         "noise_dt_inv" => noise_dt_inv,
-        # "rho2_traces" => rho2_traces,
         "save_file_path" => save_file_path,
     )
 
