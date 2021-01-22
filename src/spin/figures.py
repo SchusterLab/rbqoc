@@ -28,6 +28,8 @@ F3D_DATA_FILE_PATH = os.path.join(SAVE_PATH, "f3d.h5")
 # simulation
 DT_PREF = 1e-2
 DT_PREF_INV = 1e2
+HDIM = 2
+HDIM_ISO = 4
 
 # plotting
 DPI = 300
@@ -172,6 +174,13 @@ PT_MARKER = {
 }
 
 # METHODS #
+
+def vec_uniso(vec):
+    (length,) = np.shape(vec)
+    part = int(length/2)
+    vec_uniso_ = vec[0:part] + 1j * vec[part:]
+    return np.reshape(vec_uniso_, (np.shape(vec_uniso_)[0], 1))
+#ENDDEF
 
 def grab_controls(save_file_path):
     with h5py.File(save_file_path, "r") as save_file:
@@ -724,11 +733,30 @@ def make_figure3b():
         pulse_types = [PulseType(pt) for pt in data_file["pulse_types"][()]]
         save_file_paths = data_file["save_file_paths"][()]
         gate_errors = np.moveaxis(data_file["gate_errors"][()], (0, 1, 2), (2, 1, 0))
+        states = np.moveaxis(data_file["states"][()], (0, 1, 2, 3), (3, 2, 1, 0))
     #ENDWITH
     pulse_type_count = len(pulse_types)
     gate_count = gate_errors.shape[1] - 1
     gate_count_axis = np.arange(0, gate_count + 1)
     gate_errors = np.mean(gate_errors, axis=2)
+
+    # compute rho^2
+    avg_count = np.shape(states)[3]
+    rho2_traces = np.zeros((pulse_type_count, gate_count + 1))
+    for i in range(0, pulse_type_count):
+        for j in range(0, gate_count + 1):
+            rho = np.zeros((HDIM, HDIM))
+            for k in range(0, avg_count):
+                state = vec_uniso(states[i, j, k, :])
+                rho_ = np.matmul(state, np.conjugate(np.transpose(state)))
+                rho = rho + rho_
+            #ENDFOR
+            rho = rho / avg_count
+            rho2 = np.matmul(rho, rho)
+            rho2_trace = np.real(np.trace(rho2))
+            rho2_traces[i, j] = rho2_trace
+        #ENDFOR
+    #ENDFOR
 
     fig = plt.figure(figsize=(PAPER_TW * 0.4, PAPER_TW * 0.315))
     ax = plt.gca()
@@ -738,6 +766,8 @@ def make_figure3b():
         label = PT_STR[pulse_type]
         ax.plot(gate_count_axis, log_transform(gate_errors[i, :]),
                 color=color, linestyle=linestyle, label=label)
+        # ax.plot(gate_count_axis, rho2_traces[i, :],
+        #         color=color, linestyle=linestyle, label=label)
     #ENDFOR
 
     ax.set_ylabel("Cumulative Gate Error", fontsize=LABEL_FS)
