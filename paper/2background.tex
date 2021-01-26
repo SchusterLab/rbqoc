@@ -127,7 +127,7 @@ ALM adds terms that are linear and quadratic in the constraint functions
 to the objective. The new objective is then minimized with
 iLQR. If the solution produced by iLQR does not satisfy the constraints,
 the prefactors for the constraint terms in the objective are increased
-and the procedure is repeated.
+intelligently and the procedure is repeated.
 
 ALM converges superlinearly, but poor numerical conditioning may lead
 to small decreases in the constraint violations near the locally optimal solution
