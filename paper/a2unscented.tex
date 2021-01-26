@@ -1,52 +1,54 @@
 \section{Unscented Transformation}
 \label{appendix:unscented}
 In this section, we outline the full unscented sampling procedure.
-We consider a state $\psi \in \mathbb{R}^{2n}$ with
-a deviant parameter $\lambda \in \mathbb{R}^{d}$ and discrete dynamics
+In the unscented sampling method, we consider a state $\psi \in \mathbb{R}^{2n}$, 
+an uncertain parameter $\lambda \in \mathbb{R}^{d}$, and discrete dynamics
 $\psi_{k + 1} = f(\psi_{k}, \lambda_{k})$.
-The nominal initial state is given by $\psi_{0}$ with an associated
-positive-definite covariance matrix $P_{0} \in \mathbb{R}_{++}^{2n \times 2n}$
+The state is obtained with an isomorphism \eqref{eq:isomorphism} and
+we omit bra-ket notation to emphasize that the state is real.
+The nominal initial state is given by $\bar{\psi}_{1}$ with an associated
+positive-definite covariance matrix $P_{1} \in \mathbb{S}_{++}^{2n}$
 which describes the uncertainty in the initial state.
-$P_{0}$ is typically non-zero even if the state preparation error is negligible.
-The deviant parameter
-has zero-mean and its distribution is given by the covariance matrix
-$L_{k} \in \mathbb{R}_{++}^{d \times d}$ at knot point $k$. The zero mean assumption
+$P_{1}$ is typically non-zero even if the state preparation error is negligible.
+The uncertain parameter has zero-mean
+and its distribution is given by the covariance matrix
+$L_{k} \in \mathbb{S}_{++}^{d}$ at knot point $k$. The zero-mean assumption
 is convenient for deriving the update procedure. A non-zero mean can be encoded
-in the discrete dynamics.
+in the discrete dynamics function $f(\psi_{k}, \lambda_{k})$.
 
-The initial $4n + 2d$ sigma points and initial $4n + 2d$ deviant parameters are sampled
-from the initial distributions,
+The initial $4n + 2d$ sample states and initial $4n + 2d$
+uncertain parameters are sampled from the initial distributions,
 \begin{equation}\label{eq:uupdate}
-  \begin{bmatrix} \Psi_{0}^{i} \\ \Lambda_{0}^{i} \end{bmatrix} =
-  \begin{bmatrix} \bar{\Psi}_{0} \\ 0\end{bmatrix}
-    \pm \beta \sqrt{\begin{bmatrix} P_{0} & 0\\ 0 & L_{0}\end{bmatrix}}^{\; i}
+  \begin{bmatrix} \psi_{1}^{j} \\ \lambda_{1}^{j} \end{bmatrix} =
+  \begin{bmatrix} \bar{\psi}_{1} \\ 0\end{bmatrix}
+    \pm \beta \sqrt{\begin{bmatrix} P_{1} & 0\\ 0 & L_{1}\end{bmatrix}}^{\; j}.
 \end{equation}
-We have written $\bar{\Psi}_{0} = \psi_{0}$. $\beta$
-is a hyperparameter which controls the spacing of the covariance contour.
-The $(\pm)$ is understood to take $(+)$ for $ i \in \{1, \dots, 2n + d\}$ and $(-)$ for
-$i \in \{2n + d + 1, \dots, 4n + 2d\}$. We use the Cholesky factorization
+$\beta$ is a hyperparameter that controls the spacing of the covariance contour.
+The $(\pm)$ is understood to take $(+)$ for $j \in \{1, \dots, 2n + d\}$ and $(-)$ for
+$j \in \{2n + d + 1, \dots, 4n + 2d\}$. We use the Cholesky factorization
 to compute the square root of the
 joint covariance matrix, though other methods
 such as the principal square root may be employed.
 The superscript on the matrix square root indicates the $i$\textsuperscript{th}
 column (mod $2n + d$) of the lower triangular Cholesky factor.
-Then, the sigma points are normalized,
+Then, the sample states are normalized,
 \begin{equation}\label{eq:unormalize}
-  \Psi_{0}^{i} \gets \frac{\Psi_{0}^{i}}{\sqrt{\Psi_{0}^{i^{T}} \Psi_{0}^{i}}}
+  \psi_{1}^{j} \rightarrow \frac{\psi_{1}^{j}}{\sqrt{{\psi_{1}^{j}}^{T} \psi_{1}^{j}}}.
 \end{equation}
-The sigma points are propagated to the next knot point,
+The sample states are propagated to the next knot point,
 \begin{equation}\label{eq:upropagate}
-  \Psi_{1} = f(\Psi_{0}, \Lambda_{0})
+  \psi^{j}_{2} = f(\psi^{j}_{1}, \lambda^{j}_{1}).
 \end{equation}
-The mean and covariance of the sigma points are computed,
+The mean and covariance of the sample states are computed,
 \begin{align}
-  \bar{\Psi}_{1} &= \frac{1}{4n + 2d} \sum_{i = 1}^{4n + 2d} \Psi_{1}^{i}\\
-  P_{1} &= \frac{1}{2 \beta^{2}} \sum_{i = 1}^{4n + 2d}
-  (\Psi^{i}_{1} - \bar{\Psi}_{1})^{T}(\Psi^{i}_{1} - \bar{\Psi}_{1})
+  \bar{\psi}_{2} &= \frac{1}{4n + 2d} \sum_{j = 1}^{4n + 2d} \psi_{2}^{j},\\
+  P_{2} &= \frac{1}{2 \beta^{2}} \sum_{j = 1}^{4n + 2d}
+  (\psi^{j}_{2} - \bar{\psi}_{2})(\psi^{j}_{2} - \bar{\psi}_{2})^{T}.
 \end{align}
-The sigma points are then resampled and propagated to the next knot point using
+The sample states are then resampled and propagated to the next knot point using
 \eqref{eq:uupdate}, \eqref{eq:unormalize}, and \eqref{eq:upropagate}. Our
-choice of sigma points follows the prescription in equation 11 of \cite{julier2004unscented}.
+choice of sample states (sigma points) follows equation 11 of
+\cite{julier2004unscented}.
 Prescriptions that require fewer sigma points exist \cite{julier2002reduced}.
 
 

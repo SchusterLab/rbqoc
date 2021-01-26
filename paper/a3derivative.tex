@@ -1,36 +1,6 @@
 \section{Derivative Method \label{appendix:derivative}}
-We comment on the optimization metrics of the derivative methods and then
-outline how to efficiently integrate their dynamics.
-The 1\textsuperscript{st}-order derivative method tends
-to outperform the 2\textsuperscript{nd}-order
-derivative method in the small, static detuning regime, see Figure \ref{fig:staticb}.
-The norms of the state derivatives for the 1\textsuperscript{st}- and 2\textsuperscript{nd}-order
-methods are provided in Table \ref{tab:dnorm} for the solutions to
-the numerical experiment detailed in Section \ref{sec:static} at $t_{N} = 60$ns.
-The 2\textsuperscript{nd}-order method is able to decrease the 2\textsuperscript{nd}-order
-state derivate norm relative to the 1\textsuperscript{st}-order method at the expense of increasing
-its 1\textsuperscript{st}-order derivative norm. In the problem
-we have studied it is likely the 2\textsuperscript{nd}-order derivative norm has a smaller
-contribution to the gate error than the 1\textsuperscript{st}-order derivative norm. A
-careful analysis of contributions at each order could be used to predict the efficacy of the
-derivative method for future problems.
-
-\begin{table}[ht]
-  \begin{tabular}{c | c | c}
-    Method & $\norm*{\ket*{\partial_{f_{q}} \psi_{N}}}_{2}$ ($10^{3}$)
-    & $\norm*{\ket*{\partial^{2}_{f_{q}} \psi_{N}}}_{2}$ ($10^{6}$)\\
-    \hline
-    D1 & 0.436 & 57.817\\
-    D2 & 1.702 & 9.030\\
-  \end{tabular}
-  \caption{Norm of state derivates with respect to the qubit frequency
-    for $Z/2$ gates optimized using the derivative methods. The norms are computed
-    at the end of the gate $t_{N} = 60$ns
-    and are averaged over the four state derivatives.}
-  \label{tab:dnorm}
-\end{table}
-
-The dynamics for the derivative methods can be integrated efficiently using exponential integrators.
+Here, we outline how to efficiently integrate the dynamics
+of the derivative method using exponential integrators.
 General exponential integrators break the dynamics into a linear term and a non-linear term.
 For example, the dynamics of the first state derivative in
 units of $i\hbar = 1$ are $\frac{d}{dt} \ket{\partial_{\lambda} \psi} =
@@ -43,7 +13,7 @@ With zero-order hold on the controls the exact solution is:
     \ket{\partial_{\lambda} \psi_{k + 1}} &= \exp(\Delta t_{k} L_{k})
     \ket{\partial_{\lambda} \psi_{k}}\\
     &+ \int_{0}^{\Delta t_{k}} \exp((\Delta t_{k} - t^{'})L_{k})
-    N(t_{k} + t^{'}) dt^{'}\\
+    N(t_{k} + t^{'}) dt^{'}.\\
   \end{aligned}
 \end{equation}
 General exponential integrators proceed by breaking the integral in \eqref{eq:dgeneralexp}
@@ -53,7 +23,7 @@ method \cite{berland2005solving},
 \begin{equation}
   \begin{aligned}
     \ket{\partial_{\lambda} \psi_{k + 1}} &\approx \exp(\Delta t_{k}L_{k}) \ket{\partial_{\lambda} \psi_{k}}\\
-    &+ \exp(\Delta t_{k}L_{k}) N_{k}\\
+    &+ \exp(\Delta t_{k}L_{k}) N_{k} \Delta t_{k}.\\
   \end{aligned}
 \end{equation}
 This method provides a good tradeoff between accuracy and efficiency, requiring one unique matrix

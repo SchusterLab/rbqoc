@@ -2,50 +2,42 @@
 We provide runtimes for our optimizations and comment on the scaling of the
 robustness methods. The runtimes for
 the base optimization in Section \ref{sec:fluxonium},
-the longitudinally aware optimization in Section \ref{sec:longitude},
+the depolarization optimization in Section \ref{sec:longitude},
 and the robust optimizations in Section \ref{sec:static}
 are presented in Table \ref{tab:time}
-for a $Z/2$ gate at multiples of the analytic $Z/2$ gate time.
-Compiler optimizations for statically-sized arrays were utilized
-for all methods except for the unscented sampling method.
-The unscented sampling method's augmented state vector size
-was too large to take advantage of these optimizations,
-which adversely affected its run time.
-The runtimes of the robust methods scale
-super-linearly with the gate time.
-For large gate times, we expect the runtimes
-to scale linearly with the gate time
-because the number of knot points scales linearly with the gate time.
-We observe this trend for the base method, which has a smaller
-augmented state vector size than the robust methods.
-We performed optimizations on a single CPU thread in this work as a proof
-of concept. Future work will parallelize the robustness
-methods across the initial states in the operator basis and utilize GPUs
+for a $Z/2$ gate at gate times which are multiples of $1/4f_{q} \sim 18$ns.
+We performed optimizations on a single core of
+an AMD Ryzen Threadripper 3970X 32-Core Processor.
+Future work will parallelize the robustness methods using GPUs
 \cite{leung2017speedup},
-which will enable fast optimizations on large Hilbert spaces.
-\vspace*{\intextsep}
+which will enable fast optimizations on high-dimensional Hilbert spaces.
+
 \begin{table}[H]
-  \begin{tabular} {c | c | c | c | c | c | c}
-    & \multicolumn{6}{c}{Wall Time ($\pm 0.001$ s)}\\
+  \centering
+  \begin{tabular} {c | c | c | c }
+    & \multicolumn{3}{c}{Average Runtime (s)}\\
     \hline
-    $t_{N}$ (ns) & Base & Long. & S & SU & D1 & D2\\
+    $t_{N}$ (ns) & $18$ & $36$ & $72$\\
     \hline
-    $18$ & 0.155 & 1.688 & 1.773 & 210.573 & 16.713 & 48.398\\ % 0.155049
-    $36$ & 7.014 & - & 48.213 & 4566.236 & 67.838 & 81.030\\
-    $72$ & 15.906 & - & 281.372 & 16575.308 & 266.997 & 332.182\\
+    Base & $0.155 \pm 0.008$ & $7.0 \pm 0.4$ & $15.9 \pm 0.8$\\
+    Depol. & $1.69 \pm 0.08$ & - & -\\
+    S & $1.77 \pm 0.09$ & $48 \pm 2$ & $280 \pm 10$\\
+    U & $75 \pm 4$ & $340 \pm 20$ & $400 \pm 20$\\
+    D1 & $6.1 \pm 0.3$ & $27 \pm 1$ & $65 \pm 3$\\
+    D2 & $15.7 \pm 0.8$ & $17.3 \pm 0.9$ & $54 \pm 3$\\
   \end{tabular}
   \caption{
-    \todo{check accuracy}
-    Runtimes for $Z/2$ optimizations.
-    Programs were executed on a single thread of an
-    AMD Ryzen Threadripper 3970X 32-Core Processor.
+    Average runtimes for $Z/2$ optimizations
+    using the base, depolarization, sampling (S),
+    unscented Sampling (U), and the 1\textsuperscript{st}-
+    and 2\textsuperscript{nd}-order derivative methods (D1, D2).
   }
   \label{tab:time}
 \end{table}
 
 Now we present the problem size complexities for the robustness methods.
 For the sampling method, the size of the augmented state vector
-is $O(dn^{3})$, where $d$ is the number of deviant parameters and
+is $O(dn^{3})$, where $d$ is the number of uncertain parameters and
 $n$ is the dimension of the Hilbert space. There are $n^{2}$ initial states
 in the operator basis, $2d$ sample states per initial state,
 and each state has $2n$ real numbers.

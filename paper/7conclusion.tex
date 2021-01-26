@@ -3,30 +3,23 @@ In conclusion, we have applied state-of-the-art trajectory
 optimization techniques to mitigate decoherence and
 achieve robustness to parameter uncertainty
 errors on a quantum system.
-We have proposed a scheme for supressing
+We have proposed a scheme for suppressing
 depolarization with time-optimal
 control and the depolarization probability model.
-The computational cost of this depolarization model is
+The computational cost of this model is
 independent of the dimension of the Hilbert space, enabling
 inexpensive optimization on high-dimensional quantum systems.
 We have also proposed the derivative method for robust control which achieves
 super-linear gate error reductions in the gate time for the static parameter
 uncertainty problem we studied.
 We have shown that the derivative, sampling, and unscented sampling methods
-can mitigate 1/$f$ flux noise errors
-which dominate coherent errors for flux controlled qubits.
-\myrem{The derivative and sampling methods scale cubically with
-the dimension of the Hilbert space, allowing for applications
-to larger quantum systems.
-The derivative, sampling, and unscented sampling
-methods will benefit from interleaving optimization with
-experimental characterization, while the sampling and unscented
-sampling methods can also be applied to error channels without models.}
-\myadd{The robust control techniques can be applied
+can mitigate 1/$f$ flux noise errors--which
+dominate coherent errors for flux controlled qubits.
+These robust control techniques can be applied
 to any Hamiltonian,
 allowing experimentalists in all domains to engineer robust
-operations on their quantum systems.}
+operations on their quantum systems.
 These methods will be used to achieve the low gate errors
 required for fault-tolerant quantum computing applications. Our
-implementation of the techniques described in this work is available
-at \url{https://github.com/SchusterLab/rbqoc}.
+implementations of the techniques described in this work are available
+at \url{https://github.com/SchusterLab/rbqoc}. \todo{static code?}

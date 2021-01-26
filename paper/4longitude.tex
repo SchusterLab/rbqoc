@@ -1,39 +1,38 @@
-\section{Depolarization Awareness \label{sec:longitude}}
-The strength of depolarization varies
-with the control parameters in a range of superconducting circuit platforms,
-including the fluxonium. In this section, we outline a method
-for tuning the flux amplitude to mitigate depolarization.
-Previous work has modeled the gate error due to depolarization
+\section{Depolarization Mitigation\label{sec:longitude}}
+In this section, we outline a method
+for optimizing the flux to mitigate depolarization.
+For many superconducting circuits, the 1/$e$ depolarization time ($T_{1}$) is independent of the control parameters,
+so the fastest possible gate incurs the least depolarization error
+\cite{schulteherbruggen2011optimal}.
+For the fluxonium, however, $T_{1}$ is strongly dependent on the flux.
+We enable the optimizer to trade longer gate times
+for lower depolarizaiton times or vice-versa by making the gate time a decision variable.
+Additionally, previous work has modeled the gate error due to depolarization
 by evolving density matrices under a master
 equation \cite{rembold2020introduction, schulteherbruggen2011optimal}
 or evolving a large number of states in a quantum trajectory approach
 \cite{abdelhafez2019gradient}.
 We avoid the increase in computational complexity required for these
-techniques by
-penalizing the integrated rate (probability) of depolarization in optimization.
+techniques by penalizing the integrated rate (probability) of depolarization in optimization.
 Using this probability as a proxy for the gate error incurred
-is reasonable because losses due to depolarization increase monotonically
-in time. Additionally, for a constant $T_{1}$ time--the $1/e$ depolarization
-time for the qubit--a shorter gate duration
-would favor a lower depolarization probability. We allow
-the optimizer to tune the gate time to minimize the
-depolarization probability.
+is reasonable because depolarization errors are incoherent and therefore
+increase monotonically in time without interference.
 
 The depolarization probability is given by,
 \begin{equation}
-  P_{1}(t) = \int_{0}^{t} T_{1}^{-1}(a(t^{\prime})) dt^{\prime}
+  P_{1}(t) = \int_{0}^{t} T_{1}^{-1}(a(t^{\prime})) dt^{\prime}.
 \end{equation}
 This value is appended to the augmented state \eqref{eq:astatecontrols}
 and its norm is penalized in the objective \eqref{eq:costfun} by setting
-the corresponding element of the final augmented state $x_{f}$ to $0$.
+the corresponding element of the final augmented state to zero.
 $T_{1}(a_{k})$ is obtained at each knot point by evaluating
 a spline fit to experimental data of the form $\{(a, T_{1})\}$,
 see Figure \ref{fig:longitudeb}.
 It is also possible to fit a spline to theoretically obtained data.
-However, $T_{1}$ values are known to fluctuate greatly
-with laboratory temperatures \cite{klimov2018fluctuations}.
-Interpolating $T_{1}$ from experimental data
-increases the fridge truth of the simulation.
+However, experimental data often deviates from theoretical predictions
+because it is difficult to account for all loss channels \cite{zhang2020universal},
+and $T_{1}$ values often fluctuate on hour
+time scales \cite{klimov2018fluctuations}.
 
 We allow the optimizer to tune the gate time by
 making the time step between each knot point $\Delta t_{k}$
@@ -49,36 +48,39 @@ To ensure numerical
 integration accuracy is maintained, we constrain
 the bounds of the time step at each knot point.
 
-We compare the performance of the $X/2$, $Y/2$, and $Z/2$ gates obtained with
-our numerical method to the analytic gates. We
+We analyze the effect of depolarization on
+the $X/2$, $Y/2$, and $Z/2$ gates obtained with
+our numerical method and the analytic gates. We
 use the Lindblad master equation to simulate $T_{1}$ dissipation for successive
 gate applications, and compute the cumulative gate error
 after each application, see Appendix \ref{appendix:longitude}.
-The flux amplitudes for the numerical gates are similar; the
-waveforms are approximately periodic
-with amplitudes $\sim 0.2 \textrm{GHz}$, see Figure \ref{fig:longitudea}. \todo{Floquet}.
-Their gate times are greater
-than their analytic counterparts, but they
-reach higher amplitudes and therefore higher $T_{1}$ times.
-Although the analytic and numerical gates attain single gate errors sufficient for
-quantum error correction ($< 10^{-4}$), which are required for fault-tolerant quantum computing
-\cite{aharonov2008fault, fowler2009high, gottesman1997stabilizer},
-the single gate errors for the numerical
-gates are a factor of $5$ less
-than those for the analytic gates, commensurate to the
-depolarization probability reductions, see Appendix \ref{appendix:longitude}.
+\todo{Jens, Danny, Ziwen, any idea what the correct way to simulate depolarization is
+  when $T_{1}$ is time dependent?}.
 The gate error reported in this text is the infidelity
 of the evolved state and the target state averaged over 1000 pseudo-randomly
 generated initial states.
-The numerical $Z/2$ and $Y/2$ gates produce similar
-results in the concatenated gate application comparison,
-yielding cumulative gate errors below $8 \cdot 10^{-3}$
-over $2000$ gate applications $\sim 40 \mu\textrm{s}$, see Figure \ref{fig:longitudec}.
-The cumulative gate error for the numerical $X/2$ gate is
-$1.7 \cdot 10^{-2}$ over $2000$ gate applications $\sim 124 \mu\textrm{s}$.
-The low cumulative gate errors for high gate counts produced
-by the numerical gates are critical for
-noisy, intermediate-scale quantum (NISQ) applications.
-These improvements are significant for the realistic constraints we have imposed
-on the gates, and do not represent a fundamental limit to the optimization methods we have
-employed.
+The flux pulses for the numerical gates
+are approximately periodic
+with amplitudes $\sim 0.2 \textrm{GHz}$, see Figure \ref{fig:longitudea}.
+They are reminiscent of the analytically determined Floquet operations
+for a fluxonium described in \cite{huang2020engineering}
+and realized in \cite{mundada2020floquet}.
+The numerical gate times are greater
+than the analytic gate times, but the
+numerical flux pulses
+spend more time at higher amplitudes, achieving higher $T_{1}$ times.
+The single gate errors for both the analytic and numerical gates are
+less than $10^{-4}$, which makes them sufficient for quantum error correction--a
+prerequisite for fault-tolerant quantum
+computing \cite{aharonov2008fault, knill2005quantum, gottesman1997stabilizer}.
+However, the numerical gates achieve single gate errors
+$\sim 5$ times less than those for the analytic gates,
+which tracks closely with their relative improvement
+on the depolarization probability metric, see Appendix \ref{appendix:longitude}.
+This single gate error advantage corresponds to a significant reduction in error correction resources.
+Furthermore, for successive gate applications, the gate error due to depolarization is approximately linear
+in the gate count, which we expect for $t \ll T_{1}$, see Figure \ref{fig:longitudec}.
+The gate error reduction for large gate counts is important for noisy, intermediate-scale quantum (NISQ)
+applications. These improvements are significant for the constraints we have imposed on the gates,
+and do not represent a fundamental limit to the optimization methods we have employed.
+

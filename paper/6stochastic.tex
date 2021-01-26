@@ -2,18 +2,18 @@
 An additional source of experimental error arises from time-dependent
 Hamiltonian parameter uncertainty. For many flux-biased and inductively-coupled
 superconducting circuit elements, magnetic flux noise is a significant
-source of coherent errors \todo{coherent errors?}. Flux noise
+source of coherent errors. Flux noise
 modifies the fluxonium Hamiltonian \eqref{eq:hamiltonian}
 by $a(t) \rightarrow a(t) + \delta a(t)$.
-The spectral density of flux noise is known to
+The spectral density of the flux noise $\delta a(t)$ is observed to
 follow a 1/$f$ distribution
 \cite{bialczak20071f, koch2007model,
   yoshihara2006decoherence, yoshihara2010correlated},
 so the noise is dominated by low-frequency components.
 The analytic gate considered here
 takes advantage of the low-frequency characteristic and
-treat the noise as quasi-static, performing a generalization of the spin-echo
-technique to compensate for erroneous drift.
+treats the noise as quasi-static, performing a generalization of the spin-echo
+technique to compensate for erroneous drift \cite{hahn1952spin, meiboom1958modified}.
 
 Additionally, we modify the robust control techniques presented
 in the previous section to combat 1/$f$ flux noise.
@@ -25,22 +25,27 @@ The noise is then scaled by the
 flux noise amplitude of our device $A_{\Phi} = 5.21 \mu \Phi_{0} \implies
 \sigma_{a} = 2.5 \cdot 10^{-5} \textrm{GHz}$.
 In principle, we could modify the sampling method
-similarly; however, we choose to sample statically $a(t) \rightarrow a(t) + \sigma_{a}$
+similarly; however, we choose to subject the sample states
+to static noise
+$a(t) \rightarrow a(t) \pm \sigma_{a}$
 for comparison. The derivative methods require no algorithmic modification
 from the static case, but the TDSE is now differentiated with respect
 to $a(t)$ instead of $f_{q}$ as in \eqref{eq:d1dyn}.
 
-We compare the gate errors due to 1/$f$ flux noise for $X/2$
-gates constructed with the robust control techniques
-and the analytic method. To compute the gate error,
+We analyze the gate errors due to 1/$f$ flux noise for
+the $X/2$ gates constructed with the robust control techniques
+and the analytic $X/2$ gate. To compute the gate error,
 an initial state is evolved
 under the fluxonium Hamiltonian \eqref{eq:hamiltonian}
-where the optimized flux amplitude is modified $a(t) \rightarrow a(t) + \delta a(t)$.
-The flux noise $\delta a(t)$ is generated as
+where the optimized flux is modified $a(t) \rightarrow a(t) + \delta a(t)$.
+The flux noise is generated as
 we described for the unscented sampling method.
-Each of the $1000$ averages we perform uses a different random seed for
-generating the flux noise.
-We simulate successive applications of the gate constructed by each method
+The reported gate error is the infidelity
+averaged over $1000$ pseudorandomly generated initial states,
+each of which is subject to a distinct pseudorandomly
+generated flux noise instance.
+To observe the effect of interfering coherent errors,
+we simulate successive applications of the gate constructed by each method
 and compute the cumulative gate error
 after each application, see Figure \ref{fig:stochastic}.
 Both the analytic
@@ -51,6 +56,5 @@ numerical gates perform similarly in the concatenated
 gate application comparison. Their gate errors
 after $200$ gate applications $\sim 11 \mu\textrm{s}$ are
 two orders of magnitude less than the gate error produced by the analytic gate.
-\todo{motional narrowing}.
-1/$f$ flux noise is a significiant source of coherent errors in NISQ applications and
+1/$f$ flux noise is a significant source of coherent errors in NISQ applications and
 these numerical techniques offer effective avenues to mitigate it.

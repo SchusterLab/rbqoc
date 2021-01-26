@@ -5,93 +5,21 @@ The fluxonium is a promising building block
 for quantum computers, and the accurate
 two-level approximation of its Hamiltonian makes
 QOC on a classical computer inexpensive.
-In the two-level
-approximation, the Hamiltonian takes the form:
+To high accuracy, we approximate the Hamiltonian near the flux frustration
+as a spin-$1/2$ system:
 \begin{align}
-  H/h &= f_{q} \frac{\sigma_{z}}{2} + a(t) \frac{\sigma_{x}}{2}
+  H/h &= f_{q} \frac{\sigma_{z}}{2} + a(t) \frac{\sigma_{x}}{2},
   \label{eq:hamiltonian}
 \end{align}
 where $f_{q}$ is the qubit frequency at the flux frustration point,
-$a(t)$ is the flux-drive amplitude, $h$ is Planck's constant, and $\sigma_{z}, \sigma_{x}$
-are Pauli matrices. We optimize $X/2$, $Y/2$, and
-$Z/2$ gates for the fluxonium presented in \cite{zhang2020universal},
+$a(t)$ is the flux bias, $h$ is Planck's constant, and $\sigma_{z}, \sigma_{x}$
+are Pauli matrices. Although we use an approximation for the Hamiltonian,
+our noise model is realistic and considers the full Hilbert space. We optimize $X/2$,
+$Y/2$, and $Z/2$ gates for the fluxonium presented in \cite{zhang2020universal},
 and compare them to the analytically constructed gates for
 that device.
 
-\myrem{The optimization problem takes the form:
-\begin{mini!}[2] 
-  {x_{1:N}, u_{1:N\text{-}1}}{\sum_{k=1}^N \norm{x_k\text{-}x_f}_{Q_k}
-    + \sum_{k=1}^{N-1} \norm{u_k}_{R_k}}{}{} \label{eq:costfun}
-  \addConstraint{x_{k+1}}{= f(x_k, u_k)}  \label{eq:dyn_con}
-  \addConstraint{\ket{\psi^{0}_{1}} = \ket{0}, \ket{\psi^{1}_{1}} = \ket{1}} \label{eq:istate_con}
-  \addConstraint{\ket{\psi^{i}_{N}} = \ket{\psi^{i}_{f}}
-    \ \forall \  i \in \{0, 1\}} \label{eq:tstate_con}
-  \addConstraint{{\lvert \braket{\psi^{i}_{k}}{\psi^{i}_{k}}
-      \rvert}^{2} = 1 \ \forall \ i \in \{0, 1\}} \label{eq:statenorm_con}
-  \addConstraint{{\textstyle \int^{t_{1}}_{0} a \ \mathrm{d}t} = \pdv*{a_{1}}{t} = 0}
-  \label{eq:icintd_con}
-  \addConstraint{{\textstyle \int^{t_{N}}_{0}} a \ \mathrm{d}t= 0} \label{eq:znf_con}
-  \addConstraint{a_{1} = a_{N} = 0} \label{eq:concat_con}
-  \addConstraint{|a_{k}| \leq 0.5 \ \textrm{GHz}} \label{eq:amp_con}
-\end{mini!}
-The augmented state and augmented controls are:
-\begin{equation}
-  x = \begin{bmatrix} \psi^{0} \\ \psi^{1} \\ \int^{t}_{0} a \ \mathrm{d}t\\ a \\ \pdv*{a}{t} \end{bmatrix} \quad
-  u = \begin{bmatrix} \pdv*[2]{a}{t} \end{bmatrix}
-  \label{eq:astatecontrols}
-\end{equation}
-The matrices $Q_{k}$ and $R_{k}$ define the penalty metric.
-Including objectives at each knot point smoothens the optimization landscape, though
-the importance of the final objective is encoded in the relative
-weight $Q_{N} \sim N \cdot Q_{k}$.
-We choose $Q$ to be diagonal because it is computationally efficient. This
-metric penalizes phase differences between the states, although
-phase-insensitive metrics such as infidelity may be employed.}
-
-\myrem{We impose constraints that
-reflect the physical limitations of the apparatus and 
-improve the experimental realization of the control pulse.
-The discrete dynamics \eqref{eq:dyn_con} integrates the states
-according to the TDSE \eqref{eq:tdse} and the
-fluxonium Hamiltonian \eqref{eq:hamiltonian}
-and integrates the moments of the flux amplitude.
-Exposing lower order moments of the flux amplitude allows us to penalize their norms
-in \eqref{eq:costfun}, smoothing the flux amplitude
-and mitigating AWG ringing due to high frequency transitions.
-We ensure the desired gate is achieved by imposing the constraints
-\eqref{eq:istate_con} and \eqref{eq:tstate_con}.
-The initial states in \eqref{eq:istate_con}
-are chosen to span the Hilbert space.
-The final states in \eqref{eq:tstate_con} are the image
-of the initial states under the desired gate.
-The ALTRO implementation we use does not currently support complex numbers so
-we compute in the isomorphism $\mathcal{H}(\mathbb{C}^{n}) \cong \mathcal{H}(\mathbb{R}^{2n})$
-given in \cite{leung2017speedup},
-\begin{equation}
-  H \ket{\psi} \cong \begin{bmatrix} H_{\textrm{re}} & -H_{\textrm{im}}
-    \\ H_{\textrm{im}} & H_{\textrm{re}}\end{bmatrix}
-  \begin{bmatrix} \psi_{\textrm{re}} \\ \psi_{\textrm{im}}\end{bmatrix}
-  \label{eq:isomorphism}
-\end{equation}
-We ensure the solver does not take advantage of discretization
-error by imposing the normalization constraint \eqref{eq:statenorm_con}.
-The constraint \eqref{eq:icintd_con} is an initial condition.
-We ensure the pulse has zero net flux by imposing \eqref{eq:znf_con},
-which mitigates the hysteresis ubiquitous in flux bias lines
-\cite{battistel2019fast, krantz2019quantum, zhang2020universal}.
-We ensure gates may be concatenated arbitrarily without
-inducing AWG ringing due to high-frequency transitions by imposing
-the boundary condition \eqref{eq:concat_con}.
-Finally, we ensure the two-level
-approximation \eqref{eq:hamiltonian} remains valid
-by imposing the amplitude constraint \eqref{eq:amp_con}.
-All of the gates presented in this work achieve a maximum
-individual constraint violation of $10^{-8}$
-for \eqref{eq:dyn_con}--\eqref{eq:amp_con}.}
-
-
-
-\myadd{First, we outline the constraints for the fluxonium gate problem.
+First, we outline the constraints for the fluxonium gate problem.
 We formulate this problem as a multi-state-transfer problem.
 The initial conditions on
 the states are $\ket{\psi^{0}_{1}} = \ket{0}$, $\ket{\psi^{1}_{1}} = \ket{1}$
@@ -102,32 +30,25 @@ The states at the final knot point are constrained to be
 the image of the initial states under the desired gate $U$,
 $\ket{\psi^{i}_{N}} = U \ket{\psi^{i}_{1}} \ \forall \ i$
 \eqref{eq:tstate_con}.
-%% This constraint is sensitive to global phase
-%% differences between the states.
-%% , but it is computationally efficient
-%% because the Jacobian and Hessian
-%% of the corresponding constraint function are diagonal.
-%% We could have analogously chosen a metric which is insensitive
-%% to global phases, such as the fidelity of the states.
 Furthermore, we impose the normalization constraint
 ${\lvert \braket{\psi^{i}_{k}}{\psi^{i}_{k}} \rvert}^{2} = 1 \ \forall \ i,k$
 \eqref{eq:statenorm_con}
-to ensure the solver does not take advantge of discretization errors in numerical integration.
-To refer to the discrete moments the flux amplitude, we introduce the notation
+to ensure the solver does not take advantage of discretization errors in numerical integration.
+To refer to the discrete moments the flux, we introduce the notation
 $\int^{t_{k}}_{t_{1}} a(t) \ \mathrm{d}t \equiv \int_{t} a_{k}$,
-$a(t) \lvert_{t = t_{k}} \equiv a_{k}$,
+$a(t = t_{k}) \equiv a_{k}$,
 $\pdv*[n]{a(t)}{t} \lvert_{t = t_{k}} \equiv \partial^{n}_{t} a_{k}$.
 We impose the zero net flux constraint $\int_{t} a_{N} = 0$
 \eqref{eq:znf_con}
-which mitigates the hysteresis ubiquitous in flux-bias lines
+which mitigates the inductive drift ubiquitous in flux-bias lines
 \cite{battistel2019fast, krantz2019quantum, zhang2020universal}.
-The flux amplitude is constrained by $\lvert a_{k} \rvert \leq 0.5 \ \textrm{GHz} \ \forall \ k$
+The flux is constrained by $\lvert a_{k} \rvert \leq 0.5 \ \textrm{GHz} \ \forall \ k$
 \eqref{eq:amp_con}
 to ensure the two-level approximation \eqref{eq:hamiltonian} remains valid.
 We also enforce the boundary condition $a_{1} = a_{N} = 0$ \eqref{eq:bound_con}
 so the gates may be concatenated arbitrarily. Additionally,
 we have the initial condition $\int_{t} a_{1} = \partial_{t} a_{1} = 0$
-\eqref{eq:ic_con}.}
+\eqref{eq:ic_con}.
 
 %% F1
 \begin{figure*}[ht]
@@ -145,45 +66,56 @@ we have the initial condition $\int_{t} a_{1} = \partial_{t} a_{1} = 0$
     \caption{\label{fig:longitudec}}
   \end{subfigure}
   \caption{
-    (a) Numerically optimized gates (dark blue)
-    and analytically optimized gates (light pink).
-    (b) $T_{1}$ interpolation function used in optimization. Markers
-    denote the time-averaged, absolute amplitude of each gate.
+    (a) Flux pulses for the numerical gates (dark blue)
+    and the analytic gates (light pink).
+    (b) $T_{1}$ interpolation function used in optimization. Circle markers
+    indicate measured $T_{1}$ times. Non-circle markers
+    indicate the time-averaged, absolute amplitude of each flux pulse.
     (c) Cumulative gate errors due to depolarization as a function of the
     number of gates applied.
-    Gate errors for the numerically optimized $Z/2$ and $Y/2$ gates
-    are indistinguishable. Inset shows the cumulative gate errors
-    plotted on a log scale for small gate counts.
+    Cumulative gate errors for the numerical $Z/2$ and $Y/2$ gates
+    are indistinguishable. Inset shows log-scaled cumulative gate errors
+    for small gate counts.
   }
   \label{fig:longitude}
 \end{figure*}
 
-\myadd{Next, we outline the cost functions for the fluxonium gate problem.
-The augmented state and augmented control are:
+Next, we introduce the augmented control and augmented state:
 \begin{equation}
   \begingroup
   \renewcommand*{\arraystretch}{1.3}
+  u_{k} = \begin{bmatrix} \partial^{2}_{t} a_{k} \end{bmatrix}, \quad
   x_{k} = \begin{bmatrix} \ket{\psi^{0}_{k}} \\ \ket{\psi^{1}_{k}}
-    \\ \int_{t} a_{k} \\ a_{k} \\ \partial_{t} a_{k} \end{bmatrix} \quad
-  u_{k} = \begin{bmatrix} \partial^{2}_{t} a_{k} \end{bmatrix}
+    \\ \int_{t} a_{k} \\ a_{k} \\ \partial_{t} a_{k} \end{bmatrix}.
   \endgroup
   \label{eq:astatecontrols}
 \end{equation}
-The cost function at each knot point is
-$\ell_{k}(x_{k}, u_{k}) = (x_{k} - x_{f})^{T} Q_{k} (x_{k} - x_{f}) + u^{T}_{k} R_{k} u_{k}$
-where $Q_{k}$ and $R_{k}$ are matrices we supply, and
-$x_{f}$ is given by the constraints we have imposed on
-$\ket{\psi^{i}_{N}}$, $\int_{t} a_{N}$, and $a_{N}$ in addition to
-$\partial_{t} a_{f} = 0$. We choose $Q_{k}$ to be diagonal
-so the cost function incentivizes the achievement of the constraints on
-$\ket{\psi^{i}_{N}}$, $\int_{t} a_{N}$, and $a_{N}$,
-and penalizes the norm of $\partial_{t} a_{k}$ and $\partial^{2}_{t} a_{k}$,
-mitigating AWG ringing due to high-frequency transitions.
-In the discrete dynamics function for this problem \eqref{eq:dyn_con},
-we integrate the states according to the TDSE \eqref{eq:tdse} and the
+The variables in the augmented state are derived from
+the decision variable in the augmented
+control via coupled, first-order differential equations in the 
+the discrete dynamics function \eqref{eq:dyn_con}.
+We integrate the states according to the TDSE \eqref{eq:tdse} and the
 fluxonium Hamiltonian \eqref{eq:hamiltonian} and integrate
 the second-derivative of the flux amplitude to obtain
 the first-derivative, proportional, and integral moments.
+The ALTRO implementation we use does not currently
+support complex numbers, so we repesent the states
+in the isomorphism $\mathcal{H}(\mathbb{C}^{n})
+\cong \mathcal{H}(\mathbb{R}^{2n})$ given in \cite{leung2017speedup},
+\begin{equation}
+  H \ket{\psi} \cong \begin{bmatrix} H_{\textrm{re}} & -H_{\textrm{im}}
+    \\ H_{\textrm{im}} & H_{\textrm{re}}\end{bmatrix}
+  \begin{bmatrix} \ket{\psi}_{\textrm{re}} \\ \ket{\psi}_{\textrm{im}}\end{bmatrix}.
+  \label{eq:isomorphism}
+\end{equation}
+The cost function at each knot point is
+$\ell_{k}(x_{k}, u_{k}) = (x_{k} - x_{f})^{T} Q_{k} (x_{k} - x_{f}) + u^{T}_{k} R_{k} u_{k}$
+where $Q_{k}$ and $R_{k}$ are diagonal matrices we supply. The $Q_{k}$ term
+penalizes deviations from the final augmented state $x_{f}$,
+which is given by the constraints we have imposed on
+$\ket*{\psi^{i}_{N}}$, $\int_{t} a_{N}$, and $a_{N}$ in addition to
+$\partial_{t} a_{f} = 0$. The $R_{k}$ term penalizes the norm of $\partial^{2}_{t} a_{k}$,
+mitigating AWG ringing due to high-frequency transitions.
 Stated succinctly, the optimization problem takes the form:
 \begin{mini!}[2] 
   {x_{1:N}, u_{1:N\text{-}1}}{\sum_{k=1}^N {(x_k\text{-}x_f)}^{T} Q_k (x_k\text{-}x_{f})
@@ -197,9 +129,5 @@ Stated succinctly, the optimization problem takes the form:
   \addConstraint{{\textstyle \int_{t}} a_{N} = 0} \label{eq:znf_con}
   \addConstraint{|a_{k}| \leq 0.5 \ \textrm{GHz} \ \forall \ k} \label{eq:amp_con}
   \addConstraint{a_{1} = a_{N} = 0} \label{eq:bound_con}
-  \addConstraint{{\textstyle \int_{t}} a_{1} = \partial_{t} a_{1} = 0} \label{eq:ic_con}
-\end{mini!}}
-
-
-
-
+  \addConstraint{{\textstyle \int_{t}} a_{1} = \partial_{t} a_{1} = 0}. \label{eq:ic_con}
+\end{mini!}

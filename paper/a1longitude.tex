@@ -18,19 +18,20 @@ is similar across the two metrics.
     X/2 & 16.251 & 2.660 & 6.109 & 5.347 & 0.863 & 6.196\\
   \end{tabular}
   \caption{
-    Single gate depolarization probability (P) ratios
-    and single gate error due to depolarization (GE) ratios.
-    Values are reported for the analytic (A) and numerical (N) techniques.
+    Single gate depolarization probability (P)
+    and single gate error due to depolarization (GE).
+    Values are reported for the analytic (A) and numerical (N) gates.
   }
   \label{tab:longitude}
 \end{table}
 
-To compute the gate error due to depolarization
-we employ the Lindblad master equation. This equation takes the form:
+We employ the Lindblad master equation
+to compute the gate error due to depolarization.
+This equation takes the form:
 \begin{equation}
   \frac{d}{dt} \rho = \frac{-i}{\hbar} [H, \rho]
   + \sum_{i = 1}^{n^{2} - 1} \gamma_{i} (L_{i} \rho L_{i}^{\dagger}
-  - \frac{1}{2} \{L_{i}^{\dagger} L_{i}, \rho\})
+  - \frac{1}{2} \{L_{i}^{\dagger} L_{i}, \rho\}),
 \end{equation}
 where $\rho = \ket{\psi}\bra{\psi}$ is the density matrix, $n$ is the
 dimension of the Hilbert space,
@@ -44,26 +45,26 @@ Both $T_{1, \uparrow}$ and $T_{1, \downarrow}$ are obtained from the spline
 shown in Figure \ref{fig:longitudeb}.
 We obtain the $T_{1}$ values in this spline
 by driving the qubit at the desired flux amplitude
-and monitoring the resultant decay.
-For more details consult \cite{zhang2020universal}.
+and monitoring the resultant decay. For more details
+on these measurements, consult \cite{zhang2020universal}.
 
-Exponential integrators can be employed to integrate the Lindblad master equation
-using the Vectorization/Choi-Jamiolkowski isomorphism \cite{Landi2018},
+So that we may use exponential integrators, we employ
+the Vectorization/Choi-Jamiolkowski isomorphism \cite{Landi2018},
 \begin{equation}
-  \frac{d}{dt} \textrm{vec}({\rho}) = \hat{\mathcal{L}} \textrm{vec}({\rho})
+  \frac{d}{dt} \textrm{vec}({\rho}) = \hat{\mathcal{L}} \textrm{vec}({\rho}),
 \end{equation}
 \begin{equation}
   \begin{aligned}
     \hat{\mathcal{L}} &= -i(I \otimes H - H^{T} \otimes I)\\
     &+ \sum_{i = 1}^{n^{2} - 1} \gamma_{i}
     (L_{i}^{*} \otimes L_{i} - \frac{1}{2} (I \otimes L_{i}^{\dagger}L_{i}
-    - L_{i}^{T}L_{i}^{*} \otimes I))
+    - L_{i}^{T}L_{i}^{*} \otimes I)),
   \end{aligned}
 \end{equation}
 where $\rho = \sum_{i, j} \alpha_{i, j} \ket{i}\bra{j}$
 and $\textrm{vec}(\rho) = \sum_{i, j} \alpha_{i, j} \ket{i} \otimes \ket{j}$.
 We use zero-order hold on the controls so the exact solution is
-$\textrm{vec}(\rho_{k + 1}) = \exp(\Delta t_{k} \hat{\mathcal{L}}_{k}) \textrm{vec}(\rho_{k})$.
+$\textrm{vec}(\rho_{k + 1}) = {\exp}{\textstyle(}\Delta t_{k} \hat{\mathcal{L}}_{k}{\textstyle)} \textrm{vec}(\rho_{k})$.
 This isomorphism transforms $(n^{2} \times n^{2}) \times (n^{2} \times n^{2})$
 matrix-matrix multiplications to $(n^{4} \times n^{4}) \times n^{4}$ matrix-vector
 multiplications. For small $n$ and zero-order hold on the controls, we find that it is
