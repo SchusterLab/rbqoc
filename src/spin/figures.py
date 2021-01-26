@@ -28,6 +28,8 @@ F3D_DATA_FILE_PATH = os.path.join(SAVE_PATH, "f3d.h5")
 # simulation
 DT_PREF = 1e-2
 DT_PREF_INV = 1e2
+HDIM = 2
+HDIM_ISO = 4
 
 # plotting
 DPI = 300
@@ -105,7 +107,7 @@ PT_STR = {
     PulseType.d2b: "D-2",
     PulseType.d3b: "D-2",
     PulseType.corpse: "C-2",
-    PulseType.sut8: "SU",
+    PulseType.sut8: "U",
 }
 
 # https://davidmathlogic.com/colorblind/#%23648FFF-%23785EF0-%23DC267F-%23FE6100-%23FFB000
@@ -172,6 +174,13 @@ PT_MARKER = {
 }
 
 # METHODS #
+
+def vec_uniso(vec):
+    (length,) = np.shape(vec)
+    part = int(length/2)
+    vec_uniso_ = vec[0:part] + 1j * vec[part:]
+    return np.reshape(vec_uniso_, (np.shape(vec_uniso_)[0], 1))
+#ENDDEF
 
 def grab_controls(save_file_path):
     with h5py.File(save_file_path, "r") as save_file:
@@ -397,7 +406,7 @@ F1C_GT_LS = {
     GateType.xpiby2: "dashdot",
 }
 F1C_LB = 1.1
-F1C_ALPHA = np.array([[1, 0.4], [1, 0.4], [1, 1]])
+F1C_ALPHA = np.array([[1, 1], [1, 1], [1, 1]])
 def make_figure1c():
     """
     Refs:
@@ -637,7 +646,7 @@ def make_figure2c():
     ax.tick_params(direction="in", labelsize=TICK_FS)
     plt.xlabel("$|\delta f_{q} / f_{q}| \; (\%)$", fontsize=LABEL_FS)
     plt.ylabel("Gate Error", fontsize=LABEL_FS)
-    fig.text(0.82, 0.66, "$t_{N}$", fontsize=TEXT_FS)
+    fig.text(0.82, 0.68, "$t_{N}$", fontsize=TEXT_FS)
     # color legend
     c1, = plt.plot([], [], label=PT_STR[PulseType.analytic], color=PT_COLOR[PulseType.analytic])
     c2, = plt.plot([], [], label=PT_STR[PulseType.d1], color=PT_COLOR[PulseType.d1])
@@ -651,7 +660,7 @@ def make_figure2c():
     l3, = plt.plot([], [], label="54ns", linestyle=DDASH_LS, color="black")
     l4, = plt.plot([], [], label="72ns", linestyle=DDDASH_LS, color="black")
     line_legend = plt.legend(handles=[l1, l2, l3, l4], frameon=False,
-                             loc="lower right", bbox_to_anchor=(1.05, 0.22),
+                             loc="lower right", bbox_to_anchor=(1.05, 0.24),
                              fontsize=LEGEND_FS, handlelength=1.85, handletextpad=0.4)
     fig.text(0, 0.955, "(c)", fontsize=TEXT_FS)
     plt.subplots_adjust(left=0.3, right=0.97, bottom=0.15, top=0.96, hspace=None, wspace=None)
@@ -724,11 +733,30 @@ def make_figure3b():
         pulse_types = [PulseType(pt) for pt in data_file["pulse_types"][()]]
         save_file_paths = data_file["save_file_paths"][()]
         gate_errors = np.moveaxis(data_file["gate_errors"][()], (0, 1, 2), (2, 1, 0))
+        states = np.moveaxis(data_file["states"][()], (0, 1, 2, 3), (3, 2, 1, 0))
     #ENDWITH
     pulse_type_count = len(pulse_types)
     gate_count = gate_errors.shape[1] - 1
     gate_count_axis = np.arange(0, gate_count + 1)
     gate_errors = np.mean(gate_errors, axis=2)
+
+    # compute rho^2
+    avg_count = np.shape(states)[3]
+    rho2_traces = np.zeros((pulse_type_count, gate_count + 1))
+    for i in range(0, pulse_type_count):
+        for j in range(0, gate_count + 1):
+            rho = np.zeros((HDIM, HDIM))
+            for k in range(0, avg_count):
+                state = vec_uniso(states[i, j, k, :])
+                rho_ = np.matmul(state, np.conjugate(np.transpose(state)))
+                rho = rho + rho_
+            #ENDFOR
+            rho = rho / avg_count
+            rho2 = np.matmul(rho, rho)
+            rho2_trace = np.real(np.trace(rho2))
+            rho2_traces[i, j] = rho2_trace
+        #ENDFOR
+    #ENDFOR
 
     fig = plt.figure(figsize=(PAPER_TW * 0.4, PAPER_TW * 0.315))
     ax = plt.gca()
@@ -738,6 +766,8 @@ def make_figure3b():
         label = PT_STR[pulse_type]
         ax.plot(gate_count_axis, log_transform(gate_errors[i, :]),
                 color=color, linestyle=linestyle, label=label)
+        # ax.plot(gate_count_axis, rho2_traces[i, :],
+        #         color=color, linestyle=linestyle, label=label)
     #ENDFOR
 
     ax.set_ylabel("Cumulative Gate Error", fontsize=LABEL_FS)
@@ -755,7 +785,7 @@ def make_figure3b():
     ax.tick_params(direction="in", labelsize=TICK_FS)
 
     plt.legend(frameon=False, loc="lower right", bbox_to_anchor=(1., 0.05),
-               fontsize=8, handlelength=1.85, handletextpad=0.4, ncol=2, columnspacing=0.)
+               fontsize=8, handlelength=1.85, handletextpad=0.4, ncol=2, columnspacing=.5)
     fig.text(0, 0.95, "(b)", fontsize=TEXT_FS)
     plt.subplots_adjust(left=0.18, right=0.965, top=0.97, bottom=0.15, hspace=0., wspace=None)
     plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
@@ -820,6 +850,55 @@ def make_figure3d():
     bloch.fig.savefig(plot_file_path, dpi=DPI)
     print("Saved Figure3d to {}"
           "".format(plot_file_path))
+#ENDDEF
+
+
+def make_figure3e():
+    data_file_path = latest_file_path("h5", "f3b", SAVE_PATH)
+    with h5py.File(data_file_path, "r") as data_file:
+        pulse_types = [PulseType(pt) for pt in data_file["pulse_types"][()]]
+        save_file_paths = data_file["save_file_paths"][()]
+        gate_errors = np.moveaxis(data_file["gate_errors"][()], (0, 1, 2), (2, 1, 0))
+        rho2_traces = np.moveaxis(data_file["rho2_traces"][()], (0, 1, 2), (2, 1, 0))
+    #ENDWITH
+    pulse_type_count = len(pulse_types)
+    gate_count = gate_errors.shape[1] - 1
+    gate_count_axis = np.arange(0, gate_count + 1)
+    gate_errors = np.mean(gate_errors, axis=2)
+    rho2_traces = np.mean(rho2_traces, axis=2)
+
+    fig = plt.figure(figsize=(PAPER_TW * 0.4, PAPER_TW * 0.315))
+    ax = plt.gca()
+    for (i, pulse_type) in enumerate(pulse_types):
+        color = PT_COLOR[pulse_type]
+        linestyle = "solid"
+        label = PT_STR[pulse_type]
+        ax.plot(gate_count_axis, rho2_traces[i, :],
+                color=color, linestyle=linestyle, label=label)
+    #ENDFOR
+
+    ax.set_ylabel("rho2_traces", fontsize=LABEL_FS)
+    ax.set_xlabel("Gate Count", fontsize=LABEL_FS)
+    ax_xticks = np.arange(0, gate_count + 1, 20)
+    ax_xtick_labels = ["0"] + [""] * 4 + ["100"] + [""] * 4 + ["200"]
+    ax.set_xticks(ax_xticks)
+    ax.set_xticklabels(ax_xtick_labels)
+    ax.set_xlim(0, gate_count)
+    # ax_yticks_ = np.arange(-6., -2. + 1, 1.)
+    # ax_yticks = log_transform(10 ** ax_yticks_)
+    # ax.set_yticks(ax_yticks)
+    # ax.set_yticklabels(["$10^{{{0}}}$".format(int(ax_ytick)) for ax_ytick in ax_yticks_])
+    # ax.set_ylim(ax_yticks[0], ax_yticks[-1])
+    ax.tick_params(direction="in", labelsize=TICK_FS)
+
+    plt.legend(frameon=False, loc="lower right", bbox_to_anchor=(1., 0.05),
+               fontsize=8, handlelength=1.85, handletextpad=0.4, ncol=2, columnspacing=0.)
+    fig.text(0, 0.95, "(b)", fontsize=TEXT_FS)
+    plt.subplots_adjust(left=0.18, right=0.965, top=0.9, bottom=0.15, hspace=0., wspace=None)
+    plot_file_path = generate_file_path("png", EXPERIMENT_NAME, SAVE_PATH)
+    plt.savefig(plot_file_path, dpi=DPI_FINAL)
+    print("Plotted Figure3e to {}"
+            "".format(plot_file_path))
 #ENDDEF
 
 
@@ -961,6 +1040,8 @@ def main():
         make_figure3c()
     elif fig_str == "3d":
         make_figure3d()
+    elif fig_str == "3e":
+        make_figure3e()
     elif fig_str == "4a":
         make_figure4a()
     elif fig_str == "4b":

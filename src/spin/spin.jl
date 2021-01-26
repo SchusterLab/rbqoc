@@ -323,9 +323,13 @@ const XPI_ISO_1 = SVector{HDIM_ISO}(get_vec_iso(XPI[:,1]))
 const XPI_ISO_2 = SVector{HDIM_ISO}(get_vec_iso(XPI[:,2]))
 
 const IS1_ISO_ = [1., 0, 0, 0]
+const IS1_ISO = SVector{HDIM_ISO}(IS1_ISO_)
 const IS2_ISO_ = [0., 1, 0, 0]
+const IS2_ISO = SVector{HDIM_ISO}(IS2_ISO_)
 const IS3_ISO_ = [1., 0, 0, 1] ./ sqrt(2)
+const IS3_ISO = SVector{HDIM_ISO}(IS3_ISO_)
 const IS4_ISO_ = [1., -1, 0, 0] ./ sqrt(2)
+const IS4_ISO = SVector{HDIM_ISO}(IS4_ISO_)
 
 const GT_GATE = Dict(
     xpiby2 => XPIBY2,
@@ -431,7 +435,8 @@ function dynamics_schroed_deqjl(state::SVector, params::SimParams, time::Float64
 end
 
 
-function integrate_prop_schroed!(gate_count::Int, states::Array{T, 2}, state::SVector, params::SimParams) where {T}
+function integrate_prop_schroed!(gate_count::Int, states::Array{T, 2},
+                                 state::SVector, params::SimParams) where {T}
     states[1, :] = state
     dt = params.controls_dt_inv^(-1)
     prop = I(HDIM_ISO)
@@ -461,7 +466,8 @@ function dynamics_schroedda_deqjl(state::SVector, params::SimParams, time::Float
 end
 
 
-function integrate_prop_schroedda!(gate_count::Int, states::Array{T, 2}, state::SVector, params::SimParams) where {T}
+function integrate_prop_schroedda!(gate_count::Int, states::Array{T, 2},
+                                   state::SVector, params::SimParams) where {T}
     dt = params.controls_dt_inv^(-1)
     time = 0.
     states[1, :] = state
@@ -810,7 +816,8 @@ end
 """
 this function assumes noise_dt_inv = 1e1
 """
-function integrate_prop_xpiby2da!(gate_count::Int, states::Array{T, 2}, state::SVector, params::SimParams) where {T}
+function integrate_prop_xpiby2da!(gate_count::Int, states::Array{T, 2},
+                                  state::SVector, params::SimParams) where {T}
     dt = 1e-1
     states[1, :] = state
     for i = 1:gate_count
@@ -1234,6 +1241,29 @@ end
 
 
 """
+Given an array of states, compute their
+"""
+function compute_rho2_traces(states)
+    state_type = length(size(states)) == 2 ? st_state : st_density
+    if state_type == st_state
+        (state_count, _) = size(states)
+        rho2_traces = zeros(state_count)
+        for i = 1:state_count
+            state = states[i, :]
+            state_uniso = get_vec_uniso(state) 
+            density = state_uniso * state_uniso'
+            rho2_trace = real(tr(density * density))
+            rho2_traces[i] = rho2_trace
+        end
+    else
+        (state_count, _, _) = size(states)
+        rho2_traces = zeros(state_count)
+    end
+    return rho2_traces
+end
+
+
+"""
 run_sim_deqjl - Apply a gate multiple times and measure the fidelity
 after each application. Save the output.
 
@@ -1485,7 +1515,8 @@ function sample_controls(save_file_path; dt=DT_PREF, dt_inv=DT_PREF_INV,
     # Plot.
     if plot
         fig = Plots.plot(dpi=DPI)
-        Plots.scatter!(time_axis, controls[:, 1], label="controls data", markersize=MS_SMALL, alpha=ALPHA)
+        Plots.scatter!(time_axis, controls[:, 1], label="controls data",
+                       markersize=MS_SMALL, alpha=ALPHA)
         Plots.scatter!(time_axis_sample, controls_sample[:, 1], label="controls fit",
                        markersize=MS_SMALL, alpha=ALPHA)
         Plots.scatter!(time_axis, d2controls_dt2[:, 1], label="d2_controls_dt2 data")
@@ -1570,7 +1601,7 @@ function run_sim_prop(
         "namp" => namp,
         "ndist" => string(ndist),
         "noise_dt_inv" => noise_dt_inv,
-        "save_file_path" => save_file_path
+        "save_file_path" => save_file_path,
     )
 
     return result
@@ -1622,4 +1653,20 @@ function evaluate_fqdev(;fq_cov=FQ * 1e-2, trial_count=1000,
     )
 
     return result
+end
+
+
+function evaluate_adev(;gate_count=100, gate_type=xpiby2, dynamics_type=schroedda,
+                       save_file_path=nothing, trial_count=100)
+    gate_errors = zeros(trial_count)
+    for seed = 1:trial_count
+        res = run_sim_prop(gate_count, gate_type; dynamics_type=dynamics_type,
+                           save_file_path=save_file_path, seed=seed, save=false)
+        gate_error = 1 - res["fidelities"][end]
+        gate_errors[seed] = gate_error
+    end
+    
+    result = Dict(
+        "gate_errors" => gate_errors,
+    )
 end

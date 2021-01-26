@@ -1,5 +1,5 @@
 """
-spin25.jl - unscented transform robustness for the δa problem
+spin30.jl - unscented transform robustness for the δfq problem
 """
 
 WDIR = joinpath(@__DIR__, "../../")
@@ -18,33 +18,29 @@ const TO = TrajectoryOptimization
 
 # paths
 const EXPERIMENT_META = "spin"
-const EXPERIMENT_NAME = "spin25"
+const EXPERIMENT_NAME = "spin30"
 const SAVE_PATH = joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME)
 
 # problem
 const CONTROL_COUNT = 1
 const ACONTROL_SIZE = CONTROL_COUNT
+const STATE_COUNT = 3
 # const STATE_COUNT = 4
-const STATE_COUNT = 2
-const PFIR_SIZE = 6
-const PFIR_SIZE_BY2 = 3
-const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT + PFIR_SIZE
+const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
 const SAMPLES_PER_STATE = 10
 const PENALTY_SIZE = 1
 const CHUNK_SIZE = SAMPLES_PER_STATE * HDIM_ISO + PENALTY_SIZE
 # state indices
 const STATE1_IDX = SVector{HDIM_ISO}(1:HDIM_ISO)
 const STATE2_IDX = SVector{HDIM_ISO}(STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO)
-# const STATE3_IDX = SVector{HDIM_ISO}(STATE2_IDX[end] + 1:STATE2_IDX[end] + HDIM_ISO)
+const STATE3_IDX = SVector{HDIM_ISO}(STATE2_IDX[end] + 1:STATE2_IDX[end] + HDIM_ISO)
 # const STATE4_IDX = SVector{HDIM_ISO}(STATE3_IDX[end] + 1:STATE3_IDX[end] + HDIM_ISO)
 # const INTCONTROLS_IDX = SVector{CONTROL_COUNT}(STATE4_IDX[end] + 1:STATE4_IDX[end] + CONTROL_COUNT)
-const INTCONTROLS_IDX = SVector{CONTROL_COUNT}(STATE2_IDX[end] + 1:STATE2_IDX[end] + CONTROL_COUNT)
+const INTCONTROLS_IDX = SVector{CONTROL_COUNT}(STATE3_IDX[end] + 1:STATE3_IDX[end] + CONTROL_COUNT)
 const CONTROLS_IDX = SVector{CONTROL_COUNT}(INTCONTROLS_IDX[end] + 1:
                                             INTCONTROLS_IDX[end] + CONTROL_COUNT)
 const DCONTROLS_IDX = SVector{CONTROL_COUNT}(CONTROLS_IDX[end] + 1:
                                              CONTROLS_IDX[end] + CONTROL_COUNT)
-const PFIRX_IDX = SVector{PFIR_SIZE_BY2}(DCONTROLS_IDX[end] + 1:DCONTROLS_IDX[end] + PFIR_SIZE_BY2)
-const PFIRY_IDX = SVector{PFIR_SIZE_BY2}(PFIRX_IDX[end] + 1:PFIRX_IDX[end] + PFIR_SIZE_BY2)
 # control indices
 const D2CONTROLS_IDX = SVector{CONTROL_COUNT}(1:CONTROL_COUNT)
 # sample indices
@@ -64,8 +60,7 @@ const STATE_IDX = SVector{HDIM_ISO}(1:HDIM_ISO)
 struct Model <: RD.AbstractModel
     S::Diagonal{Float64,SVector{HDIM_ISO,Float64}}
     nominal_idxs::Array{SVector{HDIM_ISO,Int},1}
-    namp::Float64
-    wnamp_cov::Float64
+    fq_cov::Float64
     alpha::Float64
     sample_state_count::Int
 end
@@ -89,8 +84,8 @@ end
 ]
 
 function unscented_transform(model::Model, astate::AbstractVector,
-                             dt::Real, i::Int, camp::Real, namp::Real,
-                             h_prop::AbstractMatrix)
+                             negi_hc::AbstractMatrix, h_prop::AbstractMatrix,
+                             dt::Real, i::Int)
     # get states
     offset = ASTATE_SIZE_BASE + (i - 1) * CHUNK_SIZE
     s1 = astate[offset + S1_IDX]
@@ -103,17 +98,19 @@ function unscented_transform(model::Model, astate::AbstractVector,
     s8 = astate[offset + S8_IDX]
     s9 = astate[offset + S9_IDX]
     s10 = astate[offset + S10_IDX]
+    # grab chol info
+    fq_chol5 = sqrt(model.fq_cov)
     # propagate states
     s1 = h_prop * s1
     s2 = h_prop * s2
     s3 = h_prop * s3
     s4 = h_prop * s4
-    s5 = exp(dt * (FQ_NEGI_H0_ISO + (camp + namp) * NEGI_H1_ISO)) * s5
+    s5 = exp(dt * ((FQ + fq_chol5) * NEGI_H0_ISO + negi_hc)) * s5
     s6 = h_prop * s6
     s7 = h_prop * s7
     s8 = h_prop * s8
     s9 = h_prop * s9
-    s10 = exp(dt * (FQ_NEGI_H0_ISO + (camp - namp) * NEGI_H1_ISO)) * s10
+    s10 = exp(dt * ((FQ - fq_chol5) * NEGI_H0_ISO + negi_hc)) * s10
     # compute state mean
     sm = 1//SAMPLES_PER_STATE .* (
         s1 + s2 + s3 + s4 + s5
@@ -138,7 +135,7 @@ function unscented_transform(model::Model, astate::AbstractVector,
     # perform cholesky decomposition on joint covariance
     cov = zeros(eltype(s_cov), HDIM_ISO + 1, HDIM_ISO + 1)
     cov[1:HDIM_ISO, 1:HDIM_ISO] .= s_cov
-    cov[HDIM_ISO + 1, HDIM_ISO + 1] = model.wnamp_cov
+    cov[HDIM_ISO + 1, HDIM_ISO + 1] = model.fq_cov
     # TOOD: cholesky! requires writing zeros in upper triangle
     cov_chol = model.alpha * cholesky(Symmetric(cov)).L
     # resample states
@@ -146,17 +143,16 @@ function unscented_transform(model::Model, astate::AbstractVector,
     s_chol2 = cov_chol[STATE_IDX, 2]
     s_chol3 = cov_chol[STATE_IDX, 3]
     s_chol4 = cov_chol[STATE_IDX, 4]
-    # s_chol5 = cov_chol[STATE_IDX, 5]
     s1 = sm + s_chol1
     s2 = sm + s_chol2
     s3 = sm + s_chol3
     s4 = sm + s_chol4
-    s5 = sm # + s_chol5
+    s5 = sm
     s6 = sm - s_chol1
     s7 = sm - s_chol2
     s8 = sm - s_chol3
     s9 = sm - s_chol4
-    s10 = sm # - s_chol5
+    s10 = sm
     # normalize
     s1 = s1 ./sqrt(s1's1)
     s2 = s2 ./sqrt(s2's2)
@@ -178,64 +174,31 @@ function unscented_transform(model::Model, astate::AbstractVector,
 end
 
 # dynamics
-function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector,
-                              acontrol::SVector, time::Real, dt::Real) where {T}
+function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::StaticVector,
+                              acontrol::StaticVector, time::Real, dt::Real) where {n}
     # base dynamics
-    camp = astate[CONTROLS_IDX[1]]
-    h_prop = exp(dt * (FQ_NEGI_H0_ISO + camp * NEGI_H1_ISO))
+    negi_hc = astate[CONTROLS_IDX[1]] * NEGI_H1_ISO
+    h_prop = exp(dt * (FQ_NEGI_H0_ISO + negi_hc))
     state1 = h_prop * astate[STATE1_IDX]
     state2 = h_prop * astate[STATE2_IDX]
-    # state3 = h_prop * astate[STATE3_IDX]
+    state3 = h_prop * astate[STATE3_IDX]
     # state4 = h_prop * astate[STATE4_IDX]
-    intcontrols = astate[INTCONTROLS_IDX[1]] + dt * astate[CONTROLS_IDX[1]]
-    controls = astate[CONTROLS_IDX[1]] + dt * astate[DCONTROLS_IDX[1]]
-    dcontrols = astate[DCONTROLS_IDX[1]] + dt * acontrol[D2CONTROLS_IDX[1]]
-
-    # filter white noise
-    xk = sqrt(model.wnamp_cov)
-    knot_point = Int(div(time, dt))
-    xp1 = astate[PFIRX_IDX[1]]
-    xp2 = astate[PFIRX_IDX[2]]
-    xp3 = astate[PFIRX_IDX[3]]
-    yp1 = astate[PFIRY_IDX[1]]
-    yp2 = astate[PFIRY_IDX[2]]
-    yp3 = astate[PFIRY_IDX[3]]
-    if knot_point == 1
-        yk = PFIR_B1 * xk
-    elseif knot_point == 2
-        yk = PFIR_B1 * xk + PFIR_B2 * xp1 - PFIR_A2 * yp1
-    elseif knot_point == 3
-        yk = (PFIR_B1 * xk + PFIR_B2 * xp1 + PFIR_B3 * xp2
-              - PFIR_A2 * yp1 - PFIR_A3 * yp2)
-    else
-        yk = (PFIR_B1 * xk + PFIR_B2 * xp1 + PFIR_B3 * xp2 + PFIR_B4 * xp3
-              - PFIR_A2 * yp1 - PFIR_A3 * yp2 - PFIR_A4 * yp3)
-    end
-    xp3 = xp2
-    xp2 = xp1
-    xp1 = xk
-    yp3 = yp2
-    yp2 = yp1
-    yp1 = yk
-    namp = model.namp * yk
-
+    intcontrols = astate[INTCONTROLS_IDX] + dt * astate[CONTROLS_IDX]
+    controls = astate[CONTROLS_IDX] + dt * astate[DCONTROLS_IDX]
+    dcontrols = astate[DCONTROLS_IDX] + dt * acontrol[D2CONTROLS_IDX]
+    
     astate_ = [
         # state1; state2; state3; state4; intcontrols; controls; dcontrols;
-        state1; state2; intcontrols; controls; dcontrols;
-        xp1; xp2; xp3; yp1; yp2; yp3;
+        state1; state2; state3; intcontrols; controls; dcontrols;
     ]
 
     # unscented transform
     for i = 1:model.sample_state_count
-        sample_states = unscented_transform(model, astate, dt, i, camp, namp, h_prop)
-        append!(astate_, sample_states)
+        sample_states = unscented_transform(model, astate, negi_hc, h_prop, dt, i)
+        astate_ = [astate_; sample_states]
     end
     
     return astate_
-end
-
-function RD.discrete_dynamics(::Type{RK3}, model::Model, z::AbstractKnotPoint)
-    return RD.discrete_dynamics(RK3, model, RD.state(z), RD.control(z), z.t, z.dt)
 end
 
 # main
@@ -243,15 +206,14 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
                   sqrtbp=false, integrator_type=rk3, qs=[1e0, 1e0, 1e0, 1e-1, 1e0, 1e-1],
                   dt_inv=Int64(1e1), smoke_test=false, constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true,
-                  namp=NAMP_PREFACTOR, wnamp_cov=1.,
-                  max_iterations=Int64(2e5), gradient_tol_int=1,
+                  fq_cov=FQ * 1e-2, max_iterations=Int64(2e5), gradient_tol_int=1,
                   dJ_counter_limit=Int(1e2), state_cov=1e-2, seed=0, alpha=1.,
-                  sample_states=[IS1_ISO_], nominal_idxs=[STATE1_IDX], static=true)
+                  sample_states=[IS1_ISO_], nominal_idxs=[STATE1_IDX], static=true,
+                  benchmark=false)
     Random.seed!(seed)
-    namp = namp * dt_inv
     (sample_state_count,) = size(sample_states)
     S = Diagonal(SVector{HDIM_ISO}(fill(qs[5], HDIM_ISO)))
-    model = Model(S, nominal_idxs, namp, wnamp_cov, alpha, sample_state_count)
+    model = Model(S, nominal_idxs, fq_cov, alpha, sample_state_count)
     n = RD.state_dim(model)
     m = RD.control_dim(model)
     t0 = 0.
@@ -262,18 +224,17 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     gate = GT_GATE_ISO[gate_type]
     x0[STATE1_IDX] = IS1_ISO_
     x0[STATE2_IDX] = IS2_ISO_
-    # x0[STATE3_IDX] = IS3_ISO_
+    x0[STATE3_IDX] = IS3_ISO_
     # x0[STATE4_IDX] = IS4_ISO_
     xf[STATE1_IDX] = gate * IS1_ISO_
     xf[STATE2_IDX] = gate * IS2_ISO_
     state_dist = Distributions.Normal(0., state_cov)
     for i = 1:sample_state_count
-        sample_state_initial = sample_states[i]
+        sample_state = sample_states[i]
         for j = 1:SAMPLES_PER_STATE
-            sample_state = sample_state_initial .+ rand(state_dist, HDIM_ISO)
-            sample_state = sample_state ./ sqrt(sample_state'sample_state)
             sample_idx = astate_sample_inds(i, j)
-            x0[sample_idx] = sample_state
+            sample = sample_state .+ rand(state_dist, HDIM_ISO)
+            x0[sample_idx] = sample ./ sqrt(sample'sample)
         end
     end
     if static
@@ -300,7 +261,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         x_max_boundary = SVector{n}(x_max_boundary)
         x_min_boundary = SVector{n}(x_min_boundary)
     end
-
+    
     # initial trajectory
     dt = dt_inv^(-1)
     N = Int(floor(evolution_time * dt_inv)) + 1
@@ -343,12 +304,12 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     # must reach target state, must have zero net flux
     target_astate_constraint = GoalConstraint(xf, [STATE1_IDX; STATE2_IDX; INTCONTROLS_IDX])
     # must obey unit norm
-    norm_idxs = copy(sample_idxs(model))
+    norm_idxs = sample_idxs(model)
     push!(norm_idxs, STATE1_IDX)
     push!(norm_idxs, STATE2_IDX)
-    # push!(norm_idxs, STATE3_IDX)
+    push!(norm_idxs, STATE3_IDX)
     # push!(norm_idxs, STATE4_IDX)
-    norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idxs) for idxs in norm_idxs]
+    norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idx) for idx in norm_idxs]
     constraints = ConstraintList(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
@@ -378,7 +339,12 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         gradient_tolerance_intermediate=gradient_tol_int,
         dJ_counter_limit=dJ_counter_limit, static_bp=static_bp
     )
-    Altro.solve!(solver)
+    if benchmark
+        benchmark_result = Altro.benchmark_solve!(solver)
+    else
+        benchmark_result = nothing
+        Altro.solve!(solver)
+    end
 
     # Post-process.
     acontrols_raw = TO.controls(solver)
@@ -390,11 +356,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     cmax = TO.max_violation(solver)
     cmax_info = TO.findmax_violation(TO.get_constraints(solver))
     iterations_ = iterations(solver)
-    sample_states_arr = Array{Float64, 2}(undef, sample_state_count, HDIM_ISO)
-    for i = 1:sample_state_count
-        sample_states_arr[i, :] = Array(sample_states[i])
-    end
-    
+
     result = Dict(
         "acontrols" => acontrols_arr,
         "controls_idx" => cidx_arr,
@@ -417,10 +379,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         "save_type" => Integer(jl),
         "iterations" => iterations_,
         "seed" => seed,
-        "wnamp_cov" => wnamp_cov,
-        "namp" => namp,
+        "fq_cov" => fq_cov,
         "max_iterations" => max_iterations,
-        "sample_states" => sample_states_arr,
     )
     
     # save
@@ -434,6 +394,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
         end
         result["save_file_path"] = save_file_path
     end
+
+    result = benchmark ? benchmark_result : result
 
     return result
 end

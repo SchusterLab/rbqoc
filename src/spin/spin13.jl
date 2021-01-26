@@ -172,7 +172,7 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
     if benchmark
         benchmark_result = Altro.benchmark_solve!(solver)
     else
-        benchmark_result = nothing
+        benchmark_result = 0
         Altro.solve!(solver)
     end
 

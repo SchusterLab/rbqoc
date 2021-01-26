@@ -1,5 +1,6 @@
 """
-spin23.jl - unscented transform robustness for the δfq problem
+spin28.jl - unscented sampling robustness via nominal penalization for the δfq problem
+on one initial state, see spin27.jl for this method on all operator basis states
 """
 
 WDIR = joinpath(@__DIR__, "../../")
@@ -10,29 +11,34 @@ using Debugger
 using Distributions
 using HDF5
 using Hyperopt
+using ForwardDiff
 using LinearAlgebra
 using Random
 using RobotDynamics
 using StaticArrays
+using Zygote
 using TrajectoryOptimization
 const RD = RobotDynamics
 const TO = TrajectoryOptimization
 
 # paths
 const EXPERIMENT_META = "spin"
-const EXPERIMENT_NAME = "spin23"
+const EXPERIMENT_NAME = "spin28"
 const SAVE_PATH = abspath(joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME))
 
 # problem
 const CONTROL_COUNT = 1
 const STATE_COUNT = 2
 const ASTATE_SIZE_BASE = STATE_COUNT * HDIM_ISO + 3 * CONTROL_COUNT
-const SAMPLE_STATES = [IS1_ISO_, IS2_ISO_, IS3_ISO_, IS4_ISO_]
-const SAMPLE_STATE_COUNT = 4
+const SAMPLE_STATES = [IS3_ISO]
+const SAMPLE_STATE_COUNT = 1
 const SAMPLES_PER_STATE = 10
+const SAMPLES_PER_STATE_INV = 1//10
 const SAMPLE_COUNT = SAMPLE_STATE_COUNT * SAMPLES_PER_STATE
-const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO
+const PENALTY_SIZE = 1
+const ASTATE_SIZE = ASTATE_SIZE_BASE + SAMPLE_COUNT * HDIM_ISO + SAMPLE_STATE_COUNT * PENALTY_SIZE
 const ACONTROL_SIZE = CONTROL_COUNT
+const STATE_IDX = SVector{HDIM_ISO}(1:HDIM_ISO)
 # state indices
 const STATE1_IDX = SVector{HDIM_ISO}(1:HDIM_ISO)
 const STATE2_IDX = SVector{HDIM_ISO}(STATE1_IDX[end] + 1:STATE1_IDX[end] + HDIM_ISO)
@@ -52,26 +58,21 @@ const S7_IDX = SVector{HDIM_ISO}(HDIM_ISO * 6 + 1:HDIM_ISO * 7)
 const S8_IDX = SVector{HDIM_ISO}(HDIM_ISO * 7 + 1:HDIM_ISO * 8)
 const S9_IDX = SVector{HDIM_ISO}(HDIM_ISO * 8 + 1:HDIM_ISO * 9)
 const S10_IDX = SVector{HDIM_ISO}(HDIM_ISO * 9 + 1:HDIM_ISO * 10)
-const STATE_IDX = SVector{HDIM_ISO}(1:HDIM_ISO)
 
 # model
-module Data
-using RobotDynamics
-const RD = RobotDynamics
-mutable struct Model <: RD.AbstractModel
+mutable struct Model <:RD.AbstractModel
+    S::Diagonal{T,SVector{HDIM_ISO,T}} where {T}
     fq_cov::Float64
     alpha::Float64
 end
-end
-Model = Data.Model
 @inline RD.state_dim(model::Model) = ASTATE_SIZE
 @inline RD.control_dim(model::Model) = ACONTROL_SIZE
 @inline astate_sample_inds(sample_state_index::Int, sample_index::Int) = (
     SVector{HDIM_ISO}((
-        ASTATE_SIZE_BASE + (sample_state_index - 1) * SAMPLES_PER_STATE * HDIM_ISO
+        ASTATE_SIZE_BASE + (sample_state_index - 1) * (SAMPLES_PER_STATE * HDIM_ISO + PENALTY_SIZE)
         + (sample_index - 1) * HDIM_ISO + 1
     ):(
-        ASTATE_SIZE_BASE + (sample_state_index - 1) * SAMPLES_PER_STATE * HDIM_ISO
+        ASTATE_SIZE_BASE + (sample_state_index - 1) * (SAMPLES_PER_STATE * HDIM_ISO + PENALTY_SIZE)
         + sample_index * HDIM_ISO
     ))
 )
@@ -107,7 +108,7 @@ function unscented_transform(model::Model, astate::AbstractVector,
     s9 = exp(dt * ((FQ - fq_chol4) * NEGI_H0_ISO + negi_hc)) * s9
     s10 = exp(dt * ((FQ - fq_chol5) * NEGI_H0_ISO + negi_hc)) * s10
     # compute state mean
-    sm = 1//SAMPLES_PER_STATE .* (
+    sm = SAMPLES_PER_STATE_INV .* (
         s1 + s2 + s3 + s4 + s5
         + s6 + s7 + s8 + s9 + s10
     )
@@ -160,15 +161,17 @@ function unscented_transform(model::Model, astate::AbstractVector,
     s8 = s8 ./sqrt(s8's8)
     s9 = s9 ./sqrt(s9's9)
     s10 = s10 ./sqrt(s10's10)
+    # compute penalty
+    penalty = tr(s_cov * model.S)
 
-    samples = [s1; s2; s3; s4; s5; s6; s7; s8; s9; s10]
+    samples = [s1; s2; s3; s4; s5; s6; s7; s8; s9; s10; penalty]
 
     return samples
 end
 
 # dynamics
-function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::Array{T,1},
-                              acontrol::Array{T,1}, time::Real, dt::Real) where {T}
+function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector{N,T},
+                              acontrol::SVector{M,T}, time::Real, dt::Real) where {N,M,T}
     # base dynamics
     negi_hc = astate[CONTROLS_IDX[1]] * NEGI_H1_ISO
     h_prop = exp(dt * (FQ_NEGI_H0_ISO + negi_hc))
@@ -197,92 +200,85 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, z::AbstractKnotPoint)
 end
 
 
-# This cost puts a gate error cost on
-# the sample states and a LQR cost on the other terms.
-# The hessian w.r.t the state and controls is constant.
 struct Cost{N,M,T} <: TO.CostFunction
-    Q::Diagonal{T,Array{T,1}}
-    R::Diagonal{T,Array{T,1}}
-    q::Array{T,1}
+    Q::Diagonal{T,SVector{N,T}}
+    R::Diagonal{T,SVector{M,T}}
+    S::Diagonal{T,SVector{HDIM_ISO,T}}
+    S2::Diagonal{T,SVector{HDIM_ISO,T}}
+    q::SVector{N,T}
     c::T
-    target_states::Array{T,1}
-    q_sample_states::Array{T,1}
-    active_samples::Array{Int,1}
+    active_samples::Array{Int, 1}
 end
 
-function Cost(Q::Diagonal{T,Array{T,1}}, R::Diagonal{T,Array{T,1}},
-              xf::Array{T,1}, target_states::Array{T,1}, q_sample_states::Array{T,1},
-              active_samples::Array{Int,1}) where {T}
-    N = ASTATE_SIZE
-    M = ACONTROL_SIZE
+function Cost(Q::Diagonal{T,SVector{N,T}}, R::Diagonal{T,SVector{M,T}},
+              S::Diagonal{T,SVector{HDIM_ISO,T}}, xf::SVector{N,T},
+              active_samples::Array{Int, 1}) where {N,M,T}
     q = -Q * xf
     c = 0.5 * xf' * Q * xf
-    return Cost{N,M,T}(Q, R, q, c, target_states, q_sample_states, active_samples)
+    S2 = 2 * S
+    return Cost{N,M,T}(Q, R, S, S2, q, c, active_samples)
 end
 
 @inline TO.state_dim(cost::Cost{N,M,T}) where {N,M,T} = N
 @inline TO.control_dim(cost::Cost{N,M,T}) where {N,M,T} = M
 @inline Base.copy(cost::Cost{N,M,T}) where {N,M,T} = Cost{N,M,T}(
-    cost.Q, cost.R, cost.q, cost.c, cost.target_states,
-    cost.q_sample_states, cost.active_samples
+    cost.Q, cost.R, cost.S, cost.S2, cost.q, cost.c,
+    cost.active_samples
 )
 
-function TO.stage_cost(cost::Cost{N,M,T}, astate::Array{T,1}) where {N,M,T}
+
+function TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N,T}) where {N,M,T}
     cost_ = 0.5 * astate' * cost.Q * astate + cost.q'astate + cost.c
     for i = 1:SAMPLE_STATE_COUNT
-        targeto = (i - 1) * HDIM_ISO
+        state_idx = NOMINAL_STATE_IDXS[i]
         for j in cost.active_samples
-            astateo = astate_sample_inds(i, j)[1] - 1
-            cost_ = (
-                cost_ + cost.q_sample_states[i]
-                * gate_error_iso2(astate, cost.target_states; s1o=astateo, s2o=targeto)
-            )
+            sample_idx = astate_sample_inds(i, j)
+            diff = astate[sample_idx] - astate[state_idx]
+            cost_ = cost_ + diff' * cost.S * diff
         end
     end
     return cost_
 end
 
-@inline TO.stage_cost(cost::Cost{N,M,T}, astate::Array{T,1},
-                      acontrol::Array{T,1}) where {N,M,T} = (
+@inline TO.stage_cost(cost::Cost{N,M,T}, astate::SVector{N,T},
+                      acontrol::SVector{M,T}) where {N,M,T} = (
     TO.stage_cost(cost, astate) + 0.5 * acontrol' * cost.R * acontrol
-)
+                      )
 
 function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T},
-                      astate::Array{T,1}) where {N,M,T}
+                      astate::SVector{N,T}) where {N,M,T}
     E.q = cost.Q * astate + cost.q
     for i = 1:SAMPLE_STATE_COUNT
-        targeto = (i - 1) * HDIM_ISO
+        state_idx = NOMINAL_STATE_IDXS[i]
         for j in cost.active_samples
             sample_idx = astate_sample_inds(i, j)
-            E.q[sample_idx] = E.q[sample_idx] + (
-                cost.q_sample_states[i]
-                * jacobian_gate_error_iso2(astate, cost.target_states;
-                                           s1o=(sample_idx[1] - 1), s2o=targeto)
-            )
+            diff = astate[sample_idx] - astate[state_idx]
+            E.q[sample_idx] = cost.S2 * diff
+            E.q[state_idx] = E.q[state_idx] + cost.S2 * -diff
         end
     end
     return false
 end
 
-function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::Array{T,1},
-                      acontrol::Array{T,1}) where {N,M,T}
+function TO.gradient!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T},
+                      acontrol::SVector{M,T}) where {N,M,T}
     TO.gradient!(E, cost, astate)
     E.r = cost.R * acontrol
     E.c = 0
     return false
 end
 
+
 function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T},
-                     astate::Array{T,1}) where {N,M,T}
-    hess_astate = zeros(N, N)
+                     astate::SVector{N,T}) where {N,M,T}
+    hess_astate = zeros(N,N)
     for i = 1:SAMPLE_STATE_COUNT
-        targeto = (i - 1) * HDIM_ISO
+        state_idx = NOMINAL_STATE_IDXS[i]
         for j in cost.active_samples
             sample_idx = astate_sample_inds(i, j)
-            hess_astate[sample_idx, sample_idx] = (
-                -1 * cost.q_sample_states[i]
-                * hessian_gate_error_iso2(cost.target_states; s2o=targeto)
-            )
+            hess_astate[sample_idx, state_idx] = hess_astate[state_idx, sample_idx] = -cost.S2
+            hess_astate[sample_idx, sample_idx] = cost.S2
+            hess_astate[state_idx, state_idx] = hess_astate[state_idx, state_idx] + cost.S2
         end
     end
     hess_astate = hess_astate + cost.Q
@@ -291,13 +287,14 @@ function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T},
     return true
 end
 
-function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::Array{T,1},
-                     acontrol::Array{T,1}) where {N,M,T}
+function TO.hessian!(E::TO.QuadraticCostFunction, cost::Cost{N,M,T}, astate::SVector{N,T},
+                     acontrol::SVector{M,T}) where {N,M,T}
     TO.hessian!(E, cost, astate)
     E.R = cost.R
     E.H .= 0
     return true
 end
+
 
 # main
 function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
@@ -310,7 +307,8 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
                   dJ_counter_limit=Int(1e2), state_cov=1e-2, seed=0, alpha=1.,
                   benchmark=false)
     Random.seed!(seed)
-    model = Model(fq_cov, alpha)
+    S = Digonal(SVector{HDIM_ISO}(repeat(qs[5:5], HDIM_ISO)))
+    model = Model(S, fq_cov, alpha)
     n = RD.state_dim(model)
     m = RD.control_dim(model)
     t0 = 0.
@@ -324,62 +322,71 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     xf[STATE1_IDX] = gate * IS1_ISO_
     xf[STATE2_IDX] = gate * IS2_ISO_
     state_dist = Distributions.Normal(0., state_cov)
-    target_states = zeros(SAMPLE_STATE_COUNT * HDIM_ISO)
     for i = 1:SAMPLE_STATE_COUNT
-        sample_state_initial = SAMPLE_STATES[i]
-        target_state = gate * sample_state_initial
-        indlo = (i - 1) * HDIM_ISO + 1
-        indhi = indlo + HDIM_ISO - 1
-        target_states[indlo:indhi] = target_state
+        nominal_state = NOMINAL_STATES[i]
+        target_state = gate * nominal_state
         for j = 1:SAMPLES_PER_STATE
-            sample_state = sample_state_initial .+ rand(state_dist, HDIM_ISO)
-            sample_state = sample_state ./ sqrt(sample_state'sample_state)
             sample_idx = astate_sample_inds(i, j)
+            sample_state = nominal_state .+ rand(state_dist, HDIM_ISO)
+            sample_state = sample_state ./ sqrt(sample_state'sample_state)
             x0[sample_idx] = sample_state
-            xf[sample_idx] = target_state
         end
     end
+    x0 = SVector{n}(x0)
+    xf = SVector{n}(xf)
 
     # control amplitude constraint
     x_max = fill(Inf, n)
     x_max[CONTROLS_IDX] .= MAX_CONTROL_NORM_0
+    x_max = SVector{n}(x_max)
     x_min = fill(-Inf, n)
     x_min[CONTROLS_IDX] .= -MAX_CONTROL_NORM_0
+    x_min = SVector{n}(x_min)
     
     # control amplitude constraint at boundary
     x_max_boundary = fill(Inf, n)
     x_max_boundary[CONTROLS_IDX] .= 0
+    x_max_boundary = SVector{n}(x_max_boundary)
     x_min_boundary = fill(-Inf, n)
     x_min_boundary[CONTROLS_IDX] .= 0
+    x_min_boundary = SVector{n}(x_min_boundary)
 
     # initial trajectory
     dt = dt_inv^(-1)
     N = Int(floor(evolution_time * dt_inv)) + 1
-    U0 = [[
+    U0 = [SVector{m}([
         fill(1e-4, CONTROL_COUNT);
-    ] for k = 1:N-1]
-    X0 = [[
+    ]) for k = 1:N-1]
+    X0 = [SVector{n}([
         fill(NaN, n);
-    ] for k = 1:N]
+    ]) for k = 1:N]
     Z = Traj(X0, U0, dt * ones(N))
 
     # cost function
-    Q = Diagonal([
-        fill(qs[1], STATE_COUNT * HDIM_ISO); # ψ1, ψ2
+    Q = Diagonal(SVector{n}([
+        fill(qs[1], 2 * HDIM_ISO); # ψ1, ψ2
+        fill(0, (STATE_COUNT - 2) * HDIM_ISO); # ψ3, ψ4
         fill(qs[2], CONTROL_COUNT); # ∫a
         fill(qs[3], CONTROL_COUNT); # a
         fill(qs[4], CONTROL_COUNT); # ∂a
         fill(0, SAMPLE_COUNT * HDIM_ISO);
-    ])
+        # fill(0, 4 * HDIM_ISO);
+        # fill(0, 1 * HDIM_ISO);
+        # fill(0, 4 * HDIM_ISO);
+        # fill(qs[5], 1 * HDIM_ISO);
+    ]))
     Qf = Q * N
-    R = Diagonal([
+    S = Diagonal(SVector{HDIM_ISO}([
+        fill(qs[5], HDIM_ISO);
+    ]))
+    Sf = S * N
+    R = Diagonal(SVector{m}([
         fill(qs[6], CONTROL_COUNT); # ∂2a
-    ])
+    ]))
     # objective = LQRObjective(Q, R, Qf, xf, N)
-    active_samples = Array(1:SAMPLES_PER_STATE)
-    q_ss = repeat(qs[5:5], SAMPLE_STATE_COUNT)
-    cost_k = Cost(Q, R, xf, target_states, q_ss, active_samples)
-    cost_f = Cost(Qf, R, xf, target_states, N * q_ss, active_samples)
+    active_samples = [10]
+    cost_k = Cost(Q, R, S, xf, active_samples)
+    cost_f = Cost(Qf, R, Sf, xf, active_samples)
     objective = TO.Objective(cost_k, cost_f, N)
 
     # constraints
@@ -425,7 +432,7 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
     if benchmark
         benchmark_result = Altro.benchmark_solve!(solver)
     else
-        benchmark_result = nothing
+        benchmark_result = 0
         Altro.solve!(solver)
     end
 
@@ -485,99 +492,22 @@ function run_traj(;gate_type=xpiby2, evolution_time=60., solver_type=altro,
 end
 
 
-function sample_diffs(saved)
-    gate_type = GateType(saved["gate_type"])
-    knot_count = size(saved["astates"], 1)
-    fds = zeros(knot_count, SAMPLE_COUNT)
-    gate_iso = GT_GATE_ISO[gate_type]
-    # target_states = [gate_iso * is for is in (IS1_ISO_, IS2_ISO_, IS3_ISO_, IS4_ISO_)]
-    target_states = [gate_iso * is for is in (IS3_ISO_,)]
-    astates = saved["astates"]
-    for i = 1:SAMPLE_STATE_COUNT
-        target_state = target_states[i]
-        for j = 1:SAMPLES_PER_STATE
-            astate_inds = astate_sample_inds(i, j)
-            store_ind = (i - 1) * SAMPLES_PER_STATE + j
+function state_diffs(astates; nominal_state_idxs=NOMINAL_STATE_IDXS,
+                     sample_state_count=SAMPLE_STATE_COUNT,
+                     samples_per_state=SAMPLES_PER_STATE)
+    (knot_count, astate_size) = size(astates)
+    diffs = zeros(SAMPLE_COUNT, knot_count)
+    for i = 1:sample_state_count
+        state_idx = nominal_state_idxs[i]
+        for j = 1:samples_per_state
+            sample_idx = astate_sample_inds(i, j)
             for k = 1:knot_count
-                sample = astates[k, astate_inds]
-                fds[k, store_ind] = fidelity_vec_iso2(sample, target_state)
+                state = astates[k, state_idx]
+                sample = astates[k, sample_idx]
+                diff = state - sample
+                diffs[(i - 1) * samples_per_state + j, k] = diff'diff
             end
         end
     end
-
-    return fds
-end
-
-
-function hyperopt_me(;iterations=50, save=true)
-    save_file_path = generate_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
-    gate_type = zpiby2
-    save_file_paths = fill("", iterations)
-    weights = zeros(iterations)
-    alphas = zeros(iterations)
-    statecovs = zeros(iterations)
-    gate_errors = zeros(iterations)
-    
-    result::Dict{String, Any} = Dict(
-        "weights" => weights,
-        "alphas" => alphas,
-        "statecovs" => statecovs,
-        "save_file_paths" => save_file_paths,
-        "gate_errors" => gate_errors,
-    )
-
-    if save
-        h5open(save_file_path, "cw") do save_file
-            for key in keys(result)
-                write(save_file, key, result[key])
-            end
-        end
-    end
-    
-    weights_space = exp10.(LinRange(-5, 5, 1000))
-    alpha_space = LinRange(1e-1, 10, 1000)
-    statecov_space = LinRange(1e-6, 1e0, 1000)
-    ho = Hyperoptimizer(iterations, GPSampler(Min); a=weights_space, b=alpha_space, c=statecov_space)
-    for (i, weight, alpha, statecov) in ho
-        # evaluate
-        gate_error = 1
-        (gate_error, save_file_path_) = try 
-            res_train = run_traj(;gate_type=gate_type, qs=[1e0, 1e0, 1e0, 1e-1, weight,
-                                                           weight, weight, weight, 1e-1],
-                                 alpha=alpha, state_cov=statecov, verbose=true, save=true)
-            save_file_path_ = res_train["save_file_path"]
-            res_eval = evaluate_fqdev(;save_file_path=save_file_path_, gate_type=gate_type)
-            gate_error = mean(res_eval["gate_errors"])
-            (gate_error, save_file_path_)
-        catch err
-            gate_error = 1
-            save_file_path_ = ""
-            (gate_error, save_file_path_)
-        end
-        
-        # log
-        i_ = Int(i)
-        weights[i_] = weight
-        alphas[i_] = alpha
-        statecovs[i_] = statecov
-        gate_errors[i_] = gate_error
-        save_file_paths[i_] = save_file_path_
-        if save
-            h5open(save_file_path, "cw") do save_file
-                for key in keys(result)
-                    o_delete(save_file, key)
-                    write(save_file, key, result[key])
-                end
-            end
-        end
-
-        push!(ho.results, gate_error)
-        push!(ho.history, [weight, alpha, statecov])
-    end
-
-    if save
-        result["save_file_path"] = save_file_path
-    end
-
-    return result
+    return diffs
 end
