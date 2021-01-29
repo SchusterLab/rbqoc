@@ -3,11 +3,11 @@
 In this section, we outline the full unscented sampling procedure.
 In the unscented sampling method, we consider a state $\psi \in \mathbb{R}^{2n}$, 
 an uncertain parameter $\lambda \in \mathbb{R}^{d}$, and discrete dynamics
-$\psi_{k + 1} = f(\psi_{k}, \lambda_{k})$.
+$\psi_{k + 1} = f(\psi_{k}, \lambda_{k})$ (maybe choose one between this and $x_{k + 1} = f(x_{k}, u_{k})$).
 The state is obtained with an isomorphism \eqref{eq:isomorphism} and
 we omit bra-ket notation to emphasize that the state is real.
 The nominal initial state is given by $\bar{\psi}_{1}$ with an associated
-positive-definite covariance matrix $P_{1} \in \mathbb{S}_{++}^{2n}$
+positive-definite covariance matrix $P_{1} \in \mathbb{S}_{++}^{2n}$ (I certainly have never seen this notation before - obviously $\mathbb{R}^{2n}$ doesn't need to be explained but maybe $\mathbb{S}_{++}^{2n}$ is not as well known.)
 which describes the uncertainty in the initial state.
 $P_{1}$ is typically non-zero even if the state preparation error is negligible.
 The uncertain parameter has zero-mean

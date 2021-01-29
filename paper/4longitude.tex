@@ -28,11 +28,12 @@ the corresponding element of the final augmented state to zero.
 $T_{1}(a_{k})$ is obtained at each knot point by evaluating
 a spline fit to experimental data of the form $\{(a, T_{1})\}$,
 see Figure \ref{fig:longitudeb}.
+
 It is also possible to fit a spline to theoretically obtained data.
 However, experimental data often deviates from theoretical predictions
 because it is difficult to account for all loss channels \cite{zhang2020universal},
 and $T_{1}$ values often fluctuate on hour
-time scales \cite{klimov2018fluctuations}.
+time scales \cite{klimov2018fluctuations}. (You could cut this - no need to justify using experimental data if you've got it! Maybe just cite where the data is coming from, if published.)
 
 We allow the optimizer to tune the gate time by
 making the time step between each knot point $\Delta t_{k}$
@@ -41,7 +42,7 @@ than the number of knot points $N$, preserves the
 Markovianity of the trajectory
 optimization problem. The square root of the time step $\sqrt{\Delta t_{k}}$
 is appended to the augmented control \eqref{eq:astatecontrols}
-and the squared root
+and the squared root (this looks like a typo)
 of the time step $\lvert \Delta t_{k} \rvert$ is used
 for numerical integration in the discrete dynamics function \eqref{eq:dyn_con}.
 To ensure numerical
@@ -55,9 +56,9 @@ use the Lindblad master equation to simulate $T_{1}$ dissipation for successive
 gate applications, and compute the cumulative gate error
 after each application, see Appendix \ref{appendix:longitude}.
 \todo{Jens, Danny, Ziwen, any idea what the correct way to simulate depolarization is
-  when $T_{1}$ is time dependent?}.
+  when $T_{1}$ is time dependent? Jens is going to have the best opinion on this - personally I think what you've done seems correct}.
 The gate error reported in this text is the infidelity
-of the evolved state and the target state averaged over 1000 pseudo-randomly
+of the evolved state and the target state averaged over 1000 pseudo-randomly (what is this a cryptography paper?! "pseudo" lol)
 generated initial states.
 The flux pulses for the numerical gates
 are approximately periodic
@@ -77,7 +78,7 @@ However, the numerical gates achieve single gate errors
 $\sim 5$ times less than those for the analytic gates,
 which tracks closely with their relative improvement
 on the depolarization probability metric, see Appendix \ref{appendix:longitude}.
-This single gate error advantage corresponds to a significant reduction in error correction resources.
+This single gate error advantage corresponds to a significant reduction in error correction resources (this seems like a strong statement - citation?).
 Furthermore, for successive gate applications, the gate error due to depolarization is approximately linear
 in the gate count, which we expect for $t \ll T_{1}$, see Figure \ref{fig:longitudec}.
 The gate error reduction for large gate counts is important for noisy, intermediate-scale quantum (NISQ)
