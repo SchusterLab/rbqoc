@@ -20,12 +20,13 @@ and compare them to the analytically constructed gates for
 that device.
 
 First, we outline the constraints for the fluxonium gate problem.
-We formulate this problem as a multi-state-transfer problem.
+All gates in this work satisfy these constraints to a tolerance
+of $\sim 10^{-8}$.
 The initial conditions on
 the states are $\ket{\psi^{0}_{1}} = \ket{0}$, $\ket{\psi^{1}_{1}} = \ket{1}$
 \eqref{eq:istate_con}
 where the superscript is an index $i \in \{0, 1\}$,
-and the subscript indicates the first knot point $k = 1$.
+and the subscript indicates the knot point $k = 1$.
 The states at the final knot point are constrained to be
 the image of the initial states under the desired gate $U$,
 $\ket{\psi^{i}_{N}} = U \ket{\psi^{i}_{1}} \ \forall \ i$
@@ -36,7 +37,7 @@ ${\lvert \braket{\psi^{i}_{k}}{\psi^{i}_{k}} \rvert}^{2} = 1 \ \forall \ i,k$
 to ensure the solver does not take advantage of discretization errors in numerical integration.
 To refer to the discrete moments the flux, we introduce the notation
 $\int^{t_{k}}_{t_{1}} a(t) \ \mathrm{d}t \equiv \int_{t} a_{k}$,
-$a(t = t_{k}) \equiv a_{k}$,
+$a(t_{k}) \equiv a_{k}$,
 $\pdv*[n]{a(t)}{t} \lvert_{t = t_{k}} \equiv \partial^{n}_{t} a_{k}$.
 We impose the zero net flux constraint $\int_{t} a_{N} = 0$
 \eqref{eq:znf_con}
@@ -70,7 +71,7 @@ we have the initial condition $\int_{t} a_{1} = \partial_{t} a_{1} = 0$
     and the analytic gates (light pink).
     (b) $T_{1}$ interpolation function used in optimization. Circle markers
     indicate measured $T_{1}$ times. Non-circle markers
-    indicate the time-averaged, absolute amplitude of each flux pulse.
+    are plotted at the time-averaged, absolute amplitude of each flux pulse.
     (c) Cumulative gate errors due to depolarization as a function of the
     number of gates applied.
     Cumulative gate errors for the numerical $Z/2$ and $Y/2$ gates

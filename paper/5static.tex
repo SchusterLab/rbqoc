@@ -34,11 +34,11 @@
 We have formulated the QOC
 problem as an open-loop optimization problem, equivalently,
 we do not incorporate feedback from the experiment in optimization.
-However, the device typically deviates from the Hamiltonian we use in optimization,
+However, the device's parameters deviate from the parameters we use in optimization,
 leading to poor experimental performance. We combat errors
 of this form using robust control techniques,
 making the state evolution insensitive
-to Hamiltonian parameter uncertainty. As an example,
+to parameter uncertainty. As an example,
 we mitigate errors arising from the drift and finite measurement
 precision of the qubit frequency which modifies the fluxonium Hamiltonian
 \eqref{eq:hamiltonian} by $f_{q} \rightarrow f_{q} + \delta f_{q}$.
@@ -47,7 +47,7 @@ a sampling method, an unscented sampling method,
 and a derivative method.
 
 The sampling method incentivizes the optimizer
-to ensure multiple instances of a state, each of which evolves
+to ensure multiple copies of a state, each of which evolves
 with a distinct value of the uncertain parameter, achieve
 the same target state. Variants of this technique have been proposed
 in the context of QOC
@@ -63,8 +63,8 @@ with $f_{q} \rightarrow f_{q} \pm \sigma_{f_{q}}$ for a fixed
 hyperparameter $\sigma_{f_{q}}$ which is the standard deviation of the qubit frequency.
 We penalize the infidelities of the sample states and their target state
 by adding a cost function to the objective \eqref{eq:costfun} of the form
-$\sum_{k, \pm} q_{k} (1 - {\lvert \braket{\psi^{\pm}_{k}}{U \psi_{1}} \rvert}^{2})$
-where $q_{k}$ is a constant we supply.
+$\sum_{k, \pm} b_{k} (1 - {\lvert \bra*{\psi^{\pm}_{k}}U\ket*{\psi_{1}} \rvert}^{2})$
+where $b_{k}$ is a constant we supply.
 For this method, the standard orthonormal basis states are an insufficient choice
 for the initial states. As an example, a $Z/2$ gate achieved by idling
 at the flux frustration point $a_{k} = 0 \ \forall \ k$
@@ -84,8 +84,8 @@ penalizes the deviations of the sample states from the nominal state
 \cite{howell2020direct, lee2013sigma,
   thangavel2020robust}. Accordingly, the cost function we add
 to the objective \eqref{eq:costfun} takes the form
-$\sum_{k, j} q_{k} (\psi^{j}_{k} - \psi_{k})^{T}
-(\psi^{j}_{k} - \psi_{k})$, where $q_{k}$ is a
+$\sum_{k, j} c_{k} (\psi^{j}_{k} - \psi_{k})^{T}
+(\psi^{j}_{k} - \psi_{k})$, where $c_{k}$ is a
 constant we supply, $\psi_{k}$ is
 the evolved initial state (nominal state), and $\psi^{j}_{k}$ is a sample state
 that evolves under a modified Hamiltonian similar to that in the sampling method.
@@ -139,7 +139,7 @@ For example, the dynamics for the $1$\textsuperscript{st}-order derivative metho
 We integrate the coupled ODEs with exponential
 integrators, see Appendix \ref{appendix:derivative},
 in the discrete dynamics function \eqref{eq:dyn_con}. For runtimes
-and complexity analyses for the three robust control techniques,
+of the three robust control techniques,
 consult Appendix \ref{appendix:time}.
 
 We examine the gate errors due to a static qubit frequency

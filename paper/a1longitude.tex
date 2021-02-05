@@ -1,7 +1,7 @@
 \section{Depolarization \label{appendix:longitude}}
 We comment on the depolarization metrics and then give
 our procedure for integrating the Lindblad master equation.
-The depolarization probability and the gate error due to
+The integrated depolarization rate and the gate error due to
 depolarization metrics are compared in Table \ref{tab:longitude} for the
 numerical experiment described in Section \ref{sec:longitude}.
 The relative performance of the analytic and numerical techniques
@@ -9,8 +9,8 @@ is similar across the two metrics.
 
 \begin{table}[ht]
   \begin{tabular}{c | c | c | c | c | c | c}
-         & $P_{1\textrm{A}}$ & $P_{1\textrm{N}}$ & & GE$_{\textrm{A}}$ & GE$_{\textrm{N}}$ &\\
-    Gate & $(10^{-5})$ & $(10^{-5})$ & $P_{1\textrm{A}}/ P_{1\textrm{N}}$ & $(10^{-5})$ &
+         & $D_{1\textrm{A}}$ & $D_{1\textrm{N}}$ & & GE$_{\textrm{A}}$ & GE$_{\textrm{N}}$ &\\
+    Gate & $(10^{-5})$ & $(10^{-5})$ & $D_{1\textrm{A}}/ D_{1\textrm{N}}$ & $(10^{-5})$ &
     $(10^{-5})$ & GE$_{\textrm{A}} / \textrm{GE}_{\textrm{N}}$\\
     \hline
     Z/2 & 5.745 & 1.149 & 5.000 & 1.776 & 0.371 & 4.787\\
@@ -18,7 +18,7 @@ is similar across the two metrics.
     X/2 & 16.251 & 2.660 & 6.109 & 5.347 & 0.863 & 6.196\\
   \end{tabular}
   \caption{
-    Single gate depolarization probability (P)
+    Single gate integrated depolarization rate ($D_{1}$)
     and single gate error due to depolarization (GE).
     Values are reported for the analytic (A) and numerical (N) gates.
   }
@@ -30,19 +30,18 @@ to compute the gate error due to depolarization.
 This equation takes the form:
 \begin{equation}
   \frac{d}{dt} \rho = \frac{-i}{\hbar} [H, \rho]
-  + \sum_{i = 1}^{n^{2} - 1} \gamma_{i} (L_{i} \rho L_{i}^{\dagger}
+  + \sum_{i} \gamma_{i} (L_{i} \rho L_{i}^{\dagger}
   - \frac{1}{2} \{L_{i}^{\dagger} L_{i}, \rho\}),
 \end{equation}
-where $\rho = \ket{\psi}\bra{\psi}$ is the density matrix, $n$ is the
-dimension of the Hilbert space,
+where $\rho = \ket{\psi}\bra{\psi}$ is the density matrix,
 $[\cdot, \cdot]$ is the algebraic commutator, and $\{\cdot, \cdot \}$ is the algebraic
 anti-commutator.
 For depolarization $\gamma_{\uparrow} = T_{1, \uparrow}^{-1}$,
 $\gamma_{\downarrow} = T_{1, \downarrow}^{-1}$,
 $L_{\uparrow} = \sigma^{+}/2$, and
 $L_{\downarrow} = \sigma^{-}/2$ where $\sigma^{\pm} = \sigma_{x} \pm i \sigma_{y}$.
-Both $T_{1, \uparrow}$ and $T_{1, \downarrow}$ are obtained from the spline
-shown in Figure \ref{fig:longitudeb}.
+Both $T_{1, \uparrow}$ and $T_{1, \downarrow}$ are obtained at each knot point
+from the spline shown in Figure \ref{fig:longitudeb}.
 We obtain the $T_{1}$ values in this spline
 by driving the qubit at the desired flux amplitude
 and monitoring the resultant decay. For more details
@@ -56,17 +55,20 @@ the Vectorization/Choi-Jamiolkowski isomorphism \cite{Landi2018},
 \begin{equation}
   \begin{aligned}
     \hat{\mathcal{L}} &= -i(I \otimes H - H^{T} \otimes I)\\
-    &+ \sum_{i = 1}^{n^{2} - 1} \gamma_{i}
+    &+ \sum_{i} \gamma_{i}
     (L_{i}^{*} \otimes L_{i} - \frac{1}{2} (I \otimes L_{i}^{\dagger}L_{i}
     - L_{i}^{T}L_{i}^{*} \otimes I)),
   \end{aligned}
 \end{equation}
 where $\rho = \sum_{i, j} \alpha_{i, j} \ket{i}\bra{j}$
 and $\textrm{vec}(\rho) = \sum_{i, j} \alpha_{i, j} \ket{i} \otimes \ket{j}$.
-We use zero-order hold on the controls so the exact solution is
+We use zero-order hold on the controls--equivalently, $a(t)$ is piecewise-constant
+on the intervals $[t_{k}, t_{k + 1}]$. Therefore,
+$H(a(t))$, $L(a(t))$, and $\gamma_{i}(a(t))$ are also piecewise-constant.
+So, the exact solution is
 $\textrm{vec}(\rho_{k + 1}) = {\exp}{\textstyle(}\Delta t_{k} \hat{\mathcal{L}}_{k}{\textstyle)} \textrm{vec}(\rho_{k})$.
-This isomorphism transforms $(n^{2} \times n^{2}) \times (n^{2} \times n^{2})$
-matrix-matrix multiplications to $(n^{4} \times n^{4}) \times n^{4}$ matrix-vector
+This isomorphism transforms $(n \times n) \times (n \times n)$
+matrix-matrix multiplications to $(n^{2} \times n^{2}) \times n^{2}$ matrix-vector
 multiplications. For small $n$ and zero-order hold on the controls, we find that it is
 faster to use an exponential integrator on the vectorized equation than to perform
 Runge-Kutta on the unvectorized equation. The latter requires decreasing the integration

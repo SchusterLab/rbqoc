@@ -15,7 +15,7 @@ The QOC problem is to find the
 controls that minimize a functional $J(u(t))$.
 To make the problem numerically tractable,
 the controls and state are discretized into $N$ knot points (time steps).
-In the case of a single state transfer problem, the functional is
+In the case of a single state-transfer problem, the functional is
 the infidelity of the desired final state and the initial state evolved
 to the final knot point,
 $J(u) = 1 - {\lvert \braket{\psi_{f}}{\psi_{N}(u)} \rvert}^{2}$.
@@ -134,7 +134,7 @@ to small decreases in the constraint violations near the locally optimal solutio
 \cite{bertsekas1996constrained}.
 To address this shortcoming, ALTRO
 projects the solution from the ALM stage onto the constraint manifold using
-a projected Newton method, achieving ultra-low
+a (direct) projected Newton method, achieving ultra-low
 constraint violations $\sim 10^{-8}$.
 For more information on the details of the ALTRO
 solver, see \cite{howell2019altro, Jackson2020altroc}.

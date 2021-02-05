@@ -13,14 +13,14 @@ equation \cite{rembold2020introduction, schulteherbruggen2011optimal}
 or evolving a large number of states in a quantum trajectory approach
 \cite{abdelhafez2019gradient}.
 We avoid the increase in computational complexity required for these
-techniques by penalizing the integrated rate (probability) of depolarization in optimization.
-Using this probability as a proxy for the gate error incurred
+techniques by penalizing the integrated depolarization rate in optimization.
+Using this metric as a proxy for the gate error incurred
 is reasonable because depolarization errors are incoherent and therefore
 increase monotonically in time without interference.
 
-The depolarization probability is given by,
+The integrated depolarization rate is given by,
 \begin{equation}
-  P_{1}(t) = \int_{0}^{t} T_{1}^{-1}(a(t^{\prime})) dt^{\prime}.
+  D_{1}(t) = \int_{0}^{t} T_{1}^{-1}(a(t^{\prime})) dt^{\prime}.
 \end{equation}
 This value is appended to the augmented state \eqref{eq:astatecontrols}
 and its norm is penalized in the objective \eqref{eq:costfun} by setting
@@ -35,11 +35,9 @@ and $T_{1}$ values often fluctuate on hour
 time scales \cite{klimov2018fluctuations}.
 
 We allow the optimizer to tune the gate time by
-making the time step between each knot point $\Delta t_{k}$
-a decision variable. Promoting $\Delta t_{k}$ to a decision variable, rather
-than the number of knot points $N$, preserves the
-Markovianity of the trajectory
-optimization problem. The square root of the time step $\sqrt{\Delta t_{k}}$
+making the time step between each knot point
+a decision variable. 
+The square root of the time step $\sqrt{\Delta t_{k}}$
 is appended to the augmented control \eqref{eq:astatecontrols}
 and the squared root
 of the time step $\lvert \Delta t_{k} \rvert$ is used
@@ -47,6 +45,11 @@ for numerical integration in the discrete dynamics function \eqref{eq:dyn_con}.
 To ensure numerical
 integration accuracy is maintained, we constrain
 the bounds of the time step at each knot point.
+We promote the time steps
+to decision variables, rather
+than the number of knot points $N$, to ensure each cost function depends
+only on the augmented state and augmented
+controls at its own knot point $\ell_{k}(x_{k}, u_{k})$, which is necessary for iLQR.
 
 We analyze the effect of depolarization on
 the $X/2$, $Y/2$, and $Z/2$ gates obtained with
@@ -54,8 +57,6 @@ our numerical method and the analytic gates. We
 use the Lindblad master equation to simulate $T_{1}$ dissipation for successive
 gate applications, and compute the cumulative gate error
 after each application, see Appendix \ref{appendix:longitude}.
-\todo{Jens, Danny, Ziwen, any idea what the correct way to simulate depolarization is
-  when $T_{1}$ is time dependent?}.
 The gate error reported in this text is the infidelity
 of the evolved state and the target state averaged over 1000 pseudo-randomly
 generated initial states.
@@ -76,7 +77,7 @@ computing \cite{aharonov2008fault, knill2005quantum, gottesman1997stabilizer}.
 However, the numerical gates achieve single gate errors
 $\sim 5$ times less than those for the analytic gates,
 which tracks closely with their relative improvement
-on the depolarization probability metric, see Appendix \ref{appendix:longitude}.
+on the integrated depolarization rate metric, see Appendix \ref{appendix:longitude}.
 This single gate error advantage corresponds to a significant reduction in error correction resources.
 Furthermore, for successive gate applications, the gate error due to depolarization is approximately linear
 in the gate count, which we expect for $t \ll T_{1}$, see Figure \ref{fig:longitudec}.

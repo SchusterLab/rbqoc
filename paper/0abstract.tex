@@ -35,14 +35,12 @@
   realizing high-fidelity gates, but they require exquisite calibration to be performant.
   We apply robust trajectory optimization techniques to suppress gate errors arising from system
   parameter uncertainty.
-  We propose a method that takes advantage of uncertain parameter
-  derivative information while maintaining
-  computational efficiency by transforming high-order differential equations to coupled,
-  first-order ODEs.
-  Additionally, the effect of depolarization on a gate is most accurately modeled by
+  We propose a derivative-based approach that maintains
+  computational efficiency by using forward-mode differentiation.
+  Additionally, the effect of depolarization on a gate is typically modeled by
   integrating the Lindblad master equation,
   which is computationally expensive.
-  We propose a computationally efficient model
+  We employ a computationally efficient model
   and utilize time-optimal control to achieve high fidelity gates in the presence of depolarization.
   We apply these techniques to a fluxonium qubit and suppress
   simulated gate errors due to parameter uncertainty below $10^{-7}$ for
