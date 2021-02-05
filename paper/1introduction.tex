@@ -21,7 +21,12 @@ while adhering to experimental constraints.
 Experimental errors such as parameter drift, noise, and
 finite control resolution cause the system to deviate
 from the model used in optimization, leading
-to poor experimental performance.
+to poor experimental performance
+\todo{could be a good place for a citation here?
+  It obviosuly makes sense in principle,
+  but I'm not aware of a paper that tried to implement optimal
+  control and failed for these reasons.
+  *on reading further* Maybe the Zhou book from below}.
 Robust control improves upon
 standard optimal control by encoding
 model parameter uncertainties
@@ -40,9 +45,9 @@ pulses obtained with the DRAG scheme \cite{motzoi2009simple}.
 These techniques are not amenable to arbitrary experimental constraints,
 so recent work has sought to achieve robustness in quantum optimal
 control frameworks using closed-loop methods \cite{egger2014adaptive, feng2018gradient,
-  wittler2020integrated} and open-loop methods \cite{
+  li2017hybrid, wittler2020integrated} and open-loop methods \cite{
   allen2019robust, carvalho2020error, reinhold2019controlling,
-  rembold2020introduction, kosut2013robust}.
+  rembold2020introduction, kosut2013robust, niu2019universal}.
 
 In this work, we study three robust control techniques that
 make the system's quantum state trajectory less sensitive

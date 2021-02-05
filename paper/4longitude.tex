@@ -33,14 +33,16 @@ However, experimental data often deviates from theoretical predictions
 because it is difficult to account for all loss channels \cite{zhang2020universal},
 and $T_{1}$ values often fluctuate on hour
 time scales \cite{klimov2018fluctuations}.
+\todo{You could cut this - starting from "It is also" to end of paragraph -
+  no need to justify using experimental data if you've got it!
+  Maybe just cite where the data is coming from, if published.}
 
 We allow the optimizer to tune the gate time by
 making the time step between each knot point
 a decision variable. 
 The square root of the time step $\sqrt{\Delta t_{k}}$
 is appended to the augmented control \eqref{eq:astatecontrols}
-and the squared root
-of the time step $\lvert \Delta t_{k} \rvert$ is used
+and its square $\lvert \Delta t_{k} \rvert$ is used
 for numerical integration in the discrete dynamics function \eqref{eq:dyn_con}.
 To ensure numerical
 integration accuracy is maintained, we constrain
@@ -78,10 +80,10 @@ However, the numerical gates achieve single gate errors
 $\sim 5$ times less than those for the analytic gates,
 which tracks closely with their relative improvement
 on the integrated depolarization rate metric, see Appendix \ref{appendix:longitude}.
-This single gate error advantage corresponds to a significant reduction in error correction resources.
+This single gate error advantage corresponds to a significant reduction in error correction resources
+\todo{this seems like a strong statement - citation?}.
 Furthermore, for successive gate applications, the gate error due to depolarization is approximately linear
 in the gate count, which we expect for $t \ll T_{1}$, see Figure \ref{fig:longitudec}.
 The gate error reduction for large gate counts is important for noisy, intermediate-scale quantum (NISQ)
 applications. These improvements are significant for the constraints we have imposed on the gates,
 and do not represent a fundamental limit to the optimization methods we have employed.
-

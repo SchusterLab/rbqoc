@@ -94,7 +94,7 @@ and its update procedure is based on the differential-dynamic-programming approa
 First, iLQR uses an initial guess for the augmented controls to obtain the augmented
 states with the discrete dynamics function.
 iLQR then constructs quadratic models for each cost function using
-their zeroth-, first- and second-order derivatvies in a Taylor expansion
+their zeroth-, first- and second-order derivatives in a Taylor expansion
 about the current augmented controls and augmented states.
 These models are used to derive a recurrence relation between knot points
 which gives the locally optimal update for the augmented controls.

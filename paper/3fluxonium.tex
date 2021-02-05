@@ -35,11 +35,12 @@ Furthermore, we impose the normalization constraint
 ${\lvert \braket{\psi^{i}_{k}}{\psi^{i}_{k}} \rvert}^{2} = 1 \ \forall \ i,k$
 \eqref{eq:statenorm_con}
 to ensure the solver does not take advantage of discretization errors in numerical integration.
-To refer to the discrete moments the flux, we introduce the notation
+To refer to the discrete moments of the flux, we introduce the notation
 $\int^{t_{k}}_{t_{1}} a(t) \ \mathrm{d}t \equiv \int_{t} a_{k}$,
 $a(t_{k}) \equiv a_{k}$,
 $\pdv*[n]{a(t)}{t} \lvert_{t = t_{k}} \equiv \partial^{n}_{t} a_{k}$.
 We impose the zero net flux constraint $\int_{t} a_{N} = 0$
+\todo{seems kind of funny to be referencing the equations so far below - might be nicer to introduce the equations, referencing Eqs. (2)a-(2)d, then talk about what they mean.}
 \eqref{eq:znf_con}
 which mitigates the inductive drift ubiquitous in flux-bias lines
 \cite{battistel2019fast, krantz2019quantum, zhang2020universal}.
@@ -53,7 +54,6 @@ we have the initial condition $\int_{t} a_{1} = \partial_{t} a_{1} = 0$
 
 %% F1
 \begin{figure*}[ht]
-  
   \begin{subfigure}{.315\textwidth}
     \includegraphics[width=\linewidth]{assets/f1a.png}
     \caption{\label{fig:longitudea}}
@@ -71,7 +71,8 @@ we have the initial condition $\int_{t} a_{1} = \partial_{t} a_{1} = 0$
     and the analytic gates (light pink).
     (b) $T_{1}$ interpolation function used in optimization. Circle markers
     indicate measured $T_{1}$ times. Non-circle markers
-    are plotted at the time-averaged, absolute amplitude of each flux pulse.
+    are plotted at the time-averaged, absolute amplitude of each flux pulse
+    \todo{seems a bit odd to plot these on this figure - it looks like you're assigning a T1 value to the entire pulse, which I'm not sure how to interpret}.
     (c) Cumulative gate errors due to depolarization as a function of the
     number of gates applied.
     Cumulative gate errors for the numerical $Z/2$ and $Y/2$ gates
@@ -111,7 +112,9 @@ in the isomorphism $\mathcal{H}(\mathbb{C}^{n})
 \end{equation}
 The cost function at each knot point is
 $\ell_{k}(x_{k}, u_{k}) = (x_{k} - x_{f})^{T} Q_{k} (x_{k} - x_{f}) + u^{T}_{k} R_{k} u_{k}$
-where $Q_{k}$ and $R_{k}$ are diagonal matrices we supply. The $Q_{k}$ term
+where $Q_{k}$ and $R_{k}$ are diagonal matrices we supply
+\todo{didn't we say above that iLQR constructs
+quadratic models for each cost function? Is that what's going on here? How do we reconcile then that "we supply" Q and R?}. The $Q_{k}$ term
 penalizes deviations from the final augmented state $x_{f}$,
 which is given by the constraints we have imposed on
 $\ket*{\psi^{i}_{N}}$, $\int_{t} a_{N}$, and $a_{N}$ in addition to

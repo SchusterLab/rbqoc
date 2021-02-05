@@ -20,7 +20,8 @@
     for twice the gate time of the analytic gate.
     (b) Single gate error at a one-percent qubit frequency detuning as
     a function of the gate time. Missing
-    data points represent gates with a gate error greater than $5 \cdot 10^{-5}$.
+    data points represent gates with a gate error greater than $5 \cdot 10^{-5}$
+    \todo{...what's going on here? Should I be concerned? This seems like a relatively big thing that goes unexplained}.
     (c) Single gate error as a function of the qubit frequency detuning.
     The gate errors for the analytic and 1\textsuperscript{st}-order derivative
     methods are shown for gate times which are multiples of $1 / 4 f_{q} \sim 18 \textrm{ns}$.
@@ -32,7 +33,7 @@
 
 \section{Robustness to Static Parameter Uncertainty \label{sec:static}}
 We have formulated the QOC
-problem as an open-loop optimization problem--equivalently,
+problem as an open-loop optimization problem; equivalently,
 we do not incorporate feedback from the experiment in optimization.
 However, the device's parameters deviate from the parameters we use in optimization,
 leading to poor experimental performance. We combat errors
@@ -65,6 +66,9 @@ We penalize the infidelities of the sample states and their target state
 by adding a cost function to the objective \eqref{eq:costfun} of the form
 $\sum_{k, \pm} b_{k} (1 - {\lvert \bra*{\psi^{\pm}_{k}}U\ket*{\psi_{1}} \rvert}^{2})$
 where $b_{k}$ is a constant we supply.
+\todo{I thought of this question here but it applies also to when we first write down the objective 6a.
+Doesn't the sum over k imply that we are penalizing the time it takes to complete the gate?
+Why do we need to append $\Delta t_{k}$ to the augmented state vector?}
 For this method, the standard orthonormal basis states are an insufficient choice
 for the initial states. As an example, a $Z/2$ gate achieved by idling
 at the flux frustration point $a_{k} = 0 \ \forall \ k$
@@ -98,7 +102,7 @@ to prevent the sample states
 from drifting too far or close to the nominal state during evolution,
 which would result in exceedingly large or small deviations in the cost function.
 In particular, the sample states are chosen to encode a unimodal distribution over
-the $2n$ elements of the nominal state, modeling the uncertainty in the state
+the $2n$ \todo{at this point the reader has forgotten what lower-case n refers to} elements of the nominal state, modeling the uncertainty in the state
 as a result of the uncertainty in the parameter. The unscented transform
 accurately propagates the mean and covariance of this distribution between
 knot points, or equivalently, through the transformation of the TDSE.
@@ -107,17 +111,26 @@ and do not observe a performance increase
 using more initial states, for example those from the operator basis.
 A detailed procedure for the unscented transformation is given
 in Appendix \ref{appendix:unscented}.
+\todo{this seems far more complicated than the sampling method - if it truly is necessary,
+  perhaps earlier we could fully flesh out what the issues are?
+  Does this drifting too close to the nominal state actually occur in practice?
+  And if so, it isn't clear to me why that is a bad thing, as for example if it drifts close to the nominal state,
+  then great, isn't the optimizer doing its job?}
 
 The derivative method penalizes the sensitivity of the state
 to the uncertain parameter, which is encoded in the $l$\textsuperscript{th}-order
-state derivative $\partial_{f_{q}}^{l} \ket{\psi}$. In the $m$\textsuperscript{th}-order
+state derivative $\partial_{f_{q}}^{l} \ket{\psi}$ \todo{seems funny to change from $l$ to $m$ immediately after introduction}.
+In the $m$\textsuperscript{th}-order
 derivative method, we append all state derivatives of order $1, \dots, m$
 to the augmented state vector \eqref{eq:astatecontrols}
 for each initial state. We use the initial state $\ket{0}$ for this method,
-and observe no advantage to using more initial states.
+and observe no advantage to using more initial states
+\todo{comment on why you've chosen different states for this vs. unscented?}.
 We penalize the norms of the state derivatives
 in the objective \eqref{eq:costfun} by setting the corresponding elements
-of the final augmented state to zero.
+of the final augmented state to zero
+\todo{this isn't totally obvious to me - why should this be the right way to penalize?
+  Also the wording seems a bit off - surely you don't mean that you're penalizing the norm of the state derivative with itself? Isn't it normalized?}.
 We could obtain the state derivatives at each knot point
 with backward-mode differentiation.
 In a naive automatic differentiation scheme,
@@ -137,11 +150,17 @@ For example, the dynamics for the $1$\textsuperscript{st}-order derivative metho
   \label{eq:d1dyn}
 \end{align}
 We integrate the coupled ODEs with exponential
-integrators, see Appendix \ref{appendix:derivative},
-in the discrete dynamics function \eqref{eq:dyn_con}. For runtimes
+integrators
+in the discrete dynamics function \eqref{eq:dyn_con}, see Appendix \ref{appendix:derivative}.
+For runtimes
 of the three robust control techniques,
 consult Appendix \ref{appendix:time}.
 
+\todo{you have obviously made the choice to first present all three methods as theoretical tools,
+  then discuss their results together, which is fine. It might make sense to also consider presenting
+  a method and presenting results associated with that method, before moving on to the next one.
+  Might make it easier to justify, e.g., the complexity of the unscented sampling method
+  if there are deficiencies to be addressed that are clear from the results of the sampling method.}
 We examine the gate errors due to a static qubit frequency
 detuning for the $Z/2$ gates obtained with the robust control techniques
 and the analytic $Z/2$ gate.
@@ -158,6 +177,8 @@ generated initial states.
 We set $\sigma_{f_{q}}/f_{q} = 1\%$
 for the sampling and unscented sampling
 methods.
+\todo{right so reading further - this paragraph has nothing to do with the previous two
+  - might make sense to put this with the corresponding explanation of the method.}
 
 The analytic gate corresponds to
 idling at the flux frustration point $a_{k} = 0 \ \forall \ k$, see Figure
@@ -176,11 +197,12 @@ to gate times other than
 $1 / 4 f_{q}$. The ability to perform
 phase gates in any given time is critical
 for multi-qubit experiments, where the qubits operate at different
-frequencies $f_{q, i} \neq f_{q, j}$.
+frequencies.
 We can find solutions using the numerical methods at
 all gate times above $18$ns, see Figure \ref{fig:staticb}.
 These numerical methods offer an effective scheme for synchronizing
 multi-qubit experiments.
+\todo{this seems like a funny way to end this paragraph - I was told that static parameter deviations were the issue the whole time, and suddenly it's that analytic pulses aren't flexible enough w.r.t. the time it takes to complete them. I would stress instead that you can do better than $\sim 4.5 \cdot 10^{-5}$! The time issue, though important, feels like it should be more of an aside given the things you've emphasized are the issues you're trying to solve.}
 
 The flux pulse produced by the sampling method
 transitions  smoothly away from idles at the flux frustration point,
@@ -200,6 +222,10 @@ The gate errors at a one-percent qubit frequency detuning
 for both derivative methods decrease super-linearly in their gate times.
 The 2\textsuperscript{nd}-order method does not offer a substantial improvement
 over the 1\textsuperscript{st}-order method for most gate times.
+\todo{I would say the second order method as compared to the first order method feels the same as the sampling method as compared
+  to the unscented method. You say here that there is no improvement, but improvement for unscented looks mostly like noise to me,
+  even if you have some idea of where it's coming from (larmor period fractions).
+  I would just be careful with how these things are framed - seems opportunistic to claim that unscented gives some sort of serious advantage here.}
 The gate error at a one-percent detuning for the 1\textsuperscript{st}-order
 method reaches $10^{-7}$ at the Larmor period $1 / f_{q} \sim 72$ns,
 see Figure \ref{fig:staticc}.
