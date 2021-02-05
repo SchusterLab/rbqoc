@@ -125,7 +125,7 @@ ALM remedies this issue by adaptively adjusting a Lagrange multiplier estimate
 for each constraint function to ensure the constraints are satisfied.
 ALM adds terms that are linear and quadratic in the constraint functions
 to the objective. The new objective is then minimized with
-iLQR. If the solution produced by iLQR does not satisfy the constraints,
+iLQR. If the solution obtained with iLQR does not satisfy the constraints,
 the prefactors for the constraint terms in the objective are increased
 intelligently and the procedure is repeated.
 
