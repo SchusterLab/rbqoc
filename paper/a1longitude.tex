@@ -36,16 +36,29 @@ This equation takes the form:
 where $\rho = \ket{\psi}\bra{\psi}$ is the density matrix,
 $[\cdot, \cdot]$ is the algebraic commutator, and $\{\cdot, \cdot \}$ is the algebraic
 anti-commutator.
-For depolarization $\gamma_{\uparrow} = T_{1, \uparrow}^{-1}$,
-$\gamma_{\downarrow} = T_{1, \downarrow}^{-1}$,
-$L_{\uparrow} = \sigma^{+}/2$, and
-$L_{\downarrow} = \sigma^{-}/2$ where $\sigma^{\pm} = \sigma_{x} \pm i \sigma_{y}$.
-Both $T_{1, \uparrow}$ and $T_{1, \downarrow}$ are obtained at each knot point
+For depolarization $\gamma_{+} = T_{+}^{-1}$,
+$\gamma_{-} = T_{-}^{-1}$,
+$L_{+} = \sigma^{+}/2$, and
+$L_{-} = \sigma^{-}/2$ where $\sigma^{\pm} = \sigma_{x} \pm i \sigma_{y}$.
+\todo{Ask Jens and company to okay the rest of this paragraph}
+$T_{+} = T_{-} = T_{1}$ are obtained at each knot point
 from the spline shown in Figure \ref{fig:longitudeb}.
 We obtain the $T_{1}$ values in this spline
-by driving the qubit at the desired flux amplitude
+by driving the qubit at the desired flux bias
 and monitoring the resultant decay. For more details
 on these measurements, consult \cite{zhang2020universal}.
+Because $T_{1}$ depends on the flux, so do
+the decay rates, $\gamma_{i}$.
+Integrating the master equation with time-dependent decay crates
+provides a heuristic for how the gates we study may perform in
+the experiment, but it may not be strictly correct in the regime we
+are operating in, where the decay rates change much faster
+than the relaxation time, $\Delta t_{k} \ll T_{1}$. Standard
+derivations of the Lindblad master equation do not account for
+time-dependent decay rates \cite{manzano2020a}, and a more thorough
+treatment in future work would unlock new insights for
+quantum computing platforms where decoherence is strongly
+dependent on the control parameters.
 
 So that we may use exponential integrators, we employ
 the Vectorization/Choi-Jamiolkowski isomorphism \cite{Landi2018},
@@ -60,13 +73,14 @@ the Vectorization/Choi-Jamiolkowski isomorphism \cite{Landi2018},
     - L_{i}^{T}L_{i}^{*} \otimes I)),
   \end{aligned}
 \end{equation}
-where $\rho = \sum_{i, j} \alpha_{i, j} \ket{i}\bra{j}$
-and $\textrm{vec}(\rho) = \sum_{i, j} \alpha_{i, j} \ket{i} \otimes \ket{j}$.
-We use zero-order hold on the controls--equivalently, $a(t)$ is piecewise-constant
-on the intervals $[t_{k}, t_{k + 1}]$. Therefore,
-$H(a(t))$, $L(a(t))$, and $\gamma_{i}(a(t))$ are also piecewise-constant.
+where $\rho = \sum_{i, j} \alpha_{ij} \ket{i}\bra{j}$
+and $\textrm{vec}(\rho) = \sum_{i, j} \alpha_{ij} \ket{i} \otimes \ket{j}$.
+We use zero-order hold on the controls; equivalently, $a(t)$ is constant
+on each integration interval $[t_{k}, t_{k + 1}]$. Therefore,
+$H(a(t))$, and $\gamma_{i}(a(t))$ are also piecewise-constant.
 So, the exact solution is
-$\textrm{vec}(\rho_{k + 1}) = {\exp}{\textstyle(}\Delta t_{k} \hat{\mathcal{L}}_{k}{\textstyle)} \textrm{vec}(\rho_{k})$.
+$\textrm{vec}(\rho_{k + 1}) = {\exp}{\textstyle(}\Delta t_{k}
+\hat{\mathcal{L}}_{k}{\textstyle)} \textrm{vec}(\rho_{k})$.
 This isomorphism transforms $(n \times n) \times (n \times n)$
 matrix-matrix multiplications to $(n^{2} \times n^{2}) \times n^{2}$ matrix-vector
 multiplications. For small $n$ and zero-order hold on the controls, we find that it is

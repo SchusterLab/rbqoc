@@ -5,28 +5,31 @@ Early techniques were proposed for nuclear magnetic resonance experiments
 \cite{vandersypen2005nmr, kehlet2004improving, khaneja2005optimal,
   maximov2008optimal, nielsen2010optimal, skinner2003application, tosner2009optimal},
 and applications now include superconducting circuits \cite{abdelhafez2020universal,
-  chakram2020multimode, fisher2010optimal, gokhale2019partial,
-  leng2019robust, leung2017speedup, li2020fast},
+  chakram2020multimode, egger2013optimized, fisher2010optimal, gokhale2019partial,
+  huang2014optimal, heeres2017implementing, kelly2014optimal, leng2019robust,
+  leung2017speedup, li2020fast,
+  liebermann2016optimal, reinhold2019controlling,
+  rebentrost2009optimal, rebentrost2009optimal2, spiteri2018quantum,
+  sporl2007optimal},
 neutral atoms and ions \cite{brouzos2015quantum,
-  de2008optimal, goerz2011quantum, guo2019high, jensen2019time,
-  larrouy2020fast, omran2019generation, rosi2013fast, sorensen2019qengine,
+  de2008optimal, grace2007optimal, goerz2011quantum, guo2019high, jensen2019time,
+  larrouy2020fast, nebendahl2009optimal, omran2019generation,
+  rosi2013fast,
   treutlein2006microwave, van2016optimal},
 nitrogen-vacancy centers in diamond \cite{chou2015optimal,
   dolde2014high, geng2016experimental,
   nobauer2015smooth, poggiali2018optimal, rembold2020introduction, tian2019optimal},
-and Bose-Einstein condensates \cite{amri2019optimal, sorensen2018quantum}.
+and Bose-Einstein condensates \cite{amri2019optimal, doria2011optimal,
+  sorensen2019qengine, sorensen2018quantum}.
 In the context of quantum computation,
 optimal control is employed to achieve high-fidelity gates
 while adhering to experimental constraints.
 Experimental errors such as parameter drift, noise, and
 finite control resolution cause the system to deviate
-from the model used in optimization, leading
-to poor experimental performance
-\todo{could be a good place for a citation here?
-  It obviosuly makes sense in principle,
-  but I'm not aware of a paper that tried to implement optimal
-  control and failed for these reasons.
-  *on reading further* Maybe the Zhou book from below}.
+from the model used in optimization, hampering
+experimental performance
+\cite{chakram2020multimode, heeres2017implementing, klimov2020snake,
+  omran2019generation, reinhold2019controlling}.
 Robust control improves upon
 standard optimal control by encoding
 model parameter uncertainties
@@ -42,9 +45,14 @@ errors include composite pulses \cite{cummins2000use, cummins2003tackling,
 pulses designed by considering dynamic and geometric phases
 \cite{han2020experimental, xu2020nonadiabatic}, and
 pulses obtained with the DRAG scheme \cite{motzoi2009simple}.
-These techniques are not amenable to arbitrary experimental constraints,
-so recent work has sought to achieve robustness in quantum optimal
-control frameworks using closed-loop methods \cite{egger2014adaptive, feng2018gradient,
+As compared to analytical techniques, QOC is advantageous for
+designing pulses that consider all experimental constraints and
+performance tradeoffs
+\cite{leung2017speedup},
+and for constructing operations without a known analytic solution
+\cite{chakram2020multimode, heeres2017implementing}.
+Accordingly, recent work has sought to achieve robustness in QOC
+frameworks using closed-loop methods \cite{egger2014adaptive, feng2018gradient,
   li2017hybrid, wittler2020integrated} and open-loop methods \cite{
   allen2019robust, carvalho2020error, reinhold2019controlling,
   rembold2020introduction, kosut2013robust, niu2019universal}.
@@ -56,9 +64,9 @@ to static and time-dependent parameter uncertainty:
 \item A sampling method, similar to the work of \cite{allen2019robust,
   ball2020software, carvalho2020error, khaneja2005optimal,
   reinhold2019controlling, rembold2020introduction}.
-  \item An unscented sampling method adapted from the unscented transform used in
-    state estimation \cite{howell2020direct, julier2004unscented,
-      lee2013sigma, thangavel2020robust}.
+\item An unscented sampling method \cite{howell2020direct, lee2013sigma, thangavel2020robust}
+  adapted from the unscented transform \cite{julier2004unscented,
+    uhlmann1995dynamic} used in state estimation.
   \item A derivative method, which penalizes the sensitivity of the quantum state trajectory
     to uncertain parameters.
 \end{enumerate}
@@ -74,15 +82,15 @@ for which the computational cost is independent of the
 Hilbert space dimension.
 Leveraging recent advances in trajectory optimization within the field of robotics, we
 solve these optimization problems using ALTRO (Augmented Lagrangian TRajectory Optimizer)
-\cite{howell2019altro}, which can enforce constraints on the quantum state trajectory
-and control parameters.
+\cite{howell2019altro}, which can enforce constraints on
+the control parameters and the quantum state trajectory.
 
 This paper is organized as follows.
 First, we describe ALTRO in the context of QOC
 in Section \ref{sec:background}.
 We outline realistic constraints for operating the fluxonium and
 define the associated QOC problem in Section \ref{sec:fluxonium}.
-Then, we formulate a method for supressing depolarization
+Then, we formulate a method for suppressing depolarization
 in Section \ref{sec:longitude}. Next, we describe three techniques for achieving
 robustness to static parameter uncertainties in Section \ref{sec:static}. We
 adapt the same techniques to mitigate 1/$f$ flux noise

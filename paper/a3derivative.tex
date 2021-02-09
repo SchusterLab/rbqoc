@@ -2,10 +2,12 @@
 Here, we outline how to efficiently integrate the dynamics
 for the derivative method using exponential integrators.
 General exponential integrators break the dynamics into a linear term and a non-linear term.
-For example, the dynamics of the first state derivative in
-units of $i\hbar = 1$ (is setting i=1 something that is done? Seems fraught and scary...just leave it in there bro and set hbar to 1 like the rest of us!)are $\frac{d}{dt} \ket{\partial_{\lambda} \psi} =
-H \ket{\partial_{\lambda} \psi} + (\partial_{\lambda} H) \ket{\psi}$.
-The linear term is $L = H$ and the non-linear term is $N = (\partial_{\lambda} H) \ket{\psi}$.
+For example, the dynamics for the first state derivative
+are $\frac{d}{dt} \ket{\partial_{\lambda} \psi} =
+-\frac{i}{\hbar} H  \ket{\partial_{\lambda} \psi} -
+\frac{i}{\hbar} (\partial_{\lambda} H) \ket{\psi}$.
+The linear term is $L = -\frac{i}{\hbar} H$ and the non-linear
+term is $N = -\frac{i}{\hbar} (\partial_{\lambda} H) \ket{\psi}$.
 With zero-order hold on the controls the exact solution is:
 \begin{equation}
   \label{eq:dgeneralexp}
@@ -22,7 +24,8 @@ for Runge-Kutta schemes. We use a simple approximation known as the Lawson-Euler
 method \cite{berland2005solving},
 \begin{equation}
   \begin{aligned}
-    \ket{\partial_{\lambda} \psi_{k + 1}} &\approx \exp(\Delta t_{k}L_{k}) \ket{\partial_{\lambda} \psi_{k}}\\
+    \ket{\partial_{\lambda} \psi_{k + 1}} &\approx \exp(\Delta t_{k}L_{k})
+    \ket{\partial_{\lambda} \psi_{k}}\\
     &+ \exp(\Delta t_{k}L_{k}) N_{k} \Delta t_{k}.\\
   \end{aligned}
 \end{equation}

@@ -1,22 +1,21 @@
 \section{Depolarization Mitigation\label{sec:longitude}}
 In this section, we outline a method
 for optimizing the flux to mitigate depolarization.
-For many superconducting circuits, the 1/$e$ depolarization time ($T_{1}$) is independent of the control parameters,
+For many superconducting circuits, the 1/$e$ depolarization time
+($T_{1}$) is independent of the control parameters,
 so the fastest possible gate incurs the least depolarization error
 \cite{schulteherbruggen2011optimal}.
 For the fluxonium, however, $T_{1}$ is strongly dependent on the flux.
 We enable the optimizer to trade longer gate times
-for lower depolarizaiton times or vice-versa by making the gate time a decision variable.
+for longer $T_{1}$ times, or shorter $T_{1}$ times for shorter gate times,
+by making the gate time a decision variable.
 Additionally, previous work has modeled the gate error due to depolarization
 by evolving density matrices under a master
-equation \cite{rembold2020introduction, schulteherbruggen2011optimal}
+equation \cite{rembold2020introduction, schulteherbruggen2011optimal},
 or evolving a large number of states in a quantum trajectory approach
 \cite{abdelhafez2019gradient}.
 We avoid the increase in computational complexity required for these
 techniques by penalizing the integrated depolarization rate in optimization.
-Using this metric as a proxy for the gate error incurred
-is reasonable because depolarization errors are incoherent and therefore
-increase monotonically in time without interference.
 
 The integrated depolarization rate is given by,
 \begin{equation}
@@ -24,22 +23,27 @@ The integrated depolarization rate is given by,
 \end{equation}
 This value is appended to the augmented state \eqref{eq:astatecontrols}
 and its norm is penalized in the objective \eqref{eq:costfun} by setting
-the corresponding element of the final augmented state to zero.
+the corresponding element of the final augmented state to zero,
+which has the effect of incentivizing long $T_{1}$ times at each knot point.
 $T_{1}(a_{k})$ is obtained at each knot point by evaluating
 a spline fit to experimental data of the form $\{(a, T_{1})\}$,
 see Figure \ref{fig:longitudeb}.
-It is also possible to fit a spline to theoretically obtained data.
-However, experimental data often deviates from theoretical predictions
-because it is difficult to account for all loss channels \cite{zhang2020universal},
-and $T_{1}$ values often fluctuate on hour
-time scales \cite{klimov2018fluctuations}.
-\todo{You could cut this - starting from "It is also" to end of paragraph -
-  no need to justify using experimental data if you've got it!
-  Maybe just cite where the data is coming from, if published.}
+Using the integrated depolarization rate as a proxy for the gate error incurred
+is reasonable because depolarization errors are incoherent and therefore
+increase monotonically in time without interference.
+Additionally, a master equation approach would require adding
+density matrices of size $n \times n$
+to the augmented state, and a quantum trajectory approach
+would require adding many states of size $n$ to the augmented state,
+where $n$ is the dimension of the Hilbert space.
+The integrated depolarization rate is a single
+real number; thus, the computational complexity of this
+depolarization model does not scale
+with the dimension of the Hilbert space.
 
 We allow the optimizer to tune the gate time by
 making the time step between each knot point
-a decision variable. 
+a decision variable \cite{howell2019altro}. 
 The square root of the time step $\sqrt{\Delta t_{k}}$
 is appended to the augmented control \eqref{eq:astatecontrols}
 and its square $\lvert \Delta t_{k} \rvert$ is used
@@ -47,21 +51,17 @@ for numerical integration in the discrete dynamics function \eqref{eq:dyn_con}.
 To ensure numerical
 integration accuracy is maintained, we constrain
 the bounds of the time step at each knot point.
-We promote the time steps
-to decision variables, rather
-than the number of knot points $N$, to ensure each cost function depends
-only on the augmented state and augmented
-controls at its own knot point $\ell_{k}(x_{k}, u_{k})$, which is necessary for iLQR.
 
 We analyze the effect of depolarization on
 the $X/2$, $Y/2$, and $Z/2$ gates obtained with
-our numerical method and the analytic gates. We
+our numerical method and the corresponding analytic gates. We
 use the Lindblad master equation to simulate $T_{1}$ dissipation for successive
 gate applications, and compute the cumulative gate error
 after each application, see Appendix \ref{appendix:longitude}.
 The gate error reported in this text is the infidelity
 of the evolved state and the target state averaged over 1000 pseudo-randomly
 generated initial states.
+
 The flux pulses for the numerical gates
 are approximately periodic
 with amplitudes $\sim 0.2 \textrm{GHz}$, see Figure \ref{fig:longitudea}.
@@ -71,7 +71,8 @@ and realized in \cite{mundada2020floquet}.
 The numerical gate times are greater
 than the analytic gate times, but the
 numerical flux pulses
-spend more time at higher amplitudes, achieving higher $T_{1}$ times.
+spend more time at higher flux values, achieving higher $T_{1}$ times on average,
+see Figure \ref{fig:longitudeb}.
 The single gate errors for both the analytic and numerical gates are
 less than $10^{-4}$, which makes them sufficient for quantum error correction--a
 prerequisite for fault-tolerant quantum
@@ -80,10 +81,16 @@ However, the numerical gates achieve single gate errors
 $\sim 5$ times less than those for the analytic gates,
 which tracks closely with their relative improvement
 on the integrated depolarization rate metric, see Appendix \ref{appendix:longitude}.
-This single gate error advantage corresponds to a significant reduction in error correction resources
-\todo{this seems like a strong statement - citation?}.
-Furthermore, for successive gate applications, the gate error due to depolarization is approximately linear
+This single gate error advantage corresponds to a
+significant reduction in error correction resources
+\cite{paetznick2014resource, suchara2013comparing}.
+Furthermore, for successive gate applications,
+the gate error due to depolarization is approximately linear
 in the gate count, which we expect for $t \ll T_{1}$, see Figure \ref{fig:longitudec}.
-The gate error reduction for large gate counts is important for noisy, intermediate-scale quantum (NISQ)
-applications. These improvements are significant for the constraints we have imposed on the gates,
-and do not represent a fundamental limit to the optimization methods we have employed.
+The gate error reduction for large gate counts is
+important for noisy, intermediate-scale quantum (NISQ)
+applications. These improvements are significant for the constraints
+we have imposed on the gates,
+and do not represent a fundamental limit to the optimization
+methods we have employed.
+

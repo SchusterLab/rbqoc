@@ -20,8 +20,7 @@
     for twice the gate time of the analytic gate.
     (b) Single gate error at a one-percent qubit frequency detuning as
     a function of the gate time. Missing
-    data points represent gates with a gate error greater than $5 \cdot 10^{-5}$
-    \todo{...what's going on here? Should I be concerned? This seems like a relatively big thing that goes unexplained}.
+    data points represent gates with a gate error greater than $5 \cdot 10^{-5}$.
     (c) Single gate error as a function of the qubit frequency detuning.
     The gate errors for the analytic and 1\textsuperscript{st}-order derivative
     methods are shown for gate times which are multiples of $1 / 4 f_{q} \sim 18 \textrm{ns}$.
@@ -41,7 +40,7 @@ of this form using robust control techniques,
 making the state evolution insensitive
 to parameter uncertainty. As an example,
 we mitigate errors arising from the drift and finite measurement
-precision of the qubit frequency which modifies the fluxonium Hamiltonian
+precision of the qubit frequency, which modifies the fluxonium Hamiltonian
 \eqref{eq:hamiltonian} by $f_{q} \rightarrow f_{q} + \delta f_{q}$.
 We consider three robust control techniques to accomplish this task:
 a sampling method, an unscented sampling method,
@@ -66,9 +65,6 @@ We penalize the infidelities of the sample states and their target state
 by adding a cost function to the objective \eqref{eq:costfun} of the form
 $\sum_{k, \pm} b_{k} (1 - {\lvert \bra*{\psi^{\pm}_{k}}U\ket*{\psi_{1}} \rvert}^{2})$
 where $b_{k}$ is a constant we supply.
-\todo{I thought of this question here but it applies also to when we first write down the objective 6a.
-Doesn't the sum over k imply that we are penalizing the time it takes to complete the gate?
-Why do we need to append $\Delta t_{k}$ to the augmented state vector?}
 For this method, the standard orthonormal basis states are an insufficient choice
 for the initial states. As an example, a $Z/2$ gate achieved by idling
 at the flux frustration point $a_{k} = 0 \ \forall \ k$
@@ -94,53 +90,30 @@ constant we supply, $\psi_{k}$ is
 the evolved initial state (nominal state), and $\psi^{j}_{k}$ is a sample state
 that evolves under a modified Hamiltonian similar to that in the sampling method.
 We omit bra-ket notation here to emphasize that
-the states are real vectors, and are given by the right-hand-side of the
-isomorphism \eqref{eq:isomorphism}. Additionally,
-the unscented sampling method employs the unscented transform
+the states are real vectors and are given by the right-hand-side of the
+isomorphism \eqref{eq:isomorphism}.
+The sample states are chosen to encode a unimodal distribution over
+the $2n$ elements of the nominal state, modeling the uncertainty in the state
+as a result of the uncertainty in the parameter. We use the unscented transform
 \cite{julier2004unscented, uhlmann1995dynamic}
-to prevent the sample states
-from drifting too far or close to the nominal state during evolution,
-which would result in exceedingly large or small deviations in the cost function.
-In particular, the sample states are chosen to encode a unimodal distribution over
-the $2n$ \todo{at this point the reader has forgotten what lower-case n refers to} elements of the nominal state, modeling the uncertainty in the state
-as a result of the uncertainty in the parameter. The unscented transform
-accurately propagates the mean and covariance of this distribution between
-knot points, or equivalently, through the transformation of the TDSE.
-For this method, we sample on one initial state $(\ket{0} + i\ket{1}) / \sqrt{2}$,
-and do not observe a performance increase
-using more initial states, for example those from the operator basis.
+to accurately propagate the mean and covariance of this distribution between
+knot points, or equivalently, through the transformation of the TDSE \eqref{eq:tdse}.
+Unlike the sampling method, the cost function for the unscented sampling method
+is sensitive to global phases. Accordingly, we
+do not observe a performance increase when
+using more than one initial state. 
 A detailed procedure for the unscented transformation is given
 in Appendix \ref{appendix:unscented}.
-\todo{this seems far more complicated than the sampling method - if it truly is necessary,
-  perhaps earlier we could fully flesh out what the issues are?
-  Does this drifting too close to the nominal state actually occur in practice?
-  And if so, it isn't clear to me why that is a bad thing, as for example if it drifts close to the nominal state,
-  then great, isn't the optimizer doing its job?}
 
 The derivative method penalizes the sensitivity of the state
-to the uncertain parameter, which is encoded in the $l$\textsuperscript{th}-order
-state derivative $\partial_{f_{q}}^{l} \ket{\psi}$ \todo{seems funny to change from $l$ to $m$ immediately after introduction}.
+to the uncertain parameter, which is encoded in the $m$\textsuperscript{th}-order
+state derivative $\ket*{\partial_{f_{q}}^{m} \psi} \equiv \partial_{f_{q}}^{m} \ket*{\psi}$.
 In the $m$\textsuperscript{th}-order
 derivative method, we append all state derivatives of order $1, \dots, m$
 to the augmented state vector \eqref{eq:astatecontrols}
-for each initial state. We use the initial state $\ket{0}$ for this method,
-and observe no advantage to using more initial states
-\todo{comment on why you've chosen different states for this vs. unscented?}.
-We penalize the norms of the state derivatives
-in the objective \eqref{eq:costfun} by setting the corresponding elements
-of the final augmented state to zero
-\todo{this isn't totally obvious to me - why should this be the right way to penalize?
-  Also the wording seems a bit off - surely you don't mean that you're penalizing the norm of the state derivative with itself? Isn't it normalized?}.
-We could obtain the state derivatives at each knot point
-with backward-mode differentiation.
-In a naive automatic differentiation scheme,
-the discrete dynamics function at knot points
-$1, \dots, k - 1$ would be differentiated to obtain the state
-derivative at knot point $k$, requiring
-$O(N^{2})$ matrix multiplications. Instead, we 
-employ forward-mode differentiation on the TDSE \eqref{eq:tdse}
-to obtain coupled, first-order ODEs
-which require $O(N)$ matrix multiplications to integrate.
+for each initial state.
+We obtain the state derivatives at each knot point by performing forward-mode
+differentiation on the TDSE \eqref{eq:tdse}.
 For example, the dynamics for the $1$\textsuperscript{st}-order derivative method are:
 \begin{align}
   i \hbar \frac{d}{dt} \ket{\psi} &= H \ket{\psi},\\
@@ -150,17 +123,21 @@ For example, the dynamics for the $1$\textsuperscript{st}-order derivative metho
   \label{eq:d1dyn}
 \end{align}
 We integrate the coupled ODEs with exponential
-integrators
-in the discrete dynamics function \eqref{eq:dyn_con}, see Appendix \ref{appendix:derivative}.
-For runtimes
-of the three robust control techniques,
+integrators in the discrete dynamics function \eqref{eq:dyn_con},
+see Appendix \ref{appendix:derivative}.
+While the state $\ket*{\psi}$ has unit norm,
+the state derivatives $\ket*{\partial^{m}_{f_{q}} \psi}$ need not, as is evident
+from the non-unitary dynamics \eqref{eq:d1dyn}.
+We penalize the norms of the state derivatives
+in the objective \eqref{eq:costfun} by setting the corresponding elements
+of the final augmented state to zero. Intuitively, this corresponds to penalizing
+the sensitivity of each state element to the uncertain parameter. As was the case for
+the unscented sampling
+method, we do not observe a performance increase when using more than one initial state
+for the derivative method.
+For runtimes of the three robust control techniques,
 consult Appendix \ref{appendix:time}.
 
-\todo{you have obviously made the choice to first present all three methods as theoretical tools,
-  then discuss their results together, which is fine. It might make sense to also consider presenting
-  a method and presenting results associated with that method, before moving on to the next one.
-  Might make it easier to justify, e.g., the complexity of the unscented sampling method
-  if there are deficiencies to be addressed that are clear from the results of the sampling method.}
 We examine the gate errors due to a static qubit frequency
 detuning for the $Z/2$ gates obtained with the robust control techniques
 and the analytic $Z/2$ gate.
@@ -177,8 +154,6 @@ generated initial states.
 We set $\sigma_{f_{q}}/f_{q} = 1\%$
 for the sampling and unscented sampling
 methods.
-\todo{right so reading further - this paragraph has nothing to do with the previous two
-  - might make sense to put this with the corresponding explanation of the method.}
 
 The analytic gate corresponds to
 idling at the flux frustration point $a_{k} = 0 \ \forall \ k$, see Figure
@@ -188,54 +163,26 @@ The gate's erroneous rotation angle
 $2 \pi \delta f_{q} / 4 f_{q}$ is linear in the
 qubit frequency detuning, resulting in a gate error that is quadratic
 in the detuning.
-At a one-percent
-detuning ($\lvert \delta f_{q} \rvert / f_{q} = 1\%$),
-the gate error is $\sim 4.5 \cdot 10^{-5}$,
+At a one-percent detuning ($\lvert \delta f_{q} \rvert / f_{q} = 1\%$),
+the gate error is $\sim 4.7 \cdot 10^{-5}$,
 which is sufficient for quantum error correction.
-Although the gate performs well, it cannot be extended
-to gate times other than
-$1 / 4 f_{q}$. The ability to perform
-phase gates in any given time is critical
-for multi-qubit experiments, where the qubits operate at different
-frequencies.
-We can find solutions using the numerical methods at
-all gate times above $18$ns, see Figure \ref{fig:staticb}.
-These numerical methods offer an effective scheme for synchronizing
-multi-qubit experiments.
-\todo{this seems like a funny way to end this paragraph - I was told that static parameter deviations were the issue the whole time, and suddenly it's that analytic pulses aren't flexible enough w.r.t. the time it takes to complete them. I would stress instead that you can do better than $\sim 4.5 \cdot 10^{-5}$! The time issue, though important, feels like it should be more of an aside given the things you've emphasized are the issues you're trying to solve.}
 
-The flux pulse produced by the sampling method
-transitions  smoothly away from idles at the flux frustration point,
-whereas that for the unscented sampling method employs
-three distinct transitions.
-The gate error at a one-percent qubit frequency detuning for the sampling method
-does not improve substantially over the
-range of gate times. Conversely, the gate error at a one-percent detuning
-for the unscented sampling method reaches a minimum of $\sim 3.9 \cdot 10^{-5}$
-near fractions of the Larmor period $2/4f_{q} \sim 36\textrm{ns},
-3/4f_{q} \sim 54\textrm{ns}, 4/4f_{q} \sim 72\textrm{ns}$.
-
-The two derivative methods converge on qualitatively similar flux pulses that
-use fast triangle pulses at the boundaries and idle near the flux frustration point,
-similar to the flux pulse produced by the unscented sampling method.
-The gate errors at a one-percent qubit frequency detuning
-for both derivative methods decrease super-linearly in their gate times.
-The 2\textsuperscript{nd}-order method does not offer a substantial improvement
-over the 1\textsuperscript{st}-order method for most gate times.
-\todo{I would say the second order method as compared to the first order method feels the same as the sampling method as compared
-  to the unscented method. You say here that there is no improvement, but improvement for unscented looks mostly like noise to me,
-  even if you have some idea of where it's coming from (larmor period fractions).
-  I would just be careful with how these things are framed - seems opportunistic to claim that unscented gives some sort of serious advantage here.}
-The gate error at a one-percent detuning for the 1\textsuperscript{st}-order
-method reaches $10^{-7}$ at the Larmor period $1 / f_{q} \sim 72$ns,
-see Figure \ref{fig:staticc}.
-This result mimics the
-ability of composite pulses to mitigate parameter uncertainty errors to arbitrary
-order with sufficiently many pulses \cite{merrill2014progress}.
-It is difficult to choose an appropriate composite pulse
-for the problem studied here due to our Hamiltonian and experimental constraints.
-We propose comparisons between composite pulses and numerical techniques
-for future work.
+For the sampling method, the gate error at a one-percent qubit frequency detuning
+does not decrease substantially over the
+range of gate times, and begins to increase above $5 \cdot 10^{-5}$ for gate times
+greater than $\sim 50$ns, see Figure \ref{fig:staticb}.
+Optimization results for the sampling method reveal that it is typically
+able to achieve a high fidelity for
+one sample $\ket{\psi^{\pm}}$,
+but not the other $\ket{\psi^{\mp}}$, indicating that it is difficult for the optimizer
+to make progress on both objectives.
+For the unscented sampling method,
+the gate error at a one-percent detuning
+does not decrease substantially 
+over the gate times, but it does reach
+a minimum of $\sim 3.9 \cdot 10^{-5}$
+near fractions of the Larmor period $2/4f_{q} \sim 36\textrm{ns}$,
+$3/4f_{q} \sim 54\textrm{ns}$, $4/4f_{q} \sim 72\textrm{ns}$.
 
 %% F3
 \begin{figure*}[ht]
@@ -250,7 +197,7 @@ for future work.
     \label{fig:stochasticb}
   \end{subfigure}
   \caption{
-    (a) Flux pulses for $X/2$ gates robust to flux offsets
+    (a) Flux pulses for $X/2$ gates robust to flux noise
     constructed with the analytic (A),
     sampling (S), unscented sampling (U), and the 1\textsuperscript{st}-
     and 2\textsuperscript{nd}-order derivative methods (D1, D2).
@@ -260,3 +207,30 @@ for future work.
   }
   \label{fig:stochastic}
 \end{figure*}
+
+The two derivative methods converge on qualitatively similar flux pulses that
+idle near the flux frustration point and use fast triangle movements at the boundaries,
+similar to the flux pulse produced by the unscented sampling method.
+For both methods, the gate error at a one-percent qubit frequency detuning
+decreases super-linearly in the gate time.
+For the 1\textsuperscript{st}-order method, the gate error at a one-percent detuning 
+reaches $10^{-7}$ at the Larmor period $1 / f_{q} \sim 72$ns,
+see Figure \ref{fig:staticc}.
+This result mimics the
+ability of composite pulses to mitigate parameter uncertainty errors to arbitrary
+order with sufficiently many pulses \cite{merrill2014progress}.
+It is difficult to choose an appropriate composite pulse
+for the problem studied here due to our Hamiltonian and experimental constraints.
+We propose comparisons between composite pulses and numerical techniques
+for future work.
+
+Furthermore, the ability to perform
+$Z$-type gates in any given time is critical
+for synchronizing phases in multi-qubit experiments,
+where the qubits have distinct
+frequencies. Notably, the analytic gate studied here cannot be extended
+to gate times other than $1 / 4 f_{q}$. 
+We can find gates using the numerical methods at
+all gate times above $18$ns, see Figure \ref{fig:staticb}.
+These numerical methods offer an effective scheme for synchronizing
+multi-qubit experiments.
