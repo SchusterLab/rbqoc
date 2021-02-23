@@ -36,7 +36,7 @@ coherence times
 \cite{earnest2018realization, lin2018demonstration,
   manucharyan2009fluxonium, nguyen2019high,
   zhang2020universal}.
-In this section, we outline the base optimization problem,
+In this section, we outline the base optimization problem \eqref{eq:costfun}-\eqref{eq:ic_con},
 which we extend in subsequent sections to account
 for experimental error channels.
 To high accuracy, we approximate the Hamiltonian near the flux-frustration
@@ -56,7 +56,7 @@ that device.
 
 First, we outline the constraints for the fluxonium gate problem.
 All gates presented in this work satisfy these constraints to
-a tolerance of $\sim 10^{-8}$.
+a maximum violation of $\sim 10^{-8}$.
 Casting this problem as a multi-state transfer, the initial conditions on
 the states are $\ket*{\psi^{0}_{1}} = \ket*{0}$, $\ket*{\psi^{1}_{1}} = \ket*{1}$
 \eqref{eq:istate_con}
@@ -79,7 +79,7 @@ which mitigates the inductive drift ubiquitous in flux-bias lines
 \cite{battistel2019fast, krantz2019quantum, zhang2020universal}.
 The flux is constrained by $\lvert a_{k} \rvert \leq 0.5 \ \textrm{GHz} \ \forall \ k$
 \eqref{eq:amp_con}.
-Above $0.5$ GHz, we observe excitation out of the first two levels, disallowing the
+Above $0.5$ GHz, we observe population beyond the first two levels, disallowing the
 approximation \eqref{eq:hamiltonian}.
 We also enforce the boundary condition $a_{1} = a_{N} = 0$ \eqref{eq:bound_con}
 so the gates may be concatenated arbitrarily. Additionally,
@@ -115,7 +115,7 @@ in the isomorphism $\mathcal{H}(\mathbb{C}^{n})
 
 The cost function at each knot point is
 $\ell_{k}(x_{k}, u_{k}) = (x_{k} - x_{f})^{T} Q_{k} (x_{k} - x_{f}) + u^{T}_{k} R_{k} u_{k}$
-where $Q_{k}$ and $R_{k}$ are diagonal matrices we supply.
+where $Q_{k}$ and $R_{k}$ are positive-definite diagonal matrices we supply.
 The $Q_{k}$ term
 penalizes deviations from the final augmented state $x_{f}$,
 which is given by the constraints we have imposed on
@@ -150,13 +150,13 @@ intermediate knot points ($k = 1, \dots, N - 1$)
 because ALM increases the penalty at the final knot point
 to satisfy the target state constraint \eqref{eq:tstate_con}.
 Furthermore, the target state constraint \eqref{eq:tstate_con} says
-that the final state must match the target state, including its phase,
-up to the constraint tolerance $\sim 10^{-8}$.
+that the final state must match the target state, including its global phase,
+up to the maximum constraint violation $\sim 10^{-8}$.
 If we did not make target state achievement a constraint, the optimizer would
 be allowed to sacrifice the nominal gate error to achieve more depolarization protection,
 or more robustness to parameter uncertainties, which is undesirable.
 Additionally, we chose the target state constraint to be
-phase-sensitive because the Hessian of the constraint function is diagonal,
-and therefore computationally efficient, and we wish to optimize $Z/2$ gates,
-which require a phase-sensitive metric for the initial states $\ket{0}$ and $\ket{1}$.
+global phase-sensitive because the Hessian of the constraint function is diagonal--and
+therefore computationally efficient--and we wish to optimize $Z/2$ gates,
+which require a global phase-sensitive metric for the initial states $\ket{0}$ and $\ket{1}$.
 

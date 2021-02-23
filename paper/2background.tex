@@ -40,8 +40,8 @@ The augmented state trajectory obeys the physics of the system if
 the dynamics constraint is satisfied
 $x_{k + 1} = f(x_{k}, u_{k})$. For QOC, the discrete
 dynamics function $f(x_{k}, u_{k})$ propagates the state by
-integrating the TDSE \ref{eq:tdse} with Runge-Kutta methods \cite{jorgensen2011numerical}
-or exponential integrators \cite{auer2018magnus, berland2005solving, einkemmer2017performance,
+integrating the TDSE \eqref{eq:tdse} with Runge-Kutta methods \cite{jorgensen2011numerical}
+or exponential integrators \cite{auer2018magnus, berland2006solving, einkemmer2017performance,
 shillito2020fast}.
 
 Additional constraints on the augmented controls and augmented states
@@ -50,14 +50,16 @@ The constraint functions are put into a form such that, when the constraint is s
 inequality constraint functions obey $g_{k}(x_{k}, u_{k}) \leq 0$ and
 equality constraint functions obey $h_{k}(x_{k}, u_{k}) = 0$. The constraint
 functions may be vector-valued to encode multiple constraints of each type.
-If a constraint function takes a positive value, the
-value is called the constraint's violation.
-The trajectory optimization problem can be stated concisely,
+The constraint function's violation is the magnitude by which it is not satisfied:
+$\textrm{max}(g(\cdot), 0)$ or $\textrm{max}(\abs{h(\cdot)})$
+where $\textrm{max}(\cdot)$ and $\abs{\cdot}$ act element-wise.
+Stated concisely, the trajectory optimization problem is,
 \begin{mini!}[2]
-    {x_{1:N},u_{1:N-1}}{\ell_{N}(x_N) + \sum_{k=1}^{N-1} \ell_{k}(x_k,u_k)}{}{} \label{eq:gcostfun}
+  {x_{1:N},u_{1:N-1}}{\ell_{N}(x_N) + \sum_{k=1}^{N-1}
+    \ell_{k}(x_k,u_k)}{}{} \label{eq:gcostfun}
     \addConstraint{x_{k+1} = f(x_k,u_k) \ \forall \ k} \label{eq:gdyncon}
     \addConstraint{g_k(x_k,u_k) \leq 0 \ \forall \ k} \label{eq:ineqcon}
-    \addConstraint{h_k(x_k,u_k) = 0 \ \forall \ k} \label{eq:eqcon}.
+    \addConstraint{h_k(x_k,u_k) = 0 \ \forall \ k} \label{eq:eqcon}
 \end{mini!}
 
 Standard techniques for solving \eqref{eq:gcostfun}-\eqref{eq:eqcon} typically

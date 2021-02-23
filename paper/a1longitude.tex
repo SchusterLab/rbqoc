@@ -13,9 +13,9 @@ is similar across the two metrics.
     Gate & $(10^{-5})$ & $(10^{-5})$ & $D_{1\textrm{A}}/ D_{1\textrm{N}}$ & $(10^{-5})$ &
     $(10^{-5})$ & GE$_{\textrm{A}} / \textrm{GE}_{\textrm{N}}$\\
     \hline
-    Z/2 & 5.745 & 1.149 & 5.000 & 1.776 & 0.371 & 4.787\\
-    Y/2 & 5.253 & 1.157 & 4.540 & 1.539 & 0.370 & 4.159\\
-    X/2 & 16.251 & 2.660 & 6.109 & 5.347 & 0.863 & 6.196\\
+    Z/2 & 5.745 & 1.149 & 5.000 & 0.888   & 0.185  & 4.791 \\
+    Y/2 & 5.253 & 1.157 & 4.540 & 0.770 & 0.186   & 4.132\\
+    X/2 & 16.251 & 2.660 & 6.109 & 2.674 & 0.432  & 6.200\\
   \end{tabular}
   \caption{
     Single gate integrated depolarization rate ($D_{1}$)
@@ -36,27 +36,26 @@ This equation takes the form:
 where $\rho = \ket{\psi}\bra{\psi}$ is the density matrix,
 $[\cdot, \cdot]$ is the algebraic commutator, and $\{\cdot, \cdot \}$ is the algebraic
 anti-commutator.
-For depolarization $\gamma_{+} = T_{+}^{-1}$,
-$\gamma_{-} = T_{-}^{-1}$,
-$L_{+} = \sigma^{+}/2$, and
-$L_{-} = \sigma^{-}/2$ where $\sigma^{\pm} = \sigma_{x} \pm i \sigma_{y}$.
-\todo{Ask Jens and company to okay the rest of this paragraph}
-$T_{+} = T_{-} = T_{1}$ are obtained at each knot point
+For depolarization, $\gamma_{\pm} = T_{\pm}^{-1}$,
+$L_{\pm} = \sigma^{\pm} \equiv (\sigma_{x} \pm i \sigma_{y})/2$.
+The depolarization times $T_{+} = T_{-} = 2 T_{1}$ are obtained at each knot point
 from the spline shown in Figure \ref{fig:longitudeb}.
 We obtain the $T_{1}$ values in this spline
 by driving the qubit at the desired flux bias
 and monitoring the resultant decay. For more details
 on these measurements, consult \cite{zhang2020universal}.
-Because $T_{1}$ depends on the flux, so do
-the decay rates, $\gamma_{i}$.
-Integrating the master equation with time-dependent decay crates
+Because $T_{1}$ depends on the flux $a(t)$, so do
+the decay rates $\gamma_{i}$.
+Integrating the master equation with time-dependent decay rates
 provides a heuristic for how the gates we study may perform in
-the experiment, but it may not be strictly correct in the regime we
-are operating in, where the decay rates change much faster
-than the relaxation time, $\Delta t_{k} \ll T_{1}$. Standard
+the experiment. 
+This procedure may not be strictly correct
+when the decay rates change much faster
+than the relaxation time $\Delta t_{k} \ll T_{1}$,
+which is the regime we are operating in. Standard
 derivations of the Lindblad master equation do not account for
-time-dependent decay rates \cite{manzano2020a}, and a more thorough
-treatment in future work would unlock new insights for
+time-dependent decay rates \cite{manzano2020a}. A more thorough
+treatment of this regime in future work would unlock new insights for
 quantum computing platforms where decoherence is strongly
 dependent on the control parameters.
 
@@ -77,7 +76,7 @@ where $\rho = \sum_{i, j} \alpha_{ij} \ket{i}\bra{j}$
 and $\textrm{vec}(\rho) = \sum_{i, j} \alpha_{ij} \ket{i} \otimes \ket{j}$.
 We use zero-order hold on the controls; equivalently, $a(t)$ is constant
 on each integration interval $[t_{k}, t_{k + 1}]$. Therefore,
-$H(a(t))$, and $\gamma_{i}(a(t))$ are also piecewise-constant.
+$H(a(t))$ and $\gamma_{i}(a(t))$ are also piecewise-constant.
 So, the exact solution is
 $\textrm{vec}(\rho_{k + 1}) = {\exp}{\textstyle(}\Delta t_{k}
 \hat{\mathcal{L}}_{k}{\textstyle)} \textrm{vec}(\rho_{k})$.

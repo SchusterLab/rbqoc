@@ -91,7 +91,7 @@ the evolved initial state (nominal state), and $\psi^{j}_{k}$ is a sample state
 that evolves under a modified Hamiltonian similar to that in the sampling method.
 We omit bra-ket notation here to emphasize that
 the states are real vectors and are given by the right-hand-side of the
-isomorphism \eqref{eq:isomorphism}.
+complex-to-real isomorphism \eqref{eq:isomorphism}.
 The sample states are chosen to encode a unimodal distribution over
 the $2n$ elements of the nominal state, modeling the uncertainty in the state
 as a result of the uncertainty in the parameter. We use the unscented transform
@@ -106,8 +106,8 @@ A detailed procedure for the unscented transformation is given
 in Appendix \ref{appendix:unscented}.
 
 The derivative method penalizes the sensitivity of the state
-to the uncertain parameter, which is encoded in the $m$\textsuperscript{th}-order
-state derivative $\ket*{\partial_{f_{q}}^{m} \psi} \equiv \partial_{f_{q}}^{m} \ket*{\psi}$.
+to the uncertain parameter, which is encoded in the $l$\textsuperscript{th}-order
+state derivative $\ket*{\partial_{f_{q}}^{l} \psi} \equiv \partial_{f_{q}}^{l} \ket*{\psi}$.
 In the $m$\textsuperscript{th}-order
 derivative method, we append all state derivatives of order $1, \dots, m$
 to the augmented state vector \eqref{eq:astatecontrols}
@@ -163,7 +163,7 @@ The gate's erroneous rotation angle
 $2 \pi \delta f_{q} / 4 f_{q}$ is linear in the
 qubit frequency detuning, resulting in a gate error that is quadratic
 in the detuning.
-At a one-percent detuning ($\lvert \delta f_{q} \rvert / f_{q} = 1\%$),
+At a one-percent detuning ($\lvert \delta f_{q} / f_{q} \rvert = 1\%$),
 the gate error is $\sim 4.7 \cdot 10^{-5}$,
 which is sufficient for quantum error correction.
 
