@@ -1,33 +1,3 @@
-%% F1
-\begin{figure*}[ht]
-  \begin{subfigure}{.315\textwidth}
-    \includegraphics[width=\linewidth]{assets/f1a.png}
-    \caption{\label{fig:longitudea}}
-  \end{subfigure}\hfill
-  \begin{subfigure}{.23\textwidth}
-    \includegraphics[width=\linewidth]{assets/f1b.png}
-    \caption{\label{fig:longitudeb}}
-  \end{subfigure}\hfill
-  \begin{subfigure}{.4\textwidth}
-    \includegraphics[width=\linewidth]{assets/f1c.png}
-    \caption{\label{fig:longitudec}}
-  \end{subfigure}
-  \caption{
-    (a) Flux pulses for the numerical gates (dark blue)
-    and the analytic gates (light pink).
-    (b) $T_{1}$ interpolation function used in optimization. Circle markers
-    indicate measured $T_{1}$ times. Non-circle markers
-    are plotted at the time-averaged 
-    absolute flux and the time-averaged $T_{1}$ time for each pulse.
-    (c) Cumulative gate errors due to depolarization as a function of the
-    number of gates applied.
-    Cumulative gate errors for the numerical $Z/2$ and $Y/2$ gates
-    are indistinguishable. Inset shows log-scaled cumulative gate errors
-    for small gate counts.
-  }
-  \label{fig:longitude}
-\end{figure*}
-
 \section{QOC for the Fluxonium \label{sec:fluxonium}}
 In the following, we optimize quantum gates
 for the superconducting fluxonium qubit--a promising
@@ -36,7 +6,9 @@ coherence times
 \cite{earnest2018realization, lin2018demonstration,
   manucharyan2009fluxonium, nguyen2019high,
   zhang2020universal}.
-In this section, we outline the base optimization problem \eqref{eq:costfun}-\eqref{eq:ic_con},
+In this section, we use the trajectory optimization
+formalism \eqref{eq:gcostfun}-\eqref{eq:ineqcon}
+to define the problem \eqref{eq:costfun}-\eqref{eq:ic_con},
 which we extend in subsequent sections to account
 for experimental error channels.
 To high accuracy, we approximate the Hamiltonian near the flux-frustration
@@ -63,7 +35,8 @@ the states are $\ket*{\psi^{0}_{1}} = \ket*{0}$, $\ket*{\psi^{1}_{1}} = \ket*{1}
 where the superscript is an index $i \in \{0, 1\}$,
 and the subscript indicates the knot point $k = 1$.
 The states at the final knot point are constrained to be
-the target states $\ket*{\psi^{i}_{N}} = U \ket*{\psi^{i}_{1}} \ \forall \ i$
+the target states $\ket*{\psi^{i}_{N}} = \ket*{\psi^{i}_{f}} \equiv U
+\ket*{\psi^{i}_{1}} \ \forall \ i$
 \eqref{eq:tstate_con} where $U = X/2, Y/2, Z/2$ is the desired gate.
 Furthermore, we impose the normalization constraint
 ${\lvert \braket*{\psi^{i}_{k}}{\psi^{i}_{k}} \rvert}^{2} = 1 \ \forall \ i,k$
@@ -86,7 +59,7 @@ so the gates may be concatenated arbitrarily. Additionally,
 we have the initial condition $\int_{t} a_{1} = \partial_{t} a_{1} = 0$
 \eqref{eq:ic_con}.
 
-Next, we introduce the augmented control and augmented state:
+The augmented control and augmented state are:
 \begin{equation}
   \begingroup
   \renewcommand*{\arraystretch}{1.3}
@@ -96,10 +69,9 @@ Next, we introduce the augmented control and augmented state:
   \endgroup
   \label{eq:astatecontrols}
 \end{equation}
-The variables in the augmented state are obtained from the decision variable
-in the augmented control
-via coupled, first-order, differential equations, which are integrated in the 
-discrete dynamics function \eqref{eq:dyn_con}.
+The time evolution of these variables are encoded
+in coupled, first-order, differential equations
+which are integrated in the discrete dynamics function \eqref{eq:dyn_con}.
 We integrate the states according to the TDSE \eqref{eq:tdse} and the
 fluxonium Hamiltonian \eqref{eq:hamiltonian}.
 The ALTRO implementation we use does not currently
@@ -117,7 +89,7 @@ The cost function at each knot point is
 $\ell_{k}(x_{k}, u_{k}) = (x_{k} - x_{f})^{T} Q_{k} (x_{k} - x_{f}) + u^{T}_{k} R_{k} u_{k}$
 where $Q_{k}$ and $R_{k}$ are positive-definite diagonal matrices we supply.
 The $Q_{k}$ term
-penalizes deviations from the final augmented state $x_{f}$,
+penalizes deviations from the target augmented state $x_{f}$,
 which is given by the constraints we have imposed on
 $\ket*{\psi^{i}_{N}}$, $\int_{t} a_{N}$, and $a_{N}$ in addition to
 $\partial_{t} a_{f} = 0$.
@@ -129,7 +101,7 @@ Stated succinctly, the optimization problem takes the form:
     + \sum_{k=1}^{N-1} {u_k}^{T} R_k u_{k}}{}{} \label{eq:costfun}
   \addConstraint{x_{k+1}}{= f(x_k, u_k) \ \forall \ k}  \label{eq:dyn_con}
   \addConstraint{\ket{\psi^{0}_{1}} = \ket{0}, \ket{\psi^{1}_{1}} = \ket{1}} \label{eq:istate_con}
-  \addConstraint{\ket{\psi^{i}_{N}} = U \ket{\psi^{i}_{1}}
+  \addConstraint{\ket{\psi^{i}_{N}} = \ket{\psi^{i}_{f}}
     \ \forall \  i} \label{eq:tstate_con}
   \addConstraint{{\lvert \braket{\psi^{i}_{k}}{\psi^{i}_{k}}
       \rvert}^{2} = 1 \ \forall \ i, k} \label{eq:statenorm_con}
@@ -139,24 +111,53 @@ Stated succinctly, the optimization problem takes the form:
   \addConstraint{{\textstyle \int_{t}} a_{1} = \partial_{t} a_{1} = 0}. \label{eq:ic_con}
 \end{mini!}
 
-Lastly, we remark on decisions we have made in the problem definition.
-We penalize deviations from the target state at all knot points \eqref{eq:costfun}
-because it benefits the iLQR solving stage \cite{Jackson2020altroc}.
-This choice is unrelated to schemes
-for incentivizing early achievement of the desired gate \cite{leung2017speedup}.
-In practice, the penalty for deviations from the target state
-at the final knot point ($k = N$) becomes large relative to those at
-intermediate knot points ($k = 1, \dots, N - 1$)
-because ALM increases the penalty at the final knot point
-to satisfy the target state constraint \eqref{eq:tstate_con}.
-Furthermore, the target state constraint \eqref{eq:tstate_con} says
-that the final state must match the target state, including its global phase,
-up to the maximum constraint violation $\sim 10^{-8}$.
-If we did not make target state achievement a constraint, the optimizer would
-be allowed to sacrifice the nominal gate error to achieve more depolarization protection,
-or more robustness to parameter uncertainties, which is undesirable.
-Additionally, we chose the target state constraint to be
-global phase-sensitive because the Hessian of the constraint function is diagonal--and
-therefore computationally efficient--and we wish to optimize $Z/2$ gates,
-which require a global phase-sensitive metric for the initial states $\ket{0}$ and $\ket{1}$.
+Next, we remark on our problem formulation.
+We penalize the squared error of the final state and the target
+state \eqref{eq:costfun}, rather than their infidelity,
+because the Hessian of the squared error cost function is diagonal--which
+makes matrix multiplications fast--and we wish to optimize $Z/2$ gates,
+which requires a metric that is sensitive to global phases for the initial
+states $\ket{0}$ and $\ket{1}$.
+We penalize the squared error at all knot points
+because it benefits the iLQR solving stage \cite{Jackson2020altroc},
+not to incentivize early achievement
+of the desired gate \cite{leung2017speedup}.
 
+In addition to the target state cost function, we also
+impose the target state constraint \eqref{eq:tstate_con}, which
+says that the final state must match the target state, including its global phase,
+up to our chosen maximum constraint violation $\sim 10^{-8}$.
+If we did not impose this constraint, the optimizer would be
+allowed to sacrifice the closed-system gate error to achieve better
+performance on the depolarization or robustness cost functions we will
+introduce in the following sections, which is undesirable.
+To enforce a constraint in standard QOC frameworks,
+the prefactor for the constraint function is manually increased
+between separate optimization instances until the constraint is satisfied
+\cite{heeres2017implementing, leung2017speedup, reinhold2019controlling},
+which becomes infeasible for more than one constraint.
+ALM automates these prefactor updates to find
+a solution that satisfies all of the constraints.
+Hence, ALTRO's ability to handle multiple constraints makes it
+an attractive solver for robust QOC problems.
+
+In extraordinarily difficult cases of
+QOC \cite{abdelhafez2020universal}, it may be impossible
+to obey the physics of the system and achieve the desired gate,
+equivalently, the dynamics constraint \eqref{eq:dyn_con}
+and the target state constraint \eqref{eq:tstate_con} may be mutually unsatisfiable.
+In this case, the prefactors for the constraint function terms
+in the ALM objective will tend to infinity--leading to numerical instability--and the
+optimization will not converge. To maintain a constrained approach in this situation,
+the maximum constraint violation for the target state constraint can be raised
+to a level commensurate with the minimum acceptable gate error.
+
+Finally, for the indirect ALM-iLQR solving stage,
+the state at each knot point is obtained by integrating
+the TDSE, so the dynamics constraint \eqref{eq:dyn_con} is satisfied by construction.
+This is not the case for the direct projected Newton stage, where the states
+are free parameters that are adjusted to satisfy the TDSE. However,
+the solution's deviation from the TDSE is never more than the maximum constraint violation.
+When we report gate errors in this text, we explicity integrate the TDSE with the
+flux produced by the optimization to ensure accuracy. Exploring the benefit
+of direct optimization approaches for QOC is an interesting direction for future work.

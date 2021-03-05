@@ -1,3 +1,33 @@
+%% F1
+\begin{figure*}[ht]
+  \begin{subfigure}{.315\textwidth}
+    \includegraphics[width=\linewidth]{assets/f1a.png}
+    \caption{\label{fig:longitudea}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{.23\textwidth}
+    \includegraphics[width=\linewidth]{assets/f1b.png}
+    \caption{\label{fig:longitudeb}}
+  \end{subfigure}\hfill
+  \begin{subfigure}{.4\textwidth}
+    \includegraphics[width=\linewidth]{assets/f1c.png}
+    \caption{\label{fig:longitudec}}
+  \end{subfigure}
+  \caption{
+    (a) Flux pulses for the numerical gates (dark blue)
+    and the analytic gates (light pink).
+    (b) $T_{1}$ interpolation function used in optimization. Circle markers
+    indicate measured $T_{1}$ times. Non-circle markers
+    are plotted at the time-averaged 
+    absolute flux and the time-averaged $T_{1}$ time for each pulse.
+    (c) Cumulative gate errors due to depolarization as a function of the
+    number of gates applied.
+    Cumulative gate errors for the numerical $Z/2$ and $Y/2$ gates
+    are indistinguishable. Inset shows log-scaled cumulative gate errors
+    for small gate counts.
+  }
+  \label{fig:longitude}
+\end{figure*}
+
 \section{Depolarization Mitigation\label{sec:longitude}}
 In this section, we outline a method
 for optimizing the flux to mitigate depolarization.
@@ -23,7 +53,7 @@ The integrated depolarization rate is given by,
 \end{equation}
 This value is appended to the augmented state \eqref{eq:astatecontrols}
 and its norm is penalized in the objective \eqref{eq:costfun} by setting
-the corresponding element of the final augmented state to zero.
+the corresponding element of the target augmented state to zero.
 $T_{1}(a_{k})$ is obtained at each knot point by evaluating
 a spline fit to experimental data of the form $\{(a, T_{1})\}$,
 see Figure \ref{fig:longitudeb}.

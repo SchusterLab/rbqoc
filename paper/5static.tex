@@ -63,7 +63,7 @@ with $f_{q} \rightarrow f_{q} \pm \sigma_{f_{q}}$ for a fixed
 hyperparameter $\sigma_{f_{q}}$ which is the standard deviation of the qubit frequency.
 We penalize the infidelities of the sample states and their target state
 by adding a cost function to the objective \eqref{eq:costfun} of the form
-$\sum_{k, \pm} b_{k} (1 - {\lvert \bra*{\psi^{\pm}_{k}}U\ket*{\psi_{1}} \rvert}^{2})$
+$\sum_{k, \pm} b_{k} (1 - {\lvert \braket*{\psi^{\pm}_{k}}{\psi_{f}} \rvert}^{2})$
 where $b_{k}$ is a constant we supply.
 For this method, the standard orthonormal basis states are an insufficient choice
 for the initial states. As an example, a $Z/2$ gate achieved by idling
@@ -130,7 +130,7 @@ the state derivatives $\ket*{\partial^{m}_{f_{q}} \psi}$ need not, as is evident
 from the non-unitary dynamics \eqref{eq:d1dyn}.
 We penalize the norms of the state derivatives
 in the objective \eqref{eq:costfun} by setting the corresponding elements
-of the final augmented state to zero. Intuitively, this corresponds to penalizing
+of the target augmented state to zero. Intuitively, this corresponds to penalizing
 the sensitivity of each state element to the uncertain parameter. As was the case for
 the unscented sampling
 method, we do not observe a performance increase when using more than one initial state
@@ -167,23 +167,6 @@ At a one-percent detuning ($\lvert \delta f_{q} / f_{q} \rvert = 1\%$),
 the gate error is $\sim 4.7 \cdot 10^{-5}$,
 which is sufficient for quantum error correction.
 
-For the sampling method, the gate error at a one-percent qubit frequency detuning
-does not decrease substantially over the
-range of gate times, and begins to increase above $5 \cdot 10^{-5}$ for gate times
-greater than $\sim 50$ns, see Figure \ref{fig:staticb}.
-Optimization results for the sampling method reveal that it is typically
-able to achieve a high fidelity for
-one sample $\ket{\psi^{\pm}}$,
-but not the other $\ket{\psi^{\mp}}$, indicating that it is difficult for the optimizer
-to make progress on both objectives.
-For the unscented sampling method,
-the gate error at a one-percent detuning
-does not decrease substantially 
-over the gate times, but it does reach
-a minimum of $\sim 3.9 \cdot 10^{-5}$
-near fractions of the Larmor period $2/4f_{q} \sim 36\textrm{ns}$,
-$3/4f_{q} \sim 54\textrm{ns}$, $4/4f_{q} \sim 72\textrm{ns}$.
-
 %% F3
 \begin{figure*}[ht]
   \begin{subfigure}{.4\textwidth}
@@ -207,6 +190,23 @@ $3/4f_{q} \sim 54\textrm{ns}$, $4/4f_{q} \sim 72\textrm{ns}$.
   }
   \label{fig:stochastic}
 \end{figure*}
+
+For the sampling method, the gate error at a one-percent qubit frequency detuning
+does not decrease substantially over the
+range of gate times, and begins to increase above $5 \cdot 10^{-5}$ for gate times
+greater than $\sim 50$ns, see Figure \ref{fig:staticb}.
+Optimization results for the sampling method reveal that it is typically
+able to achieve a high fidelity for
+one sample $\ket{\psi^{\pm}}$,
+but not the other $\ket{\psi^{\mp}}$, indicating that it is difficult for the optimizer
+to make progress on both objectives.
+For the unscented sampling method,
+the gate error at a one-percent detuning
+does not decrease substantially 
+over the gate times, but it does reach
+a minimum of $\sim 3.9 \cdot 10^{-5}$
+near fractions of the Larmor period $2/4f_{q} \sim 36\textrm{ns}$,
+$3/4f_{q} \sim 54\textrm{ns}$, $4/4f_{q} \sim 72\textrm{ns}$.
 
 The two derivative methods converge on qualitatively similar flux pulses that
 idle near the flux frustration point and use fast triangle movements at the boundaries,
