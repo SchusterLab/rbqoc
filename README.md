@@ -51,7 +51,7 @@ or [David Schuster](mailto:David.Schuster@uchicago.edu).
 ## Quick Start
 
 
-### Who's Juila?
+### Who's Julia?
 To execute the code in this repo, you will need to
 [install Julia](https://julialang.org/downloads/).
 
