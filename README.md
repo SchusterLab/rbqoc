@@ -4,9 +4,9 @@ Repository for [Robust Quantum Optimal Control with Trajectory Optimization]().
 ## Contents
 - [About](#about)
 - [Quick Start](#quick-start)
-  - [Who's Julia?](#who's-julia)
-  - [I have Julia, how do I work with this repo?](#i-have-julia,-how-do-i-work-with-this-repo?)
-  - [I have Julia and the repo, what should I run?](#i-have-julia-and-the-repo,-what-should-i-run?)
+  - [Who's Julia?](#whos-julia)
+  - [I have Julia, how do I work with this repo?](#i-have-julia-how-do-i-work-with-this-repo)
+  - [I have Julia and the repo, what should I run?](#i-have-julia-and-the-repo-what-should-i-run)
 - [Beyond Quick Start](#beyond-quick-start)
 - [Related Work](#related-work)
 - [Cite this Work](#cite-this-work)
@@ -53,7 +53,7 @@ or [David Schuster](mailto:David.Schuster@uchicago.edu).
 
 ### Who's Juila?
 To execute the code in this repo, you will need to
-[install Julia](https://julialang.org/downloads/)
+[install Julia](https://julialang.org/downloads/).
 
 [Julia](https://julialang.org) is a dynamically-typed and just-in-time (JIT) compiled
 programming language designed for high performance computing.
@@ -69,7 +69,7 @@ We encourage the interested reader to check out the links in the
 benefits.
 
 ### I have Julia, how do I work with this repo?
-Julia uses a different package-management scheme from Python.
+Julia uses a different package-management scheme than Python.
 With Python, you use third-party installers like pip or conda
 to manage your global environment.
 With Julia, you use the [Pkg](https://docs.julialang.org/en/v1/stdlib/Pkg/)
@@ -104,7 +104,7 @@ Instantiate the project.
 julia> Pkg.instantiate()
 ```
 
-Now you have downloaded all of the necessary packages.
+You have now downloaded all of the necessary packages.
 
 ### I have Julia and the repo, what should I run?
 The base optimization outlined in section III of the paper
@@ -112,7 +112,7 @@ is a good starting point. It can be found in `src/spin/spin13.jl`.
 
 Navigate to the file.
 ```
-$ cd src/spin/
+$ cd src/spin
 ```
 Enter the Julia REPL.
 ```
@@ -120,7 +120,7 @@ $ julia
 ```
 Include the file. If this is your first time including
 the file, all of the dependent packages will be precompiled.
-This will take some time, but this will only happen once.
+Precompiling will take some time, but it will only happen once.
 ```
 julia> include("spin13.jl")
 ```
