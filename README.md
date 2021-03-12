@@ -31,14 +31,7 @@ This repo is merely a set of files to demonstrate how to use ALTRO for
 QOC, and in particular, how to engineer robustness to parameter uncertainties and
 mitigate decoherence using the techniques we introduced in the paper.
 
-This repo contains modified versions of Altro.jl, RobotDynamics.jl, and
-TrajectoryOptimization.jl.
-These versions don't correspond to exact releases of the corresponding packages and
-they contain minor bug fixes. You can obtain
-the latest versions of these packages via their
-respective GitHub repositories or through Julia's built-in package management.
-
-Lastly, this repo will NOT be updated to reflect new versions
+This repo will NOT be updated to reflect new versions
 of its dependencies. However, this repo will be updated for clarity.
 If you feel that an aspect of
 the documentation for this work is lacking, e.g. a part of this README is ambiguous
@@ -75,8 +68,8 @@ to manage your global environment.
 With Julia, you use the [Pkg](https://docs.julialang.org/en/v1/stdlib/Pkg/)
 module from the standard library 
 to manage an environment for each _project_. This is similar to the
-concept of a Pipfile. The packages and corresponding
-versions used by this project are defined in `Project.toml`
+concept of a Pipfile. The packages used by this project
+are defined in `Manifest.toml` and `Project.toml`
 at the top level of the repo.
 
 First, clone the repo.
@@ -165,9 +158,7 @@ its Google Sheet counterpart
 
 
 ## Related Work
-QOC is a very active area of research and there are many great tools available for
-performing optimization on quantum systems. Here are some projects and references
-we would like to share.
+
 
 ## Cite this Work
 

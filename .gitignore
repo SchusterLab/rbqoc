@@ -16,18 +16,10 @@ __pycache__
 *.log
 *.out
 *.pdf
+paper/.texpadtmp/
 !paper/main.pdf
-
-# julia
-Manifest.toml
 
 # ignore local files
 out
 _test
 *.DS_Store
-
-
-
-
-
-paper/.texpadtmp/
