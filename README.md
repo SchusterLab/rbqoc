@@ -171,15 +171,19 @@ its Google Sheet counterpart
 - QOC
   - [c3](https://github.com/q-optimize/c3) control, calibration and characterization
   of quantum machines
+  - [CRAB](https://github.com/Bilal092/CRAB) CRAB in MATLAB
   - [Dynamo](https://github.com/shaimach/Dynamo) DYNAMO in MATLAB
+  - [GOAT-QuantumControl](https://github.com/Bilal092/GOAT-QuantumControl) GOAT in MATLAB
+  - [Juqbox.jl](https://github.com/LLNL/Juqbox.jl) QOC from LLNL in Julia,
+  symplectic integrators, pseudo-spectral
   - [krotov](https://github.com/qucontrol/krotov) Krotov in Python
-  - [python-open-controls](https://github.com/qctrl/python-open-controls) Q-CTRL in Python
+  - [python-open-controls](https://github.com/qctrl/python-open-controls) QOC from Q-CTRL in Python
   - [qoc](https://github.com/SchusterLab/qoc) GRAPE via autograd in Python
   - [quantum-optimal-control](https://github.com/SchusterLab/quantum-optimal-control)
   GRAPE via TensorFlow in Python
   - [QuOptimalControl.jl](https://github.com/alastair-marshall/QuOptimalControl.jl)
 	a library of QOC algorithms, written in Julia
-  - [QuTiP](http://qutip.org/docs/latest/guide/guide-control.html?highlight=optimal%20control)
+  - [QuTiP](http://qutip.org/docs/latest/guide/guide-control.html)
   QOC with QuTip
 
   
