@@ -31,8 +31,8 @@
 \section{Depolarization Mitigation\label{sec:longitude}}
 In this section, we outline a method
 for optimizing the flux to mitigate depolarization.
-For many superconducting circuits, the 1/$e$ depolarization time
-($T_{1}$) is independent of the control parameters,
+For many superconducting circuits, the depolarization time
+$T_{1}$ is independent of the control parameters,
 so the fastest possible gate incurs the least depolarization error
 \cite{schulteherbruggen2011optimal}.
 For the fluxonium, however, $T_{1}$ is strongly dependent on the flux.
@@ -51,15 +51,17 @@ The integrated depolarization rate is given by,
 \begin{equation}
   D_{1}(t) = \int_{0}^{t} T_{1}^{-1}(a(t^{\prime})) dt^{\prime}.
 \end{equation}
-This value is appended to the augmented state \eqref{eq:astatecontrols}
+For the gates we consider here, where the gate time is small compared to $T_{1}$,
+the integrated depolarization rate is proportional to the probability of a depolarization event.
+Additionally, the integrated depolarization rate is a reasonable proxy for the gate error incurred
+because depolarization errors are incoherent--they increase monotonically in time without interference.
+The integrated depolarization rate is appended to the augmented state \eqref{eq:astatecontrols}
 and its norm is penalized in the objective \eqref{eq:costfun} by setting
 the corresponding element of the target augmented state to zero.
-$T_{1}(a_{k})$ is obtained at each knot point by evaluating
+$T_{1}(a_{k})$ is obtained at each time step by evaluating
 a spline fit to experimental data of the form $\{(a, T_{1})\}$,
 see Figure \ref{fig:longitudeb}.
-Using the integrated depolarization rate as a proxy for the gate error incurred
-is reasonable because depolarization errors are incoherent and therefore
-increase monotonically in time without interference.
+
 Additionally, a master equation approach would require adding
 density matrices of size $n \times n$
 to the augmented state, and a quantum trajectory approach
@@ -71,20 +73,19 @@ depolarization model does not scale
 with the dimension of the Hilbert space.
 
 We allow the optimizer to tune the gate time by
-making the time step between each knot point
+making the duration between time steps
 a decision variable \cite{howell2019altro}. 
-The square root of the time step $\sqrt{\Delta t_{k}}$
+The square root of the duration $\sqrt{\Delta t_{k}}$
 is appended to the augmented control \eqref{eq:astatecontrols}
 and its square $\lvert \Delta t_{k} \rvert$ is used
-for numerical integration in the discrete dynamics function \eqref{eq:dyn_con}.
-To ensure numerical
-integration accuracy is maintained, we constrain
-the bounds of the time step at each knot point.
+for integration in the discrete dynamics function \eqref{eq:dyn_con}.
+To ensure numerical stability, we constrain
+the bounds of the duration.
 
 We analyze the effect of depolarization on
 the $X/2$, $Y/2$, and $Z/2$ gates obtained with
-our numerical method and the corresponding analytic gates. We
-use the Lindblad master equation to simulate $T_{1}$ dissipation for successive
+our numerical method and the corresponding analytic gates presented in \cite{zhang2020universal}.
+We use the Lindblad master equation to simulate $T_{1}$ dissipation for successive
 gate applications, and compute the cumulative gate error
 after each application, see Appendix \ref{appendix:longitude}.
 The gate error reported in this text is the infidelity

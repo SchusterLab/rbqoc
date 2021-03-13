@@ -1,5 +1,5 @@
 # rbqoc
-Repository for [Robust Quantum Optimal Control with Trajectory Optimization]().
+Repository for [Robust Quantum Optimal Control with Trajectory Optimization]()
 
 ## Contents
 - [About](#about)
@@ -68,7 +68,7 @@ to manage your global environment.
 With Julia, you use the [Pkg](https://docs.julialang.org/en/v1/stdlib/Pkg/)
 module from the standard library 
 to manage an environment for each _project_. This is similar to the
-concept of a Pipfile. The packages used by this project
+concept of a pipfile. The packages used by this project
 are defined in `Manifest.toml` and `Project.toml`
 at the top level of the repo.
 
@@ -158,8 +158,31 @@ its Google Sheet counterpart
 
 
 ## Related Work
+- Trajectory Optimization
+  - [Trajectory Optimization (Wikipedia)](https://en.wikipedia.org/wiki/Trajectory_optimization)
+  - [LQR (Wikipedia)](https://en.wikipedia.org/wiki/Linear–quadratic_regulator)
+  - [ALTRO paper](https://roboticexplorationlab.org/papers/altro-iros.pdf)
+  - [ALTRO tutorial paper](https://bjack205.github.io/papers/AL_iLQR_Tutorial.pdf)
+  - [Direct Collocation tutorial paper](https://epubs.siam.org/doi/pdf/10.1137/16M1062569)
+- Julia
+  - [Julia micro-benchmarks](https://julialang.org/benchmarks/)
+  - [What scientists must know about hardware to write fast code](https://biojulia.net/post/hardware/)
+  - [QuantumOptics.jl](https://github.com/qojulia/QuantumOptics.jl) Julia's QuTiP
+- QOC
+  - [c3](https://github.com/q-optimize/c3) control, calibration and characterization
+  of quantum machines
+  - [Dynamo](https://github.com/shaimach/Dynamo) DYNAMO in MATLAB
+  - [krotov](https://github.com/qucontrol/krotov) Krotov in Python
+  - [python-open-controls](https://github.com/qctrl/python-open-controls) Q-CTRL in Python
+  - [qoc](https://github.com/SchusterLab/qoc) GRAPE via autograd in Python
+  - [quantum-optimal-control](https://github.com/SchusterLab/quantum-optimal-control)
+  GRAPE via TensorFlow in Python
+  - [QuOptimalControl.jl](https://github.com/alastair-marshall/QuOptimalControl.jl)
+	a library of QOC algorithms, written in Julia
+  - [QuTiP](http://qutip.org/docs/latest/guide/guide-control.html?highlight=optimal%20control)
+  QOC with QuTip
 
-
+  
 ## Cite this Work
 
 

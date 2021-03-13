@@ -14,10 +14,10 @@ The Hamiltonian $H(u(t), t)$ is determined by the quantum system.
 The QOC problem is to find the
 controls that minimize a functional $J(u(t))$.
 To make the problem numerically tractable,
-the controls and state are discretized into $N$ knot points (time steps).
+the controls and state are discretized into $N$ time steps.
 In the case of a single state-transfer problem, the functional is
-the infidelity of the desired final state and the initial state evolved
-to the final knot point,
+the infidelity of the target state and the initial state evolved
+to the final time step,
 $J(u) = 1 - {\lvert \braket{\psi_{f}}{\psi_{N}(u)} \rvert}^{2}$.
 In general, $J(u)$ is a linear combination of cost functions on the state
 as well as cost functions on the controls.
@@ -29,8 +29,8 @@ Alternatively, the QOC problem can be formulated as a trajectory optimization pr
 and solved using a variety of specialized solvers developed by the robotics community
 \cite{Schulman13, Tedrake16, Hereid2017FROST, howell2019altro}.
 The functional $J(u)$ is divided into its constituent
-cost functions at each knot point $\ell_{k}(x_{k}, u_{k})$,
-where $k \in \{1, ..., N\}$ denotes the knot point,
+cost functions at each time step $\ell_{k}(x_{k}, u_{k})$,
+where $k \in \{1, ..., N\}$ denotes the time step,
 $x_{k}$ is the augmented state vector,
 and $u_{k}$ is the augmented control vector.
 The augmented state contains all relevant variables
@@ -59,7 +59,7 @@ Stated concisely, the trajectory optimization problem is,
     \ell_{k}(x_k,u_k)}{}{} \label{eq:gcostfun}
     \addConstraint{x_{k+1} = f(x_k,u_k) \ \forall \ k} \label{eq:gdyncon}
     \addConstraint{g_k(x_k,u_k) \leq 0 \ \forall \ k} \label{eq:ineqcon}
-    \addConstraint{h_k(x_k,u_k) = 0 \ \forall \ k} \label{eq:eqcon}
+    \addConstraint{h_k(x_k,u_k) = 0 \ \forall \ k.} \label{eq:eqcon}
 \end{mini!}
 
 Standard techniques for solving \eqref{eq:gcostfun}-\eqref{eq:eqcon} typically
@@ -98,7 +98,7 @@ states with the discrete dynamics function.
 iLQR then constructs quadratic models for each cost function using
 their zeroth-, first- and second-order derivatives in a Taylor expansion
 about the current augmented controls and augmented states.
-These models are used to derive a recurrence relation between knot points
+These models are used to derive a recurrence relation between time steps
 which gives the locally optimal update for the augmented controls.
 Finally, a line search \cite{zhang2006global}
 is performed in the direction of this update to ensure a

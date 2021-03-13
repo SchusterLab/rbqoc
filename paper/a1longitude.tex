@@ -38,14 +38,14 @@ $[\cdot, \cdot]$ is the algebraic commutator, and $\{\cdot, \cdot \}$ is the alg
 anti-commutator.
 For depolarization, $\gamma_{\pm} = T_{\pm}^{-1}$,
 $L_{\pm} = \sigma^{\pm} \equiv (\sigma_{x} \pm i \sigma_{y})/2$.
-The depolarization times $T_{+} = T_{-} = 2 T_{1}$ are obtained at each knot point
+The depolarization times $T_{+} = T_{-} = 2 T_{1}$ are obtained at each time step
 from the spline shown in Figure \ref{fig:longitudeb}.
 We obtain the $T_{1}$ values in this spline
 by driving the qubit at the desired flux bias
 and monitoring the resultant decay. For more details
 on these measurements, consult \cite{zhang2020universal}.
 Because $T_{1}$ depends on the flux $a(t)$, so do
-the decay rates $\gamma_{i}$.
+the decay rates $\gamma_{\pm}$.
 Integrating the master equation with time-dependent decay rates
 provides a heuristic for how the gates we study may perform in
 the experiment. 
@@ -74,15 +74,14 @@ the Vectorization/Choi-Jamiolkowski isomorphism \cite{Landi2018},
 \end{equation}
 where $\rho = \sum_{i, j} \alpha_{ij} \ket{i}\bra{j}$
 and $\textrm{vec}(\rho) = \sum_{i, j} \alpha_{ij} \ket{i} \otimes \ket{j}$.
-We use zero-order hold on the controls; equivalently, $a(t)$ is constant
-on each integration interval $[t_{k}, t_{k + 1}]$. Therefore,
-$H(a(t))$ and $\gamma_{i}(a(t))$ are also piecewise-constant.
-So, the exact solution is
+Because $a(t)$ is constant between time steps $[t_{k}, t_{k + 1})$,
+so are $H(a(t))$ and $\gamma_{\pm}(a(t))$.
+Therefore, the exact solution is
 $\textrm{vec}(\rho_{k + 1}) = {\exp}{\textstyle(}\Delta t_{k}
 \hat{\mathcal{L}}_{k}{\textstyle)} \textrm{vec}(\rho_{k})$.
-This isomorphism transforms $(n \times n) \times (n \times n)$
+The vector isomorphism transforms $(n \times n) \times (n \times n)$
 matrix-matrix multiplications to $(n^{2} \times n^{2}) \times n^{2}$ matrix-vector
 multiplications. For small $n$ and zero-order hold on the controls, we find that it is
 faster to use an exponential integrator on the vectorized equation than to perform
-Runge-Kutta on the unvectorized equation. The latter requires decreasing the integration
-time step to maintain accuracy, resulting in more knot points.
+Runge-Kutta on the unvectorized equation. The latter requires decreasing the interval $\Delta t_{k}$
+to maintain accuracy, resulting in more time steps.

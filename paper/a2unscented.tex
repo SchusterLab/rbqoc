@@ -1,12 +1,12 @@
-\section{Unscented Transformation}
+\section{Unscented Sampling Method}
 \label{appendix:unscented}
 In this section, we outline the full unscented sampling procedure.
-In the unscented sampling method, we consider a state $\psi \in \mathbb{R}^{2n}$, 
+We consider a state $\psi \in \mathbb{R}^{2n}$, 
 an uncertain parameter $\lambda \in \mathbb{R}^{d}$, and discrete dynamics
 $\psi_{k + 1} = f(\psi_{k}, \lambda_{k})$.
 We omit bra-ket notation to emphasize that
 the state is a real vector, and it is given by the right-hand-side of the
-isomorphism \eqref{eq:isomorphism}.
+complex-to-real isomorphism \eqref{eq:isomorphism}.
 The nominal initial state is given by $\bar{\psi}_{1}$ with an associated
 covariance matrix $P_{1} \in \mathbb{S}_{++}^{2n}$
 which describes the uncertainty in the initial state.
@@ -16,7 +16,7 @@ By the positive-definite requirement, $P_{1}$ must be non-zero even if the state
 is negligible.
 The uncertain parameter has zero-mean
 and its distribution is given by the covariance matrix
-$L_{k} \in \mathbb{S}_{++}^{d}$ at knot point $k$. The zero-mean assumption
+$L_{k} \in \mathbb{S}_{++}^{d}$ at time step $k$. The zero-mean assumption
 is convenient for deriving the update procedure. A non-zero mean can be encoded
 in the discrete dynamics function $f(\psi_{k}, \lambda_{k})$.
 
@@ -39,7 +39,7 @@ Then, the sample states are normalized,
 \begin{equation}\label{eq:unormalize}
   \psi_{1}^{j} \rightarrow \frac{\psi_{1}^{j}}{\sqrt{{\psi_{1}^{j}}^{T} \psi_{1}^{j}}}.
 \end{equation}
-The sample states are propagated to the next knot point,
+The sample states are propagated to the next time step,
 \begin{equation}\label{eq:upropagate}
   \psi^{j}_{2} = f(\psi^{j}_{1}, \lambda^{j}_{1}).
 \end{equation}
@@ -49,7 +49,7 @@ The mean and covariance of the sample states are computed,
   P_{2} &= \frac{1}{2 \beta^{2}} \sum_{j = 1}^{4n + 2d}
   (\psi^{j}_{2} - \bar{\psi}_{2})(\psi^{j}_{2} - \bar{\psi}_{2})^{T}.
 \end{align}
-The sample states are then resampled and propagated to the next knot point using
+The sample states are then resampled and propagated to the next time step using
 \eqref{eq:uupdate}, \eqref{eq:unormalize}, and \eqref{eq:upropagate}. Our
 choice of sample states (sigma points) follows equation 11 of
 \cite{julier2004unscented}.

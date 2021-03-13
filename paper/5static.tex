@@ -97,7 +97,7 @@ the $2n$ elements of the nominal state, modeling the uncertainty in the state
 as a result of the uncertainty in the parameter. We use the unscented transform
 \cite{julier2004unscented, uhlmann1995dynamic}
 to accurately propagate the mean and covariance of this distribution between
-knot points, or equivalently, through the transformation of the TDSE \eqref{eq:tdse}.
+time steps, or equivalently, through the transformation of the TDSE \eqref{eq:tdse}.
 Unlike the sampling method, the cost function for the unscented sampling method
 is sensitive to global phases. Accordingly, we
 do not observe a performance increase when
@@ -112,7 +112,7 @@ In the $m$\textsuperscript{th}-order
 derivative method, we append all state derivatives of order $1, \dots, m$
 to the augmented state vector \eqref{eq:astatecontrols}
 for each initial state.
-We obtain the state derivatives at each knot point by performing forward-mode
+We obtain the state derivatives at each time step by performing forward-mode
 differentiation on the TDSE \eqref{eq:tdse}.
 For example, the dynamics for the $1$\textsuperscript{st}-order derivative method are:
 \begin{align}
@@ -126,7 +126,7 @@ We integrate the coupled ODEs with exponential
 integrators in the discrete dynamics function \eqref{eq:dyn_con},
 see Appendix \ref{appendix:derivative}.
 While the state $\ket*{\psi}$ has unit norm,
-the state derivatives $\ket*{\partial^{m}_{f_{q}} \psi}$ need not, as is evident
+the state derivatives $\ket*{\partial^{l}_{f_{q}} \psi}$ need not, as is evident
 from the non-unitary dynamics \eqref{eq:d1dyn}.
 We penalize the norms of the state derivatives
 in the objective \eqref{eq:costfun} by setting the corresponding elements
@@ -155,18 +155,6 @@ We set $\sigma_{f_{q}}/f_{q} = 1\%$
 for the sampling and unscented sampling
 methods.
 
-The analytic gate corresponds to
-idling at the flux frustration point $a_{k} = 0 \ \forall \ k$, see Figure
-\ref{fig:statica}. Its gate time $1 / 4 f_{q} \sim 18\textrm{ns}$
-is the shortest possible for a $Z/2$ gate on the device.
-The gate's erroneous rotation angle
-$2 \pi \delta f_{q} / 4 f_{q}$ is linear in the
-qubit frequency detuning, resulting in a gate error that is quadratic
-in the detuning.
-At a one-percent detuning ($\lvert \delta f_{q} / f_{q} \rvert = 1\%$),
-the gate error is $\sim 4.7 \cdot 10^{-5}$,
-which is sufficient for quantum error correction.
-
 %% F3
 \begin{figure*}[ht]
   \begin{subfigure}{.4\textwidth}
@@ -191,6 +179,18 @@ which is sufficient for quantum error correction.
   \label{fig:stochastic}
 \end{figure*}
 
+The analytic gate corresponds to
+idling at the flux frustration point $a_{k} = 0 \ \forall \ k$, see Figure
+\ref{fig:statica}. Its gate time $1 / 4 f_{q} \sim 18\textrm{ns}$
+is the shortest possible for a $Z/2$ gate on the device.
+The gate's erroneous rotation angle
+$2 \pi \delta f_{q} / 4 f_{q}$ is linear in the
+qubit frequency detuning, resulting in a gate error that is quadratic
+in the detuning.
+At a one-percent detuning $\lvert \delta f_{q} / f_{q} \rvert = 1\%$,
+the gate error is $\sim 4.7 \cdot 10^{-5}$,
+which is sufficient for quantum error correction.
+
 For the sampling method, the gate error at a one-percent qubit frequency detuning
 does not decrease substantially over the
 range of gate times, and begins to increase above $5 \cdot 10^{-5}$ for gate times
@@ -211,7 +211,7 @@ $3/4f_{q} \sim 54\textrm{ns}$, $4/4f_{q} \sim 72\textrm{ns}$.
 The two derivative methods converge on qualitatively similar flux pulses that
 idle near the flux frustration point and use fast triangle movements at the boundaries,
 similar to the flux pulse produced by the unscented sampling method.
-For both methods, the gate error at a one-percent qubit frequency detuning
+For both derivative methods, the gate error at a one-percent qubit frequency detuning
 decreases super-linearly in the gate time.
 For the 1\textsuperscript{st}-order method, the gate error at a one-percent detuning 
 reaches $10^{-7}$ at the Larmor period $1 / f_{q} \sim 72$ns,
