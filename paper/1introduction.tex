@@ -36,10 +36,10 @@ model parameter uncertainties
 in optimization objectives, yielding performance
 guarantees over a range of parameter values \cite{Zhou97,Morimoto00,Manchester18}.
 We adapt robust control techniques from the robotics community to mitigate
-parameter uncertainty errors for
+parameter-uncertainty errors for
 a superconducting fluxonium qubit.
 
-Analytically-dervied control pulses that mitigate parameter uncertainty
+Analytically-derived control pulses that mitigate parameter-uncertainty
 errors include composite pulses \cite{cummins2000use, cummins2003tackling,
   kupce1995stretched, merrill2014progress},
 pulses designed by considering dynamic and geometric phases
@@ -58,10 +58,9 @@ frameworks using closed-loop methods \cite{egger2014adaptive, feng2018gradient,
   rembold2020introduction, kosut2013robust, niu2019universal}.
 
 In this work, we study three robust control techniques that
-make the system's quantum state trajectory less sensitive
-to static and time-dependent parameter uncertainty:
+make the system's quantum state trajectory less sensitive to uncertainties of static and time-dependent parameters:
 \begin{enumerate}
-\item A sampling method, similar to the work of \cite{allen2019robust,
+\item A sampling method, similar to the work in Refs.~\cite{allen2019robust,
   ball2020software, carvalho2020error, khaneja2005optimal,
   reinhold2019controlling, rembold2020introduction}.
 \item An unscented sampling method \cite{howell2020direct, lee2013sigma, thangavel2020robust}
@@ -72,10 +71,10 @@ to static and time-dependent parameter uncertainty:
 \end{enumerate}
 We apply these techniques to the fluxonium qubit presented in \cite{zhang2020universal}.
 We also show that QOC can solve important problems associated with
-fluxonium-based qubits: exploiting the $T_{1}$-dependence of the controls
+fluxonium-based qubits: exploiting the $T_{1}$-dependence of the controls \textcolor{blue}{[as in the microwave generator output is $T_1$ dependent?]} 
 to mitigate depolarization
 and synchronizing the phase of qubits with distinct frequencies.
-To mitigate depolarization,
+To mitigate \textcolor{blue}{[close-range repetition]} depolarization,
 we perform time-optimal control and
 employ an efficient depolarization model
 for which the computational cost is independent of the
