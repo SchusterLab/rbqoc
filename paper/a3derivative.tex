@@ -30,9 +30,10 @@ method \cite{berland2006solving},
   \end{aligned}
 \end{equation}
 This method provides a good tradeoff between accuracy and efficiency, requiring one unique matrix
-exponential computation per stage. Integration accuracy is not of the utmost importance because the
-state derivatives guide the optimization, and do not correspond to experimental parameters
-which must be realized with high accuracy.
+exponential computation per stage. Integration accuracy for the state derivatives is not of the
+utmost importance because they are used in the robustness cost function--as opposed
+to the states themselves which are experimental parameters that must be realized
+with high accuracy.
 
 
 

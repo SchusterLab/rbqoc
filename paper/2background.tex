@@ -99,7 +99,7 @@ iLQR then constructs quadratic models for each cost function using
 their zeroth-, first- and second-order derivatives in a Taylor expansion
 about the current augmented controls and augmented states.
 These models are used to derive a recurrence relation between time steps
-which gives the locally optimal update for the augmented controls.
+that gives the locally optimal update for the augmented controls.
 Finally, a line search \cite{zhang2006global}
 is performed in the direction of this update to ensure a
 decrease in the objective \eqref{eq:gcostfun}. This procedure
@@ -119,8 +119,7 @@ they can only be used for constraints on the augmented controls,
 not the augmented states.
 Another technique, which is popular for QOC \cite{heeres2017implementing, leung2017speedup,
 reinhold2019controlling},
-is to add the constraint functions to the objective
-\eqref{eq:gcostfun}. 
+is to add the constraint functions to the objective.
 This strategy does not guarantee that the constraints
 are satisfied as the solver trades
 minimization of the cost functions and constraint functions against each other.

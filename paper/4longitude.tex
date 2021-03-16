@@ -78,9 +78,11 @@ a decision variable \cite{howell2019altro}.
 The square root of the duration $\sqrt{\Delta t_{k}}$
 is appended to the augmented control \eqref{eq:astatecontrols}
 and its square $\lvert \Delta t_{k} \rvert$ is used
-for integration in the discrete dynamics function \eqref{eq:dyn_con}.
-To ensure numerical stability, we constrain
-the bounds of the duration.
+for integration in the discrete dynamics function \eqref{eq:dyn_con},
+which ensures positivity in the event that
+the optimizer assigns a negative value to $\sqrt{\Delta t_{k}}$.
+Further, we constraint the minimum and maximum value of the
+duration to ensure integration accuracy.
 
 We analyze the effect of depolarization on
 the $X/2$, $Y/2$, and $Z/2$ gates obtained with

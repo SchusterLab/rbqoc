@@ -51,7 +51,7 @@ provides a heuristic for how the gates we study may perform in
 the experiment. 
 This procedure may not be strictly correct
 when the decay rates change much faster
-than the relaxation time $\Delta t_{k} \ll T_{1}$,
+than the relaxation time.
 which is the regime we are operating in. Standard
 derivations of the Lindblad master equation do not account for
 time-dependent decay rates \cite{manzano2020a}. A more thorough
@@ -83,5 +83,5 @@ The vector isomorphism transforms $(n \times n) \times (n \times n)$
 matrix-matrix multiplications to $(n^{2} \times n^{2}) \times n^{2}$ matrix-vector
 multiplications. For small $n$ and zero-order hold on the controls, we find that it is
 faster to use an exponential integrator on the vectorized equation than to perform
-Runge-Kutta on the unvectorized equation. The latter requires decreasing the interval $\Delta t_{k}$
+Runge-Kutta integration on the unvectorized equation. The latter requires decreasing the interval $\Delta t_{k}$
 to maintain accuracy, resulting in more time steps.
