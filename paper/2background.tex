@@ -2,70 +2,75 @@
 In this section, we
 review the QOC problem statement
 and describe the ALTRO solver \cite{howell2019altro}.
-QOC concerns a vector $\mathbf{u}(t)$ of time-dependent control parameters 
-that steer the evolution of a (quantum) state $\ket{\psi(t)}$.
+QOC concerns a vector $\mathbf{a}(t)$ of time-dependent control fields
+that steer the evolution of a quantum state $\ket{\psi(t)}$.
 The evolution of the state is governed by the time-dependent
 Schr{\"o}dinger equation (TDSE),
 \begin{equation}
-  i \hbar \frac{d}{dt} \ket{\psi(t)} = H(\mathbf{u}(t), t) \ket{\psi(t)}.
+  i \hbar \frac{d}{dt} \ket{\psi(t)} = H(\mathbf{a}(t), t) \ket{\psi(t)}.
   \label{eq:tdse}
 \end{equation}
-The Hamiltonian $H(\mathbf{u}(t), t)$ is determined by the quantum system \textcolor{blue}{and the external control fields}.
+The Hamiltonian $H(\mathbf{a}(t), t)$ is determined by the quantum system
+and the external control fields.
 The QOC problem is to find the
-controls that minimize a functional $J(u(t))$.
+controls that minimize a functional $J[\mathbf{a}(t)]$,
+which we call the objective.
 To make the problem numerically tractable,
-the controls and state are discretized into $N$ time steps.
-In the case of a single state-transfer problem, the functional is
-the infidelity of the target state and the initial state evolved
-to the final time step,
-$J(u) = 1 - {\lvert \braket{\psi_{f}}{\psi_{N}(u)} \rvert}^{2}$.
-In general, $J(u)$ is a linear combination of cost functions on the state
-as well as cost functions on the controls.
-Standard QOC solvers compute derivatives of the functional $\nabla_{u} J(u)$,
+the quantum state and controls are discretized into $N$ time steps,
+$\ket{\psi(t_{k})} \to \ket{\psi_{k}}$,
+and $\mathbf{a}(t_{k})\to \mathbf{a}_{k}$, where $t_{k + 1} = t_{k} + \Delta t$,
+and $k \in \{1, ..., N\}$.
+In the case of a single state-transfer problem, the objective is
+the infidelity of the time-evolved final state $\ket{\psi_{N}}$ and
+the intended target state $\ket{\psi_{T}}$,
+$J(\mathbf{a}) = 1 - {\lvert \braket{\psi_{T}}{\psi_{N}(\mathbf{a})} \rvert}^{2}$.
+Standard QOC solvers compute derivatives of the objective $\nabla J(\mathbf{a})$,
 which can easily be used to implement first-order optimization methods
 \cite{machnes2015tunable, khaneja2005optimal, leung2017speedup, goerz2019krotov}.
 
 Alternatively, the QOC problem can be formulated as a trajectory optimization problem 
 and solved using a variety of specialized solvers developed by the robotics community
 \cite{Schulman13, Tedrake16, Hereid2017FROST, howell2019altro}.
-The functional $J(u)$ is divided into its constituent
-cost functions at each time step $\ell_{k}(x_{k}, u_{k})$,
-where $k \in \{1, ..., N\}$ denotes the time step,
-$x_{k}$ is the augmented state vector,
-and $u_{k}$ is the augmented control vector.
-The augmented state contains all relevant variables
-that are dependent upon the controls, for example the state
-$\ket{\psi_{k}} \subseteq x_{k}$.
-The augmented state trajectory obeys the physics of the system if
-the dynamics constraint is satisfied
-$x_{k + 1} = f(x_{k}, u_{k})$. For QOC, the discrete
-dynamics function $f(x_{k}, u_{k})$ propagates the state by
-integrating the TDSE \eqref{eq:tdse} with Runge-Kutta methods \cite{jorgensen2011numerical}
-or exponential integrators \cite{auer2018magnus, berland2006solving, einkemmer2017performance,
-shillito2020fast}.
+The objective $J(\mathbf{a})=\sum_k \ell_{k}(\mathbf{x}_{k}, \mathbf{u}_{k})$ is expressed in terms of the cost function
+at each time step $\ell_k$, where
+$\mathbf{x}_{k}$ is the state vector,
+and $\mathbf{u}_{k}$ is the control vector.
+The control vector contains all variables that the experimentalist
+may manipulate, and the state vector contains all variables that
+depend upon those in the control vector.
+For example, the control field 
+$\mathbf{a}_{k}$ is a component of the control vector $\mathbf{u}_{k}$,
+and the quantum state $\ket{\psi_{k}}$ is a component of
+the state vector $\mathbf{x}_{k}$.
 
-Additional constraints on the augmented controls and augmented states
-are encoded in constraint functions.
-The constraint functions are put into a form such that, when the constraint is satisfied,
-inequality constraint functions obey $g_{k}(x_{k}, u_{k}) \leq 0$ and
-equality constraint functions obey $h_{k}(x_{k}, u_{k}) = 0$. The constraint
-functions may be vector-valued to encode multiple constraints of each type.
-The constraint function's violation is the magnitude by which it is not satisfied:
-$\textrm{max}(g(\cdot), 0)$ or $\textrm{max}(\abs{h(\cdot)})$
-where $\textrm{max}(\cdot)$ and $\abs{\cdot}$ act element-wise.
-Stated concisely, the trajectory optimization problem is,
+
+The dependence
+of the state on the controls is encoded in the discrete relationship
+$\mathbf{x}_{k + 1} = \mathbf{f}(\mathbf{x}_{k}, \mathbf{u}_{k})$.
+For QOC, the discrete dynamics function $\mathbf{f}(\mathbf{x}_{k}, \mathbf{u}_{k})$
+propagates the quantum state by integrating the TDSE with Runge-Kutta methods \cite{jorgensen2011numerical}
+or exponential integrators \cite{auer2018magnus, berland2006solving, einkemmer2017performance,
+shillito2020fast}. \todo{Jens wanted TDSE related before ddf}
+
+Additional constraints imposed on the augmented controls and augmented states
+are formulated as inequalities  $\mathbf{g}_{k}(\mathbf{x}_{k}, \mathbf{u}_{k}) \leq \mathbf{0}$ or equalities $\mathbf{h}_{k}(\mathbf{x}_{k}, \mathbf{u}_{k}) = \mathbf{0}$. \textcolor{blue}{[How to understand the $k$? labels here?]}
+The constraint functions $\mathbf{g}_k$ and $\mathbf{h}_k$ may be vector-valued to encode multiple constraints, and equalities and inequalities are understood component-wise. Each constraint function's \emph{violation} is defined as the magnitude of the maximum deviation: 
+$\textrm{max}(\mathbf{g}(\cdot), 0)$ or $\textrm{max}(\abs{\mathbf{h}(\cdot)})$
+where $\textrm{max}(\cdot)$ and $\abs{\cdot}$ are understood to act element-wise. \textcolor{blue}{[Is this the right place for this definition in the text. Seems unmotivated/out of place right now?]}
+Stated concisely, the trajectory optimization problem is
 \begin{mini!}[2]
-  {x_{1:N},u_{1:N-1}}{\ell_{N}(x_N) + \sum_{k=1}^{N-1}
-    \ell_{k}(x_k,u_k)}{}{} \label{eq:gcostfun}
-    \addConstraint{x_{k+1} = f(x_k,u_k) \ \forall \ k} \label{eq:gdyncon}
-    \addConstraint{g_k(x_k,u_k) \leq 0 \ \forall \ k} \label{eq:ineqcon}
-    \addConstraint{h_k(x_k,u_k) = 0 \ \forall \ k.} \label{eq:eqcon}
+  {\substack{\mathbf{x}_1,\ldots,\mathbf{x}_N \\ \mathbf{u}_1,\ldots,\mathbf{u}_{N-1}}}{\ell_{N}(\mathbf{x}_N) + \sum_{k=1}^{N-1}
+    \ell_{k}(\mathbf{x}_k,\mathbf{u}_k)}{}{} \label{eq:gcostfun}
+    \addConstraint{\mathbf{x}_{k+1} = \mathbf{f}(\mathbf{x}_k,\mathbf{u}_k) \quad \forall \ k} \label{eq:gdyncon}
+    \addConstraint{\mathbf{g}_k(\mathbf{x}_k,\mathbf{u}_k) \leq \mathbf{0} \quad \forall \ k} \label{eq:ineqcon}
+    \addConstraint{\mathbf{h}_k(\mathbf{x}_k,\mathbf{u}_k) = \mathbf{0} \quad \forall \ k.} \label{eq:eqcon}
 \end{mini!}
+\textcolor{blue}{[Can't we just define $\mathbf{u}_N=0$ to simplify the expression in (2a)?]}
 
 Standard techniques for solving \eqref{eq:gcostfun}-\eqref{eq:eqcon} typically
 fall into two categories: direct methods \cite{Hargraves87, kelly2017introduction}
 and indirect methods \cite{betts1998survey}. For indirect methods,
-the augmented controls are the decision variables--the
+the augmented controls are the \emph{decision variables}, i.e., the
 variables the optimizer adjusts to solve the problem.
 The augmented states are obtained from the augmented controls using the discrete dynamics function,
 and are then used to evaluate derivatives of the cost functions \eqref{eq:gcostfun}.
@@ -80,47 +85,44 @@ In this sense, the TDSE \eqref{eq:tdse} is a constraint that may be violated
 for intermediate steps of the optimization, where the states need not be physical.
 The direct approach lends itself to a nonlinear program formulation, for which
 a variety of general-purpose solvers exist \cite{gill2005snopt, wachter2006implementation}.
+
+
 Recent state-of-the-art solvers, such as ALTRO,
-have combined principles from both of these approaches. ALTRO uses an
+ combine the indirect and direct method in a two-stage approach.  Specifically, ALTRO first employs the indirect method as implemented by an
 iterative linear-quadratic regulator (iLQR) algorithm
 \cite{Li2004a} as the internal solver of an augmented Lagrangian method (ALM)
-\cite{lantoine2012hybrid, plancher2017constrained, nocedal2006numerical}
-and employs a projected Newton method \cite{bertsekas1982projected, rao1998application}
-in its final solving stage.
+\cite{lantoine2012hybrid, plancher2017constrained, nocedal2006numerical}. In the second and final stage to the solution, the direct-method approach is utilized in the form of a projected Newton method \cite{bertsekas1982projected, rao1998application}. We next provide a more detailed summary of these two stages.
 
 iLQR is an indirect method
 for solving the dynamically constrained
 trajectory optimization problem \eqref{eq:gcostfun}-\eqref{eq:gdyncon},
 and its update procedure is based on the differential-dynamic-programming approach
-\cite{mayne1966a}.
+\cite{mayne1966a}. \textcolor{blue}{[Start with the familiar or the understandable explanation. The imposing sounding names can be given afterwards. (Purely psychology.)]}
 First, iLQR uses an initial guess for the augmented controls to obtain the augmented
 states with the discrete dynamics function.
 iLQR then constructs quadratic models for each cost function using
 their zeroth-, first- and second-order derivatives in a Taylor expansion
 about the current augmented controls and augmented states.
-These models are used to derive a recurrence relation between time steps
+These models are used to derive a recurrence relation between time steps \textcolor{blue}{[for some quantity (which?) at consecutive time steps]}
 which gives the locally optimal update for the augmented controls.
 Finally, a line search \cite{zhang2006global}
 is performed in the direction of this update to ensure a
-decrease in the objective \eqref{eq:gcostfun}. This procedure
-is repeated until convergence.
+decrease in the objective \eqref{eq:gcostfun}. \textcolor{blue}{[again, I suspect that (2a) is not the ``objective"; rather the objective is what I know as cost function, which would exclude the minimization that is part of (2a).]} This procedure
+is repeated until convergence is reached.
 
-Indirect solvers such as iLQR are popular
-because they are very computationally efficient and maintain
-high accuracy for the discrete dynamics throughout the optimization.
-However, standard implementations cannot handle
+While indirect solvers like iLQR are computationally efficient and maintain high accuracy for the discrete dynamics throughout the optimization, they typically cannot handle
 nonlinear equality and inequality
 constraints \eqref{eq:ineqcon}-\eqref{eq:eqcon}.
-Projected gradient methods are a typical approach
-to handle constraints
+Projected gradient methods are a preferred approach
+to handle such constraints
 \cite{clarkson2010coresets, hauswirth2016projected, morzhin2019minimal,
   nikolskii2007convergence}. Unfortunately, within the indirect framework,
 they can only be used for constraints on the augmented controls,
-not the augmented states.
+not the augmented states. \textcolor{blue}{[Seems like my edit attempts and understanding of the two-stage process are still not appropriate. On the previous page, it seemed like the projected Newton method was the final stage and a direct method at that. However, here it sounds now like it is not good enough and we need yet another method? I'm confused.]}
 Another technique, which is popular for QOC \cite{heeres2017implementing, leung2017speedup,
 reinhold2019controlling},
 is to add the constraint functions to the objective
-\eqref{eq:gcostfun}. 
+\eqref{eq:gcostfun}. \textcolor{blue}{[(2a) is of the form $\text{min}_x L(x)$ do you really mean to add to the minimum? Or only to the cost function $L(x)$?]}
 This strategy does not guarantee that the constraints
 are satisfied as the solver trades
 minimization of the cost functions and constraint functions against each other.

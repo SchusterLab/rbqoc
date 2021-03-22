@@ -32,9 +32,9 @@
 
 \section{Robustness to Static Parameter Uncertainty \label{sec:static}}
 We have formulated the QOC
-problem as an open-loop optimization problem; equivalently,
-we do not incorporate feedback from the experiment in optimization.
-However, the device's parameters deviate from the parameters we use in optimization,
+problem as an \emph{open-loop} optimization problem, i.e.,
+we do not incorporate feedback from the experiment into the optimization.
+However, the precise device parameters will realistically deviate from the parameters we use in optimization,
 leading to poor experimental performance. We combat errors
 of this form using robust control techniques,
 making the state evolution insensitive
@@ -46,8 +46,9 @@ We consider three robust control techniques to accomplish this task:
 a sampling method, an unscented sampling method,
 and a derivative method.
 
+\textcolor{blue}{[Consider structuring the following into subsections to clearly separate the three methods.]}
 The sampling method incentivizes the optimizer
-to ensure multiple copies of a state, each of which evolves
+to ensure that multiple copies of a state, each evolving
 with a distinct value of the uncertain parameter, achieve
 the same target state. Variants of this technique have been proposed
 in the context of QOC
@@ -60,23 +61,20 @@ to the augmented state \eqref{eq:astatecontrols}. The discrete dynamics
 function \eqref{eq:dyn_con} is modified
 so the sample states evolve under the fluxonium Hamiltonian \eqref{eq:hamiltonian}
 with $f_{q} \rightarrow f_{q} \pm \sigma_{f_{q}}$ for a fixed
-hyperparameter $\sigma_{f_{q}}$ which is the standard deviation of the qubit frequency.
-We penalize the infidelities of the sample states and their target state
+ standard deviation $\sigma_{f_{q}}$ of the qubit frequency, acting as a hyperparameter.
+We penalize the infidelities of the sample states with respect to the target state
 by adding a cost function to the objective \eqref{eq:costfun} of the form
 $\sum_{k, \pm} b_{k} (1 - {\lvert \braket*{\psi^{\pm}_{k}}{\psi_{f}} \rvert}^{2})$
 where $b_{k}$ is a constant we supply.
 For this method, the standard orthonormal basis states are an insufficient choice
 for the initial states. As an example, a $Z/2$ gate achieved by idling
-at the flux frustration point $a_{k} = 0 \ \forall \ k$
+at the flux frustration point ($a_{k} = 0 \ \forall \ k$)
 will be robust to qubit frequency detunings for the initial states $\ket{0}$
 or $\ket{1}$ because the infidelity metric is insensitive to global phases,
 but this gate will not be robust for any other initial states.
-Therefore, we choose four initial states
-so that their outer products
-span the operators on the Hilbert space
-$\{\ket{0}, \ket{1}, (\ket{0} + i\ket{1}) / \sqrt{2},
+Therefore, we choose the four initial states $\{\ket{0}, \ket{1}, (\ket{0} + i\ket{1}) / \sqrt{2},
 (\ket{0} - \ket{1}) / \sqrt{2}\}$ \cite{chow2009randomized},
-which we refer to as the operator basis.
+whose outer products span the operators on the Hilbert space, and  we refer to them as the operator basis. \textcolor{blue}{[I cannot find the term ``operator basis" in the rest of the paper. If not used, then don't introduce terminology.]}
 
 Whereas the sampling method penalizes the deviations of the sample states
 from the target state, the unscented sampling method
@@ -123,7 +121,7 @@ For example, the dynamics for the $1$\textsuperscript{st}-order derivative metho
   \label{eq:d1dyn}
 \end{align}
 We integrate the coupled ODEs with exponential
-integrators in the discrete dynamics function \eqref{eq:dyn_con},
+integrators in the discrete dynamics function \eqref{eq:dyn_con} \textcolor{blue}{[integrators IN A function? sounds like mix-up between the function vs. how it is implemented numerically]},
 see Appendix \ref{appendix:derivative}.
 While the state $\ket*{\psi}$ has unit norm,
 the state derivatives $\ket*{\partial^{l}_{f_{q}} \psi}$ need not, as is evident
@@ -135,7 +133,7 @@ the sensitivity of each state element to the uncertain parameter. As was the cas
 the unscented sampling
 method, we do not observe a performance increase when using more than one initial state
 for the derivative method.
-For runtimes of the three robust control techniques,
+For runtimes of the three robust control techniques \textcolor{blue}{[a ``technique" is abstract/general; a technique does not have a concrete runtime; do you mean computational complexity?]},
 consult Appendix \ref{appendix:time}.
 
 We examine the gate errors due to a static qubit frequency
@@ -221,8 +219,8 @@ ability of composite pulses to mitigate parameter uncertainty errors to arbitrar
 order with sufficiently many pulses \cite{merrill2014progress}.
 It is difficult to choose an appropriate composite pulse
 for the problem studied here due to our Hamiltonian and experimental constraints.
-A comparison between composite pulses and numerical techniques could be an
-interesting topic for future study
+We propose comparisons between composite pulses and numerical techniques
+for future work.
 
 Furthermore, the ability to perform
 $Z$-type gates in any given time is critical
@@ -231,6 +229,6 @@ where the qubits have distinct
 frequencies. Notably, the analytic gate studied here cannot be extended
 to gate times other than $1 / 4 f_{q}$. 
 We can find gates using the numerical methods at
-all gate times at and above $1 / 4 f_{q}$, see Figure \ref{fig:staticb}.
+all gate times above $18$ns, see Figure \ref{fig:staticb}.
 These numerical methods offer an effective scheme for synchronizing
 multi-qubit experiments.

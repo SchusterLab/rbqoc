@@ -1,6 +1,6 @@
 \section{QOC for the Fluxonium \label{sec:fluxonium}}
 In the following, we optimize quantum gates
-(unitary transformations) for the superconducting fluxonium qubit--a promising
+(unitary transformations) \textcolor{blue}{[for a physics journal, you will want as much handholding and explanation for the robotics community language as possible; bu contrast, clarifying that a quantum gate is a unitary tranformation seems out of place here.]} for the superconducting fluxonium qubit -- a promising
 building block for quantum computers due to its high
 coherence times
 \cite{earnest2018realization, lin2018demonstration,
@@ -11,32 +11,30 @@ formalism \eqref{eq:gcostfun}-\eqref{eq:eqcon}
 to define the optimization problem \eqref{eq:costfun}-\eqref{eq:ic_con},
 which we extend in subsequent sections to account
 for experimental error channels.
-To high accuracy, we approximate the Hamiltonian near the flux-frustration
-point as a two-level system:
+To high accuracy, we can approximate the fluxonium Hamiltonian near the flux-frustration
+point by a two-level system:
 \begin{align}
-  H/h &= f_{q} \frac{\sigma_{z}}{2} + a(t) \frac{\sigma_{x}}{2},
+  H/h &= f_{q} \frac{\sigma_{z}}{2} + a(t) \frac{\sigma_{x}}{2}.
   \label{eq:hamiltonian}
 \end{align}
-where $f_{q}$ is the qubit frequency at the flux-frustration point,
-$a(t)$ is the flux offset from the flux-frustration point,
+Here, $f_{q}$ is the qubit frequency at the flux-frustration point,
+$a(t)$ is the control governing the flux offset from the flux-frustration point,
 $h$ is Planck's constant, and $\sigma_{z}, \sigma_{x}$
-are Pauli matrices. Although the coherent dynamics can be modeled as a two-level
-system, our noise model, experimental constraints, and system parameters
+are Pauli matrices. Although the coherent dynamics can be described based on this two-level
+system model, our noise model, experimental constraints, and system parameters
 consider the full system, and they are representative of the fluxonium
 presented in \cite{zhang2020universal}.
 
 First, we outline the constraints for the fluxonium gate problem.
-All gates presented in this work satisfy these constraints to
-a maximum violation of $\sim 10^{-8}$.
-Casting this problem as a multi-state transfer, the initial conditions on
-the states are $\ket*{\psi^{0}_{1}} = \ket*{0}$, $\ket*{\psi^{1}_{1}} = \ket*{1}$
+Casting this problem in terms of a multi-state transfer problem, we fix as the initial states
+ $\ket*{\psi^{0}_{1}} = \ket*{0}$, $\ket*{\psi^{1}_{1}} = \ket*{1}$
 \eqref{eq:istate_con}
-where the superscript is an index $i \in \{0, 1\}$,
-and the subscript indicates the time step $k = 1$.
+where the superscript $i \in \{0, 1\}$ is the state index,
+and the subscript labels the time step -- here, $k = 1$.
 The states at the final time step are constrained to be
 the target states $\ket*{\psi^{i}_{N}} = \ket*{\psi^{i}_{f}} \equiv
 U \ket*{\psi^{i}_{1}} \ \forall \ i$
-\eqref{eq:tstate_con} where $U = X/2, Y/2, Z/2$ is the target gate.
+\eqref{eq:tstate_con} with $U = X/2, Y/2, Z/2$ denoting the target gate.
 Furthermore, we impose the normalization constraint
 ${\lvert \braket*{\psi^{i}_{k}}{\psi^{i}_{k}} \rvert}^{2} = 1 \ \forall \ i,k$
 \eqref{eq:statenorm_con}
@@ -44,37 +42,39 @@ to ensure the solver does not take advantage of discretization errors in numeric
 To refer to the discrete moments of the flux, we introduce the notation
 $\int^{t_{k}}_{t_{1}} a(t) \ \mathrm{d}t \equiv \int_{t} a_{k}$,
 $a(t_{k}) \equiv a_{k}$,
-$\pdv*[n]{a(t)}{t} \lvert_{t = t_{k}} \equiv \partial^{n}_{t} a_{k}$.
-We impose the zero net flux constraint $\int_{t} a_{N} = 0$
+$\pdv*[n]{a(t)}{t} \lvert_{t = t_{k}} \equiv \partial^{n}_{t} a_{k}$. \textcolor{blue}{[Why is this a partial rather than a single-variable derivative?]}
+We impose the zero net-flux constraint $\int_{t} a_{N} = 0$
 \eqref{eq:znf_con}
 which mitigates the inductive drift ubiquitous in flux-bias lines
 \cite{battistel2019fast, krantz2019quantum, zhang2020universal}.
 The flux is constrained by $\lvert a_{k} \rvert \leq 0.5 \ \textrm{GHz} \ \forall \ k$
 \eqref{eq:amp_con}.
 Above $0.5$ GHz, we observe poor experimental agreement with the two-level approximation \eqref{eq:hamiltonian}.
-We also enforce the boundary condition $a_{1} = a_{N} = 0$ \eqref{eq:bound_con}
+We also enforce the boundary condition $a_{1} = a_{N} = 0$ \eqref{eq:bound_con} \textcolor{blue}{[Thomas, this would actually be consistent with my suggestion to set $\mathbf{u}_N$ to zero?]}
 so the gates may be concatenated arbitrarily. Additionally,
 we have the initial condition $\int_{t} a_{1} = \partial_{t} a_{1} = 0$
-\eqref{eq:ic_con}.
+\eqref{eq:ic_con}. All gates presented in this work satisfy these constraints to
+a maximum violation of $\sim 10^{-8}$.
 
 The augmented control and augmented state are:
 \begin{equation}
   \begingroup
   \renewcommand*{\arraystretch}{1.3}
-  u_{k} = \begin{bmatrix} \partial^{2}_{t} a_{k} \end{bmatrix}, \quad
-  x_{k} = \begin{bmatrix} \ket{\psi^{0}_{k}} \\ \ket{\psi^{1}_{k}}
+  \mathbf{u}_{k} = \partial^{2}_{t} {a}_{k} , \quad
+  \mathbf{x}_{k} = \begin{bmatrix} \ket{\psi^{0}_{k}} \\ \ket{\psi^{1}_{k}}
     \\ \int_{t} a_{k} \\ a_{k} \\ \partial_{t} a_{k} \end{bmatrix}.
   \endgroup
   \label{eq:astatecontrols}
 \end{equation}
-The time evolution of these variables are encoded
-in coupled, first-order, differential equations
-which are integrated in the discrete dynamics function \eqref{eq:dyn_con}.
-We integrate the states according to the TDSE \eqref{eq:tdse} and the
+(We maintain vector notation for $\mathbf{u}_k$ in anticipation of augmentation with additional components in Section \ref{sec:longitude}.)
+The time evolution of these variables is governed by 
+ coupled first-order differential equations
+which are encoded in the discrete dynamics function \eqref{eq:dyn_con}.
+We integrate the states according to the TDSE \eqref{eq:tdse} based on the
 fluxonium Hamiltonian \eqref{eq:hamiltonian}.
-The ALTRO implementation we use does not currently
-support complex numbers, so we repesent the states
-in the isomorphism $\mathcal{H}(\mathbb{C}^{n})
+Since the ALTRO implementation we use does not currently
+support complex numbers, we follow \cite{leung2017speedup} in  representing the states
+via the isomorphism $\mathcal{H}(\mathbb{C}^{n})
 \cong \mathcal{H}(\mathbb{R}^{2n})$ given in \cite{leung2017speedup},
 \begin{equation}
   H \ket{\psi} \cong \begin{bmatrix} H_{\textrm{re}} & -H_{\textrm{im}}
@@ -84,46 +84,45 @@ in the isomorphism $\mathcal{H}(\mathbb{C}^{n})
 \end{equation}
 
 The cost function at each time step is
-$\ell_{k}(x_{k}, u_{k}) = (x_{k} - x_{f})^{T} Q_{k} (x_{k} - x_{f}) + u^{T}_{k} R_{k} u_{k}$
-where $Q_{k}$ and $R_{k}$ are positive-definite diagonal matrices we supply.
+$\ell_{k}(\mathbf{x}_{k}, \mathbf{u}_{k}) = (\mathbf{x}_{k} - \mathbf{x}_{f})^{T} Q_{k} (\mathbf{x}_{k} - \mathbf{x}_{f}) + \mathbf{u}^{T}_{k} R_{k} \mathbf{u}_{k}$
+where $Q_{k}$ and $R_{k}$ are positive-definite diagonal matrices we supply. \textcolor{blue}{[``We supply" -- sure, but not very helpful. How are they defined/constructed specifically?]}
 The $Q_{k}$ term
-penalizes deviations from the target augmented state $x_{f}$,
+penalizes deviations from the target augmented state $\mathbf{x}_{f}$,
 which is given by the constraints we have imposed on
 $\ket*{\psi^{i}_{N}}$, $\int_{t} a_{N}$, and $a_{N}$ in addition to
-$\partial_{t} a_{f} = 0$.
+$\partial_{t} a_{f} = 0$. \textcolor{blue}{[Should this have been $a_N$ rather than $a_f$?]}
 The $R_{k}$ term penalizes the norm of $\partial^{2}_{t} a_{k}$,
 smoothing the flux to mitigate high-frequency AWG transitions.
 Stated succinctly, the optimization problem takes the form:
 \begin{mini!}[2] 
-  {x_{1:N}, u_{1:N\text{-}1}}{\sum_{k=1}^N {(x_k-x_f)}^{T} Q_k (x_k-x_{f})
-    + \sum_{k=1}^{N-1} {u_k}^{T} R_k u_{k}}{}{} \label{eq:costfun}
-  \addConstraint{x_{k+1}}{= f(x_k, u_k) \ \forall \ k}  \label{eq:dyn_con}
+  {\substack{\mathbf{x}_1,\ldots,\mathbf{x}_N \\ \mathbf{u}_1,\ldots,\mathbf{u}_{N-1}}}{\sum_{k=1}^N {(\mathbf{x}_k-\mathbf{x}_f)}^{T} Q_k (\mathbf{x}_k-\mathbf{x}_{f})
+    + \sum_{k=1}^{N-1} {\mathbf{u}_k}^{T} R_k \mathbf{u}_{k}}{}{} \label{eq:costfun}
+  \addConstraint{\mathbf{x}_{k+1}}{= \mathbf{f}(\mathbf{x}_k, u_k) \quad \forall \ k}  \label{eq:dyn_con}
   \addConstraint{\ket{\psi^{0}_{1}} = \ket{0}, \ket{\psi^{1}_{1}} = \ket{1}} \label{eq:istate_con}
   \addConstraint{\ket{\psi^{i}_{N}} = \ket{\psi^{i}_{f}}
-    \ \forall \  i} \label{eq:tstate_con}
+    \quad \forall \  i} \label{eq:tstate_con}
   \addConstraint{{\lvert \braket{\psi^{i}_{k}}{\psi^{i}_{k}}
-      \rvert}^{2} = 1 \ \forall \ i, k} \label{eq:statenorm_con}
+      \rvert}^{2} = 1 \quad \forall \ i, k} \label{eq:statenorm_con}
   \addConstraint{{\textstyle \int_{t}} a_{N} = 0} \label{eq:znf_con}
-  \addConstraint{|a_{k}| \leq 0.5 \ \textrm{GHz} \ \forall \ k} \label{eq:amp_con}
+  \addConstraint{|a_{k}| \leq 0.5 \ \textrm{GHz} \quad \forall \ k} \label{eq:amp_con}
   \addConstraint{a_{1} = a_{N} = 0} \label{eq:bound_con}
   \addConstraint{{\textstyle \int_{t}} a_{1} = \partial_{t} a_{1} = 0}. \label{eq:ic_con}
 \end{mini!}
 
 Next, we remark on our problem formulation.
 We penalize the squared error of the final state and the target
-state \eqref{eq:costfun}, rather than their infidelity,
-because the Hessian of the squared error cost function is diagonal--which
-makes matrix multiplications fast--and we wish to optimize $Z/2$ gates,
+state \eqref{eq:costfun} \textcolor{blue}{[referencing (6a) is puzzling here unless you specify $R_k$; how is ``squared error" different from infidelity?]}, rather than their infidelity,
+because the Hessian of the squared-error cost function is diagonal -- which
+makes matrix multiplications fast -- and we wish to optimize $Z/2$ gates,
 which requires a metric that is sensitive to global phases for the initial
 states $\ket{0}$ and $\ket{1}$.
 We penalize the squared error at all time steps
 because it benefits the iLQR solving stage \cite{Jackson2020altroc},
-not to incentivize early achievement
+not to incentivize early achievement \textcolor{blue}{[NOT to incentivize or to incentivize??]}
 of the desired gate \cite{leung2017speedup}.
 
-In addition to the target state cost function, we
-impose the target state constraint \eqref{eq:tstate_con}, which
-says that the final state must match the target state, including its global phase,
+In addition to the target-state cost function, we
+impose a target-state constraint \eqref{eq:tstate_con} which  requires the final state to match the target state, including its global phase,
 up to our chosen maximum constraint violation $\sim 10^{-8}$.
 If we did not impose this constraint, the optimizer would be
 allowed to sacrifice the closed-system gate error to achieve better
@@ -142,11 +141,11 @@ In extraordinarily difficult cases of
 QOC \cite{abdelhafez2020universal}, it may be impossible
 to obey the physics of the system and achieve the desired gate;
 equivalently, the dynamics constraint \eqref{eq:dyn_con}
-and the target state constraint \eqref{eq:tstate_con} may be mutually unsatisfiable.
+and the target-state constraint \eqref{eq:tstate_con} may be mutually unsatisfiable.
 In this case, the prefactors for the constraint function terms
-in the ALM objective will tend to infinity--leading to numerical instability--and the
+in the ALM objective will tend to infinity -- leading to numerical instability -- and the
 optimization will not converge. To maintain a constrained approach in this situation,
-the maximum constraint violation for the target state constraint can be raised
+the maximum constraint violation for the target-state constraint can be raised
 to a level commensurate with the minimum acceptable gate error.
 
 Finally, for the indirect ALM-iLQR solving stage,
