@@ -18,10 +18,10 @@
     and 2\textsuperscript{nd}-order derivative methods (D1, D2). The flux pulses shown
     for the sampling, unscented sampling, and derivative methods are optimized
     for twice the gate time of the analytic gate.
-    (b) Single gate error at a one-percent qubit frequency detuning as
+    (b) Single-gate error at a one-percent qubit frequency detuning as
     a function of the gate time. Missing
     data points represent gates with a gate error greater than $5 \cdot 10^{-5}$.
-    (c) Single gate error as a function of the qubit frequency detuning.
+    (c) Single-gate error as a function of the qubit frequency detuning.
     The gate errors for the analytic and 1\textsuperscript{st}-order derivative
     methods are shown for gate times which are multiples of $1 / 4 f_{q} \sim 18 \textrm{ns}$.
     The gate errors for the two methods are
@@ -46,7 +46,9 @@ We consider three robust control techniques to accomplish this task:
 a sampling method, an unscented sampling method,
 and a derivative method.
 
+\subsection{Sampling Method}
 \textcolor{blue}{[Consider structuring the following into subsections to clearly separate the three methods.]}
+\textcolor{red}{[better?]}
 The sampling method incentivizes the optimizer
 to ensure that multiple copies of a state, each evolving
 with a distinct value of the uncertain parameter, achieve
@@ -58,13 +60,13 @@ experimentally \cite{carvalho2020error}.
 For each initial state,
 we add two sample states $\ket{\psi^{\pm}}$
 to the augmented state \eqref{eq:astatecontrols}. The discrete dynamics
-function \eqref{eq:dyn_con} is modified
+function is modified
 so the sample states evolve under the fluxonium Hamiltonian \eqref{eq:hamiltonian}
 with $f_{q} \rightarrow f_{q} \pm \sigma_{f_{q}}$ for a fixed
  standard deviation $\sigma_{f_{q}}$ of the qubit frequency, acting as a hyperparameter.
 We penalize the infidelities of the sample states with respect to the target state
-by adding a cost function to the objective \eqref{eq:costfun} of the form
-$\sum_{k, \pm} b_{k} (1 - {\lvert \braket*{\psi^{\pm}_{k}}{\psi_{f}} \rvert}^{2})$
+by adding a cost function to the objective of the form
+$\sum_{k, \pm} b_{k} (1 - {\lvert \braket*{\psi^{\pm}_{k}}{\psi_{T}} \rvert}^{2})$
 where $b_{k}$ is a constant we supply.
 For this method, the standard orthonormal basis states are an insufficient choice
 for the initial states. As an example, a $Z/2$ gate achieved by idling
@@ -74,14 +76,19 @@ or $\ket{1}$ because the infidelity metric is insensitive to global phases,
 but this gate will not be robust for any other initial states.
 Therefore, we choose the four initial states $\{\ket{0}, \ket{1}, (\ket{0} + i\ket{1}) / \sqrt{2},
 (\ket{0} - \ket{1}) / \sqrt{2}\}$ \cite{chow2009randomized},
-whose outer products span the operators on the Hilbert space, and  we refer to them as the operator basis. \textcolor{blue}{[I cannot find the term ``operator basis" in the rest of the paper. If not used, then don't introduce terminology.]}
+whose outer products span the operators on the Hilbert space,
+and  we refer to them as the operator basis.
+\textcolor{blue}{[I cannot find the term ``operator basis" in the rest of the paper.
+    If not used, then don't introduce terminology.]}
+\textcolor{red}{[Operator basis is used in the appendix \ref{appendix:time}]}
 
+\subsection{Unscented Sampling Method}
 Whereas the sampling method penalizes the deviations of the sample states
 from the target state, the unscented sampling method
 penalizes the deviations of the sample states from the nominal state
 \cite{howell2020direct, lee2013sigma,
   thangavel2020robust}. Accordingly, the cost function we add
-to the objective \eqref{eq:costfun} takes the form
+to the objective takes the form
 $\sum_{k, j} c_{k} (\psi^{j}_{k} - \psi_{k})^{T}
 (\psi^{j}_{k} - \psi_{k})$, where $c_{k}$ is a
 constant we supply, $\psi_{k}$ is
@@ -103,6 +110,7 @@ using more than one initial state.
 A detailed procedure for the unscented transformation is given
 in Appendix \ref{appendix:unscented}.
 
+\subsection{Derivative Method}
 The derivative method penalizes the sensitivity of the state
 to the uncertain parameter, which is encoded in the $l$\textsuperscript{th}-order
 state derivative $\ket*{\partial_{f_{q}}^{l} \psi} \equiv \partial_{f_{q}}^{l} \ket*{\psi}$.
@@ -121,21 +129,25 @@ For example, the dynamics for the $1$\textsuperscript{st}-order derivative metho
   \label{eq:d1dyn}
 \end{align}
 We integrate the coupled ODEs with exponential
-integrators in the discrete dynamics function \eqref{eq:dyn_con} \textcolor{blue}{[integrators IN A function? sounds like mix-up between the function vs. how it is implemented numerically]},
-see Appendix \ref{appendix:derivative}.
+integrators, see Appendix \ref{appendix:derivative}.
+\textcolor{blue}{[integrators IN A function? sounds like mix-up between the function vs. how it is implemented numerically]}
+\textcolor{red}{[removed ref. to ddf]}
 While the state $\ket*{\psi}$ has unit norm,
 the state derivatives $\ket*{\partial^{l}_{f_{q}} \psi}$ need not, as is evident
 from the non-unitary dynamics \eqref{eq:d1dyn}.
 We penalize the norms of the state derivatives
-in the objective \eqref{eq:costfun} by setting the corresponding elements
+in the objective by setting the corresponding elements
 of the target augmented state to zero. Intuitively, this corresponds to penalizing
 the sensitivity of each state element to the uncertain parameter. As was the case for
 the unscented sampling
 method, we do not observe a performance increase when using more than one initial state
 for the derivative method.
-For runtimes of the three robust control techniques \textcolor{blue}{[a ``technique" is abstract/general; a technique does not have a concrete runtime; do you mean computational complexity?]},
-consult Appendix \ref{appendix:time}.
+We present the runtimes of our implementations of the three robust control methods
+in Appendix \ref{appendix:time}.
+\textcolor{blue}{[a ``technique" is abstract/general; a technique does not have a concrete runtime; do you mean computational complexity?]},
+\textcolor{red}{[better?]}
 
+\subsection{Comparison}
 We examine the gate errors due to a static qubit frequency
 detuning for the $Z/2$ gates obtained with the robust control techniques
 and the analytic $Z/2$ gate.

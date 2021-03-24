@@ -10,7 +10,7 @@
 \usepackage{optidef}
 \usepackage{physics}
 \usepackage{setspace}
-\usepackage{subcaption}
+\usepackage[labelformat=simple]{subcaption}
 \usepackage{xcolor}
 
 % configure imports
@@ -21,3 +21,5 @@
 \newcommand{\R}{\mathbb{R}}
 \captionsetup[subfigure]{labelformat=empty, skip=0pt}
 \restylefloat{table}
+\renewcommand\thesubfigure{(\alph{subfigure})}
+
