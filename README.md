@@ -180,6 +180,7 @@ its Google Sheet counterpart
   - [krotov](https://github.com/qucontrol/krotov) Krotov in Python
   - [python-open-controls](https://github.com/qctrl/python-open-controls) QOC from Q-CTRL in Python
   - [qoc](https://github.com/SchusterLab/qoc) GRAPE via autograd in Python
+  - [qopt](https://github.com/qutech/qopt) and [filter-functions](https://github.com/qutech/filter_functions) QOC with filter functions
   - [quantum-optimal-control](https://github.com/SchusterLab/quantum-optimal-control)
   GRAPE via TensorFlow in Python
   - [QuOptimalControl.jl](https://github.com/alastair-marshall/QuOptimalControl.jl)
