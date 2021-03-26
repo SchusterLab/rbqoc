@@ -160,7 +160,9 @@ its Google Sheet counterpart
 ## Related Work
 - Trajectory Optimization
   - [Trajectory Optimization (Wikipedia)](https://en.wikipedia.org/wiki/Trajectory_optimization)
-  - [LQR (Wikipedia)](https://en.wikipedia.org/wiki/Linear–quadratic_regulator)
+  - [Linear Quadratic Regulator (Wikipedia)](https://en.wikipedia.org/wiki/Linear–quadratic_regulator)
+  - [Differential Dynamic Programming (Wikipedia)](https://en.wikipedia.org/wiki/Differential_dynamic_programming)
+  - [Augmented Lagrangian Method (Wikipedia)](https://en.wikipedia.org/wiki/Augmented_Lagrangian_method)
   - [ALTRO paper](https://roboticexplorationlab.org/papers/altro-iros.pdf)
   - [ALTRO tutorial paper](https://bjack205.github.io/papers/AL_iLQR_Tutorial.pdf)
   - [Direct Collocation tutorial paper](https://epubs.siam.org/doi/pdf/10.1137/16M1062569)
@@ -169,20 +171,19 @@ its Google Sheet counterpart
   - [What scientists must know about hardware to write fast code](https://biojulia.net/post/hardware/)
   - [QuantumOptics.jl](https://github.com/qojulia/QuantumOptics.jl) Julia's QuTiP
 - QOC
-  - [c3](https://github.com/q-optimize/c3) control, calibration and characterization
-  of quantum machines
+  - [c3](https://github.com/q-optimize/c3) Toolset for control, calibration and characterization of physical systems
   - [CRAB](https://github.com/Bilal092/CRAB) CRAB in MATLAB
   - [Dynamo](https://github.com/shaimach/Dynamo) DYNAMO in MATLAB
   - [GOAT-QuantumControl](https://github.com/Bilal092/GOAT-QuantumControl) GOAT in MATLAB
   - [Juqbox.jl](https://github.com/LLNL/Juqbox.jl) QOC from LLNL in Julia,
-  symplectic integrators, pseudo-spectral
+  symplectic integrators, pseudo-spectral, exact derivatives
   - [krotov](https://github.com/qucontrol/krotov) Krotov in Python
   - [python-open-controls](https://github.com/qctrl/python-open-controls) QOC from Q-CTRL in Python
   - [qoc](https://github.com/SchusterLab/qoc) GRAPE via autograd in Python
   - [quantum-optimal-control](https://github.com/SchusterLab/quantum-optimal-control)
   GRAPE via TensorFlow in Python
   - [QuOptimalControl.jl](https://github.com/alastair-marshall/QuOptimalControl.jl)
-	a library of QOC algorithms, written in Julia
+	Library for solving quantum optimal control problems in Julia
   - [QuTiP](http://qutip.org/docs/latest/guide/guide-control.html)
   QOC with QuTip
 
