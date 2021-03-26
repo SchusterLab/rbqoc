@@ -7,9 +7,11 @@
 \usepackage{hyperref}
 \usepackage[utf8]{inputenc}
 \usepackage{layouts}
+\usepackage{multirow}
 \usepackage{optidef}
 \usepackage{physics}
 \usepackage{setspace}
+\usepackage{diagbox}
 \usepackage[labelformat=simple]{subcaption}
 \usepackage{xcolor}
 
@@ -20,6 +22,10 @@
 \newcommand{\half}{\frac{1}{2}}
 \newcommand{\R}{\mathbb{R}}
 \captionsetup[subfigure]{labelformat=empty, skip=0pt}
+\captionsetup{labelsep=period}
 \restylefloat{table}
 \renewcommand\thesubfigure{(\alph{subfigure})}
-
+\addto\captionsenglish{%
+  \renewcommand{\figurename}{FIG.}%
+  \renewcommand{\tablename}{TABLE}%
+}

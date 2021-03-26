@@ -3,12 +3,15 @@ Here, we outline how to efficiently integrate the dynamics
 for the derivative method using exponential integrators.
 General exponential integrators break the dynamics into a linear term and a non-linear term.
 For example, the dynamics for the first state derivative
-are $\frac{d}{dt} \ket{\partial_{\lambda} \psi} =
+are,
+\begin{equation}
+\frac{d}{dt} \ket{\partial_{\lambda} \psi} =
 -\frac{i}{\hbar} H  \ket{\partial_{\lambda} \psi} -
-\frac{i}{\hbar} (\partial_{\lambda} H) \ket{\psi}$.
+\frac{i}{\hbar} (\partial_{\lambda} H) \ket{\psi}. \label{eq:gd1dyn}
+\end{equation}
 The linear term is $L = -\frac{i}{\hbar} H$ and the non-linear
 term is $N = -\frac{i}{\hbar} (\partial_{\lambda} H) \ket{\psi}$.
-With zero-order hold on the controls the exact solution is:
+With piecewise-constant controls, the exact solution to \eqref{eq:gd1dyn} is,
 \begin{equation}
   \label{eq:dgeneralexp}
   \begin{aligned}
@@ -30,10 +33,10 @@ method \cite{berland2006solving},
   \end{aligned}
 \end{equation}
 This method provides a good tradeoff between accuracy and efficiency, requiring one unique matrix
-exponential computation per stage. Integration accuracy is not of the utmost importance because the
-state derivatives guide the optimization, and do not correspond to experimental parameters
-which must be realized with high accuracy.
-\vspace*{5mm}
+exponential computation per stage. Integration accuracy for the state derivatives
+is not of the utmost importance because they are used in the robustness cost function -- as
+opposed to the states themselves which are experimental parameters that must be realized
+with high accuracy.
 
 
 

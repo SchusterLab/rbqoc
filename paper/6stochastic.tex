@@ -1,3 +1,27 @@
+%% F3
+\begin{figure*}[ht]
+  \begin{subfigure}{.4\textwidth}
+    \includegraphics[width=\linewidth]{assets/f3a.png}
+    \caption{}
+    \label{fig:stochastica}
+  \end{subfigure}\hspace{0.05\textwidth}
+  \begin{subfigure}{.4\textwidth}
+    \includegraphics[width=\linewidth]{assets/f3b.png}
+        \caption{}
+    \label{fig:stochasticb}
+  \end{subfigure}
+  \caption{
+    (a) Flux pulses for $X/2$ gates robust to flux noise
+    constructed with the analytic (A),
+    sampling (S), unscented sampling (U), and the 1\textsuperscript{st}-
+    and 2\textsuperscript{nd}-order derivative methods (D1, D2).
+    (b) Cumulative gate error due to 1/$f$ flux noise for
+    successive gate applications. The cumulative gate errors for the
+    sampling, unscented sampling, and the derivative methods are indistinguishable.
+  }
+  \label{fig:stochastic}
+\end{figure*}
+
 \section{Robustness to Time-Dependent Parameter Uncertainty \label{sec:stochastic}}
 An additional source of experimental error arises from time-dependent
 parameter uncertainty. For many flux-biased and inductively-coupled
@@ -49,7 +73,7 @@ generated flux noise instance.
 To observe the effect of interfering coherent errors,
 we simulate successive applications of the gate constructed by each method;
 we compute the cumulative gate error
-after each application, see Figure \ref{fig:stochastic}.
+after each application, see Fig. \ref{fig:stochastic}.
 Both the analytic
 and numerical gates yield single-gate errors
 sufficient for quantum error correction.

@@ -3,25 +3,35 @@ We comment on the depolarization metrics and then give
 our procedure for integrating the Lindblad master equation.
 The integrated depolarization rate and the gate error due to
 depolarization
-\textcolor{blue}{[The error is due to depolarization METRICS?]}
-\textcolor{red}{[resolved, removed the word metrics]}
 are compared in Table \ref{tab:longitude} for the
-numerical experiment described in Section \ref{sec:longitude}.
+numerical experiment described in Sec. \ref{sec:longitude}.
 The ratio of the value obtained on the metric with the analytic technique
 to the value obtained with the numerical technique
 is similar across the two metrics.
-\textcolor{blue}{what is relative performance?}
-\textcolor{red}{replaced relative performance with more precise phrasing}
 
 \begin{table}[ht]
-  \begin{tabular}{c | c | c | c | c | c | c}
-         & $D_{1\textrm{A}}$ & $D_{1\textrm{N}}$ & & GE$_{\textrm{A}}$ & GE$_{\textrm{N}}$ &\\
-    Gate & $(10^{-5})$ & $(10^{-5})$ & $D_{1\textrm{A}}/ D_{1\textrm{N}}$ & $(10^{-5})$ &
-    $(10^{-5})$ & GE$_{\textrm{A}} / \textrm{GE}_{\textrm{N}}$\\
+  \begin{tabular}{| c | c | c | c | c | c | c | c | c |}
     \hline
-    Z/2 & 5.745 & 1.149 & 5.000 & 0.888   & 0.185  & 4.791 \\
+    \multirow{2}{*}{Gate} &
+    $D_{1\textrm{A}}$ &
+    $D_{1\textrm{N}}$ &
+    \multirow{2}{*}{$\dfrac{ D_{1\textrm{A}} }{ D_{1\textrm{N}} }$} &
+    $\textrm{GE}_{\textrm{A}}$ &
+    $\textrm{GE}_{\textrm{N}}$ &
+    \multirow{2}{*}{$\dfrac{ \textrm{GE}_{\textrm{A}} }{ \textrm{GE}_{1\textrm{N}} }$}\\
+    &
+    $(10^{-5})$ &
+    $(10^{-5})$ &
+    &
+    $(10^{-5})$ &
+    $(10^{-5})$ &\\
+    \hline\hline
+    Z/2 & 5.745 & 1.149 & 5.000 & 0.888   & 0.185  & 4.791\\
+    \hline
     Y/2 & 5.253 & 1.157 & 4.540 & 0.770 & 0.186   & 4.132\\
+    \hline
     X/2 & 16.251 & 2.660 & 6.109 & 2.674 & 0.432  & 6.200\\
+    \hline
   \end{tabular}
   \caption{
     Single-gate integrated depolarization rate ($D_{1}$)
@@ -39,18 +49,16 @@ This equation takes the form:
   + \sum_{i} \gamma_{i} (L_{i} \rho L_{i}^{\dagger}
   - \frac{1}{2} \{L_{i}^{\dagger} L_{i}, \rho\}),
 \end{equation}
-\textcolor{blue}{[I suggest to remove the rest of the sentence completely; should not state any of this for physics journal]}
-\textcolor{red}{[sentence on commutator definitions removed]}
 For depolarization, $\gamma_{\pm} = T_{\pm}^{-1}$,
 $L_{\pm} = \sigma^{\pm} \equiv (\sigma_{x} \pm i \sigma_{y})/2$.
-The depolarization times $T_{+} = T_{-} = 2 T_{1}$ are obtained at each time step
-from the spline shown in Figure \ref{fig:longitudeb}.
-\todo{$hf \ll kT$}
+We make the approximation $hf \ll k_{\textrm{B}}T$ such that
+$T_{+} = T_{-} = 2 T_{1}$, where $T_{1}$ is obtained at each time step
+from the spline shown in Fig. \ref{fig:longitudeb}.
 We obtain the $T_{1}$ values in this spline
 by driving the qubit at the desired flux bias
 and monitoring the resultant decay. For more details
 on these measurements, consult \cite{zhang2020universal}.
-Because $T_{1}$ depends on the flux $a(t)$, so do
+Because $T_{1}$ depends on the flux, so do
 the decay rates $\gamma_{\pm}$.
 Integrating the master equation with time-dependent decay rates
 provides a heuristic for how gates might  perform in
@@ -65,9 +73,10 @@ quantum computing platforms where decoherence is strongly
 dependent on the control parameters.
 
 In order to use exponential integrators, we employ
-the vectorization/Choi-Jamiolkowski isomorphism \cite{Landi2018},
+the vector (Choi-Jamiolkowski) isomorphism \cite{Landi2018},
 \begin{equation}
-  \frac{d}{dt} \textrm{vec}({\rho}) = \hat{\mathcal{L}}\, \textrm{vec}({\rho}),
+  \frac{d}{dt} \textrm{vec}({\rho}) = \hat{\mathcal{L}}\, \textrm{vec}({\rho})
+  \label{eq:veclindblad},
 \end{equation}
 \begin{equation}
   \begin{aligned}
@@ -79,21 +88,19 @@ the vectorization/Choi-Jamiolkowski isomorphism \cite{Landi2018},
 \end{equation}
 where $\rho = \sum_{i, j} \alpha_{ij} \ket{i}\bra{j}$
 and $\textrm{vec}(\rho) = \sum_{i, j} \alpha_{ij} \ket{i} \otimes \ket{j}$.
-Because $a(t)$ is constant between time steps $[t_{k}, t_{k + 1})$,
-  due to our numerical discretization,
-  \textcolor{blue}{[for real, because of the AWG? even that would get filtered,
-      right? or as an approximation because of discretization?]}
-  \textcolor{red}{[added comment bout discretization]},
-so are $H(a(t))$ and $\gamma_{\pm}(a(t))$.
-Therefore, the exact solution is
-$\textrm{vec}(\rho_{k + 1}) = {\exp}{\textstyle(}\Delta t_{k}
-\hat{\mathcal{L}}_{k}{\textstyle)} \textrm{vec}(\rho_{k})$.
+Because the flux is constant between time steps
+due to our numerical discretization,
+the Hamiltonian and decay rates are also constant
+between time steps.
+Therefore, the exact solution to \eqref{eq:veclindblad} is,
+\begin{equation}
+  \textrm{vec}(\rho_{k + 1}) = {\exp}{\textstyle(}\Delta t_{k}
+  \hat{\mathcal{L}}_{k}{\textstyle)} \textrm{vec}(\rho_{k}).
+\end{equation}
 The vector isomorphism transforms $(n \times n) \times (n \times n)$
 matrix-matrix multiplications to $(n^{2} \times n^{2}) \times n^{2}$ matrix-vector
 multiplications. For small $n$, we find that it is
 faster to use an exponential integrator on the vectorized equation than to perform
 Runge-Kutta on the unvectorized equation.
-\textcolor{blue}{[what is zero-order hold?]}
-\textcolor{red}{[removed ZOH comment]}
 The latter requires decreasing the interval $\Delta t_{k}$
 to maintain accuracy, resulting in more time steps.

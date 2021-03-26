@@ -52,17 +52,19 @@ performance tradeoffs
 and for constructing operations without a known analytic solution
 \cite{chakram2020multimode, heeres2017implementing}.
 Accordingly, recent work has sought to achieve robustness in QOC
-frameworks using closed-loop methods \cite{egger2014adaptive, feng2018gradient,
-  li2017hybrid, wittler2020integrated} and open-loop methods \cite{
-  allen2019robust, carvalho2020error, reinhold2019controlling,
-  rembold2020introduction, kosut2013robust, niu2019universal}.
+frameworks using closed-loop methods
+\cite{egger2014adaptive, feng2018gradient,
+  li2017hybrid, wittler2020integrated}
+and open-loop methods
+\cite{ball2020software, carvalho2020error, allen2019robust, reinhold2019controlling,
+  rembold2020introduction, kosut2013robust, niu2019universal, khaneja2005optimal}.
 
-In this work, we study three robust control techniques that
-make the system's quantum state trajectory less sensitive to uncertainties of static and time-dependent parameters:
+In this work, we study three open-loop robust control techniques that
+make the quantum state trajectory less sensitive to the uncertainties
+of static and time-dependent parameters:
 \begin{enumerate}
-\item A sampling method, similar to the work in Refs.~\cite{allen2019robust,
-  ball2020software, carvalho2020error, khaneja2005optimal,
-  reinhold2019controlling, rembold2020introduction}.
+\item A sampling method, similar to the work in Refs.~
+  \cite{allen2019robust, khaneja2005optimal, reinhold2019controlling, rembold2020introduction}.
 \item An unscented sampling method \cite{howell2020direct, lee2013sigma, thangavel2020robust}
   adapted from the unscented transform \cite{julier2004unscented,
     uhlmann1995dynamic} used in state estimation.
@@ -82,15 +84,15 @@ Hilbert space dimension.
 Leveraging recent advances in trajectory optimization within the field of robotics, we
 solve these optimization problems using ALTRO (Augmented Lagrangian TRajectory Optimizer)
 \cite{howell2019altro}, which can enforce constraints on
-the control parameters and the quantum state trajectory.
+the control fields and the quantum state trajectory.
 
 This paper is organized as follows.
 First, we describe ALTRO in the context of QOC
-in Section \ref{sec:background}.
+in Sec. \ref{sec:background}.
 We outline realistic constraints for operating the fluxonium and
-define the associated QOC problem in Section \ref{sec:fluxonium}.
+define the associated QOC problem in Sec. \ref{sec:fluxonium}.
 Then, we formulate a method for suppressing depolarization
-in Section \ref{sec:longitude}. Next, we describe three techniques for achieving
-robustness to static parameter uncertainties in Section \ref{sec:static}. We
+in Sec. \ref{sec:longitude}. Next, we describe three techniques for achieving
+robustness to static parameter uncertainties in Sec. \ref{sec:static}. We
 adapt the same techniques to mitigate 1/$f$ flux noise
-in Section \ref{sec:stochastic}.
+in Sec. \ref{sec:stochastic}.

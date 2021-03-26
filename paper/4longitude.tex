@@ -18,7 +18,7 @@
     (b) $T_{1}$ interpolation function used in optimization. Circle markers
     indicate measured $T_{1}$ times. Non-circle markers
     are plotted at the time-averaged 
-    absolute flux and $T_{1}$ time for each pulse.
+    absolute flux and the time-averaged $T_{1}$ time for each pulse.
     (c) Cumulative gate errors due to depolarization as a function of the
     number of gates applied.
     Cumulative gate errors for the numerical $Z/2$ and $Y/2$ gates
@@ -57,13 +57,10 @@ Additionally, the integrated depolarization rate is a reasonable proxy for the g
 because depolarization errors are incoherent -- they increase
 monotonically in time without interference.
 The integrated depolarization rate is appended to the augmented state \eqref{eq:astatecontrols}
-and its norm is penalized in the objective by setting
-the corresponding element of the target augmented state to zero.
+and its norm is penalized in the $Q_{k}$ term of the objective by setting
+the corresponding element of the target augmented state to zero, see \eqref{eq:costfun}.
 $T_{1}$ as a function of the flux is obtained by evaluating
-a spline fit to experimental data, see Figure \ref{fig:longitudeb}.
-\textcolor{blue}{[Phys. Rev. will want this to read 1(b).
-    Not sure how to change this the way you are doing automatic referencing.]}
-\textcolor{red}{[resolved]}
+a spline fit to experimental data, see Fig. \ref{fig:longitudeb}.
 
 Alternatively, modeling the depolarization with a master equation approach would require adding
 density matrices of size $n \times n$
@@ -75,10 +72,6 @@ real number; thus, the computational complexity of evaluating this
 depolarization model does not scale
 with the dimension of the Hilbert space.
 
-\textcolor{blue}{[abrupt start of a new paragraph; provide
-    transition/motivation for what's next; the entire following
-    paragraph feels a bit out of place/inserted after the fact.]}
-\textcolor{red}{[better?]}
 To perform time-optimal control, we make
 the duration between time steps
 a decision variable \cite{howell2019altro}. 
@@ -103,17 +96,17 @@ generated initial states.
 
 The flux pulses for the numerical gates
 are approximately periodic
-with amplitudes $\sim 0.2 \textrm{GHz}$, see Figure \ref{fig:longitudea}.
+with amplitudes $\sim 0.2 \textrm{GHz}$, see Fig. \ref{fig:longitudea}.
 They are reminiscent of the analytically determined Floquet operations
-for a fluxonium described in \cite{huang2020engineering}
+for a fluxonium described in \cite{huang2021engineering}
 and realized in \cite{mundada2020floquet}.
 The numerical gate times are greater
 than the analytic gate times, but the
 numerical flux pulses
-spend more time at higher flux values, achieving higher $T_{1}$ times on average,
-see Figure \ref{fig:longitudeb}.
+spend more time at larger flux values, achieving higher $T_{1}$ times on average,
+see Fig. \ref{fig:longitudeb}.
 The single-gate errors for both the analytic and numerical gates are
-less than $10^{-4}$, which makes them sufficient for quantum error correction--a
+less than $10^{-4}$, which makes them sufficient for quantum error correction -- a
 prerequisite for fault-tolerant quantum
 computing \cite{aharonov2008fault, knill2005quantum, gottesman1997stabilizer}.
 However, the numerical gates achieve single-gate errors
@@ -125,12 +118,10 @@ significant reduction in error correction resources
 \cite{paetznick2014resource, suchara2013comparing}.
 Furthermore, for successive gate applications,
 the gate error due to depolarization is approximately linear
-in the gate count, which we expect for $t \ll T_{1}$, see Figure \ref{fig:longitudec}.
+in the gate count, which we expect for $t \ll T_{1}$, see Fig. \ref{fig:longitudec}.
 The gate error reduction for large gate counts is
 important for noisy, intermediate-scale quantum (NISQ)
 applications. These improvements are significant given the constraints
-\textcolor{blue}{[improvements are significant FOR THE CONSTRAINTS?]}
-\textcolor{red}{[changed "for" to "given"]}
 we have imposed on the gates,
 and do not represent a fundamental limit to the optimization
 methods we have employed.
