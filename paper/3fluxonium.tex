@@ -8,7 +8,7 @@ coherence times
   zhang2020universal}.
 In this section, we use the trajectory optimization
 formalism \eqref{eq:gcostfun}-\eqref{eq:eqcon}
-to define the optimization problem \eqref{eq:costfun}-\eqref{eq:ic_con},
+to define the optimization problem \eqref{eq:costfun}-\eqref{eq:amp_con},
 which we extend in subsequent sections to account
 for experimental error channels.
 To high accuracy, we approximate the fluxonium Hamiltonian near the flux-frustration
@@ -78,7 +78,7 @@ Furthermore, we impose the normalization constraint
 ${\lvert \braket*{\psi^{i}_{k}}{\psi^{i}_{k}} \rvert}^{2} = 1 \ \forall \ i,k$
 \eqref{eq:statenorm_con}
 to ensure the solver does not take advantage of discretization errors in numerical integration.
-For the flux moments,
+For the flux,
 we have the initial condition $\int_{t} a_{1} = \mathrm{d}_{t} a_{1} = 0$
 \eqref{eq:ic_con}.
 We also enforce the boundary condition $a_{1} = a_{N} = 0$ \eqref{eq:ic_con}, \eqref{eq:znf_con}
@@ -88,10 +88,9 @@ We impose the zero net-flux constraint $\int_{t} a_{N} = 0$
 which mitigates the inductive drift ubiquitous in flux-bias lines
 \cite{battistel2019fast, krantz2019quantum, zhang2020universal}.
 Additionally, the flux is constrained by $\lvert a_{k} \rvert \leq 0.5 \ \textrm{GHz}
-\ \forall \ k$ \eqref{eq:amp_con} to ensure the two-level approximation
-\eqref{eq:hamiltonian} remains valid. Above $0.5$ GHz,
-we experimentally observe that the relationship
-between the energy levels and the flux becomes strongly non-linear.
+\ \forall \ k$ \eqref{eq:amp_con} to ensure the two-level
+approximation remains valid \eqref{eq:hamiltonian}. Above $0.5$ GHz,
+the relationship between the energy levels and the flux becomes strongly non-linear.
 All gates presented in this work satisfy these constraints to
 a maximum violation of $\sim 10^{-8}$.
 
