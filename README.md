@@ -13,7 +13,7 @@ Repository for [Robust Quantum Optimal Control with Trajectory Optimization](htt
 
 ## About
 This repository is associated with the paper
-[Robust Quantum Optimal Control with Trajectory Optimization](), a collaboration
+[Robust Quantum Optimal Control with Trajectory Optimization](https://arxiv.org/abs/2103.15716), a collaboration
 between [Schuster Lab](http://schusterlab.uchicago.edu) and
 the [Robotic Exploration Lab](http://roboticexplorationlab.org).
 This repo contains the files and information
