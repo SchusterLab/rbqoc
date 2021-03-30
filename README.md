@@ -1,5 +1,5 @@
 # rbqoc
-Repository for [Robust Quantum Optimal Control with Trajectory Optimization]()
+Repository for [Robust Quantum Optimal Control with Trajectory Optimization](https://arxiv.org/abs/2103.15716)
 
 ## Contents
 - [About](#about)
@@ -190,5 +190,14 @@ its Google Sheet counterpart
 
   
 ## Cite this Work
-
+```
+@misc{propson2021robust,
+      title={Robust Quantum Optimal Control with Trajectory Optimization}, 
+      author={Thomas Propson and Brian E. Jackson and Jens Koch and Zachary Manchester and David I. Schuster},
+      year={2021},
+      eprint={2103.15716},
+      archivePrefix={arXiv},
+      primaryClass={quant-ph}
+}
+```
 
