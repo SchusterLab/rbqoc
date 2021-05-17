@@ -19,7 +19,11 @@ __pycache__
 paper/.texpadtmp/
 !paper/main.pdf
 
+# ignore binaries
+*.DS_Store
+*.pages
+*.zip
+
 # ignore local files
 out
 _test
-*.DS_Store
