@@ -1,5 +1,5 @@
 """
-twospin11.jl - vanilla two spin based on spin13.jl
+twospin12.jl - vanilla two spin based on spin13.jl
 """
 
 WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
@@ -16,11 +16,11 @@ const TO = TrajectoryOptimization
 
 # paths
 const EXPERIMENT_META = "twospin"
-const EXPERIMENT_NAME = "twospin11"
+const EXPERIMENT_NAME = "twospin12"
 const SAVE_PATH = abspath(joinpath(WDIR, "out", EXPERIMENT_META, EXPERIMENT_NAME))
 
 # problem
-const CONTROL_COUNT = 3
+const CONTROL_COUNT = 1
 const STATE_COUNT = 4
 const ASTATE_SIZE = STATE_COUNT * HDIM_TWOSPIN_ISO + 3 * CONTROL_COUNT
 const ACONTROL_SIZE = CONTROL_COUNT
@@ -46,13 +46,7 @@ end
 function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector,
                               acontrol::SVector, time::Real, dt::Real)
     h_prop = exp(dt * (NEGI_H0_TWOSPIN_ISO
-                       + XI_coeff(astate[CONTROLS_IDX[1]],
-                                  astate[CONTROLS_IDX[2]],
-                                  astate[CONTROLS_IDX[3]]) * NEGI_H1_TWOSPIN_ISO_1
-                       + IX_coeff(astate[CONTROLS_IDX[1]],
-                                  astate[CONTROLS_IDX[2]],
-                                  astate[CONTROLS_IDX[3]]) * NEGI_H1_TWOSPIN_ISO_2
-                       + XX_coeff * J_eff(astate[CONTROLS_IDX[3]]) * NEGI_H1_TWOSPIN_ISO_3))
+     + J_eff(astate[CONTROLS_IDX[1]]) * NEGI_H1_TWOSPIN_ISO_3))
     state1 = h_prop * astate[STATE1_IDX]
     state2 = h_prop * astate[STATE2_IDX]
     state3 = h_prop * astate[STATE3_IDX]
@@ -69,7 +63,7 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector,
 end
 
 # main
-function run_traj(;gate_type=zzpiby2, evolution_time=70., solver_type=altro,
+function run_traj(;gate_type=iswap, evolution_time=70., solver_type=altro,
                   sqrtbp=false, integrator_type=rk3, smoke_test=false,
                   dt_inv=Int64(1e1), constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true,
@@ -102,14 +96,10 @@ function run_traj(;gate_type=zzpiby2, evolution_time=70., solver_type=altro,
 
     # control amplitude constraint
     x_max = fill(Inf, n)
-    x_max[CONTROLS_IDX[1]] = 0.1
-    x_max[CONTROLS_IDX[2]] = 0.1
-    x_max[CONTROLS_IDX[3:end]] .= MAX_CONTROL_NORM_0
+    x_max[CONTROLS_IDX] .= 0.5
     x_max = SVector{n}(x_max)
     x_min = fill(-Inf, n)
-    x_min[CONTROLS_IDX[1]] = -0.1
-    x_min[CONTROLS_IDX[2]] = -0.1
-    x_min[CONTROLS_IDX[3:end]] .= -MAX_CONTROL_NORM_0
+    x_min[CONTROLS_IDX] .= -0.5
     x_min = SVector{n}(x_min)
 
     # control amplitude constraint at boundary
