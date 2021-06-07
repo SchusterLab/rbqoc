@@ -151,7 +151,7 @@ and contain the optimized pulse. The HDF5 files used for the paper are
 available upon request from the authors--we did not put them in the repo because
 they are large binary files--but they can
 be generated on your machine by running the corresponding optimization program
-`src/spin/spinYY.jl` with the hyperparameters listed in `nb/trails.xlsx`, or
+`src/spin/spinYY.jl` with the hyperparameters listed in `nb/trials.xlsx`, or
 its Google Sheet counterpart
 [trials.xlsx](https://docs.google.com/spreadsheets/d/1DrW6S13RZ-FpTsDDSbfPPRQWIXcY5S-4/edit#gid=1396699849).
 
