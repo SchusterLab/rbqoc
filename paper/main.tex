@@ -101,7 +101,7 @@
 
 \maketitle
 
-%% SECTION 1
+%%S1
 \section{Introduction}
 Quantum optimal control (QOC) is a class of optimization
 algorithms for accurately and efficiently manipulating quantum systems.
@@ -202,6 +202,7 @@ robustness to static parameter uncertainties in Sec. \ref{sec:static}. We
 adapt the same techniques to mitigate 1/$f$ flux noise
 in Sec. \ref{sec:stochastic}.
 
+%% S2
 \section{Background \label{sec:background}}
 In this section, we
 review the QOC problem statement
@@ -367,6 +368,8 @@ can satisfy constraints on both the control fields and quantum states to tight t
 This advantage is crucial for this work, where multiple medium-priority cost functions
 are minimized subject to many high-priority constraints.
 
+
+%% S3
 \section{QOC for the Fluxonium \label{sec:fluxonium}}
 In the following, we optimize quantum gates
 for the superconducting fluxonium qubit -- a promising
@@ -586,6 +589,8 @@ for QOC is an interesting direction for future work.
   \label{fig:longitude}
 \end{figure*}
 
+
+%% S4
 \section{Depolarization Mitigation\label{sec:longitude}}
 In this section, we outline a method
 for optimizing the flux to mitigate depolarization.
@@ -684,6 +689,8 @@ we have imposed on the gates,
 and do not represent a fundamental limit to the optimization
 methods we have employed.
 
+
+%% S5
 \section{Robustness to Static Parameter Uncertainty \label{sec:static}}
 We have formulated the QOC
 problem as an \emph{open-loop} optimization problem, i.e.,
@@ -918,11 +925,13 @@ multi-qubit experiments.
   \label{fig:stochastic}
 \end{figure*}
 
+
+%% S6
 \section{Robustness to Time-Dependent Parameter Uncertainty \label{sec:stochastic}}
 An additional source of experimental error arises from time-dependent
 parameter uncertainty. For many flux-biased and inductively-coupled
 superconducting circuit elements, magnetic flux noise is the dominant
-source of coherent errors \cite{bialczak20071f, kakuyanagi2007dephasing,
+source of coherent errors, and therefore pure dephasing \cite{bialczak20071f, kakuyanagi2007dephasing,
   kumar2016origin, yoshihara2006decoherence}. Flux noise
 modifies the fluxonium Hamiltonian \eqref{eq:hamiltonian}
 by $a(t) \rightarrow a(t) + \delta a(t)$ where $\delta a(t)$ is the flux noise.
@@ -981,6 +990,15 @@ two orders of magnitude less than the gate error produced by the analytic gate.
 1/$f$ flux noise is a significant source of coherent errors in NISQ applications,
 and these numerical techniques offer effective avenues to mitigate it.
 
+For qubit platforms where pure dephasing is caused by high-frequency noise,
+i.e., noise that has a non-negligible spectral weight at frequencies which are greater
+than the sampling rate of the control pulses, it is unclear that pulse-shaping alone
+can ameliorate pure dephasing. In such cases, applying the time-optimal control
+scheme we have developed in Section \ref{sec:longitude} to decrease the gate duration may be an effective
+strategy to mitigate pure dephasing.
+
+
+%% S7
 \section{Conclusion}
 We have introduced state-of-the-art trajectory optimization
 techniques in the context of quantum optimal control, enabling
