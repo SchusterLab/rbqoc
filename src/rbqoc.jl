@@ -70,7 +70,7 @@ function generate_file_path(extension, file_name, path)
             end
         end
     end
-    
+
     file_path = joinpath(path, "$(lpad(max_numeric_prefix + 1, 5, '0'))_$(file_name).$(extension)")
     return file_path
 end
@@ -167,7 +167,7 @@ function plot_controls(save_file_paths, plot_file_path;
         (controls, controls_dt_inv, evolution_time) = grab_controls(save_file_path)
         (control_eval_count, control_count) = size(controls)
         control_eval_times = Array(0:control_eval_count - 1) / controls_dt_inv
-        
+
         # Plot.
         for j = 1:control_count
             label = isnothing(labels) ? nothing : labels[i][j]
@@ -177,7 +177,7 @@ function plot_controls(save_file_paths, plot_file_path;
         end
     end
     Plots.xlabel!("Time (ns)")
-    Plots.ylabel!("Amplitude (GHz)")
+    Plots.ylabel!("Amplitude (Phi0)")
     Plots.savefig(fig, plot_file_path)
     if print_out
         println("Plotted to $(plot_file_path)")

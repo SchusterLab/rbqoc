@@ -37,9 +37,6 @@ const DCONTROLS_IDX = CONTROLS_IDX[end] + 1:CONTROLS_IDX[end] + CONTROL_COUNT
 # control indices
 const D2CONTROLS_IDX = 1:CONTROL_COUNT
 
-const MIN_J_NORM = -0.03
-const MAX_J_NORM = 0.04
-
 # model
 struct Model <: AbstractModel
 end
@@ -58,7 +55,6 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector,
     intcontrols = astate[INTCONTROLS_IDX] + astate[CONTROLS_IDX] * dt
     controls = astate[CONTROLS_IDX] + astate[DCONTROLS_IDX] * dt
     dcontrols = astate[DCONTROLS_IDX] + acontrol[D2CONTROLS_IDX] * dt
-
     astate_ = [
         state1; state2; state3; state4; intcontrols; controls; dcontrols;
     ]
@@ -67,7 +63,7 @@ function RD.discrete_dynamics(::Type{RK3}, model::Model, astate::SVector,
 end
 
 # main
-function run_traj(;gate_type=iswap, evolution_time=70., solver_type=altro,
+function run_traj(;gate_type=sqrtiswap, evolution_time=70., solver_type=altro,
                   sqrtbp=false, integrator_type=rk3, smoke_test=false,
                   dt_inv=Int64(1e1), constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true,
@@ -243,7 +239,3 @@ function run_traj(;gate_type=iswap, evolution_time=70., solver_type=altro,
 
     return result
 end
-
-#run_traj(max_iterations=Int64(2e3))
-#plot_controls(["rbqoc-master/out/spin/spin13/00004_spin13.h5"],
-#"rbqoc-master/out/spin/spin13/test.pdf")

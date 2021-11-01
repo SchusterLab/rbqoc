@@ -61,11 +61,13 @@ end
 # main
 function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
                   sqrtbp=false, integrator_type=rk3, smoke_test=false,
-                  dt_inv=Int64(1e1), constraint_tol=1e-8, al_tol=1e-4,
+                  dt=1000.0/(384. * 16.), constraint_tol=1e-8, al_tol=1e-4,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true, max_iterations=Int64(2e5),
                   max_cost_value=1e8, qs=[1e0, 1e0, 1e0, 1e-1, 1e-1],
-                  benchmark=false,)
+                  benchmark=false, projected_newton=true)
     # model configuration
+    num_steps = floor(evolution_time / dt)
+    evolution_time = num_steps * dt
     model = Model()
     n = state_dim(model)
     m = control_dim(model)
@@ -92,7 +94,7 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
     xf[STATE1_IDX] = target_state1
     xf[STATE2_IDX] = target_state2
     xf = SVector{n}(xf)
-    
+
     # control amplitude constraint
     x_max = fill(Inf, n)
     x_max[CONTROLS_IDX] .= MAX_CONTROL_NORM_0
@@ -100,7 +102,7 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
     x_min = fill(-Inf, n)
     x_min[CONTROLS_IDX] .= -MAX_CONTROL_NORM_0
     x_min = SVector{n}(x_min)
-    
+
     # control amplitude constraint at boundary
     x_max_boundary = fill(Inf, n)
     x_max_boundary[CONTROLS_IDX] .= 0
@@ -110,8 +112,7 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
     x_min_boundary = SVector{n}(x_min_boundary)
 
     # initial trajectory
-    dt = dt_inv^(-1)
-    N = Int(floor(evolution_time * dt_inv)) + 1
+    N = Int(floor(evolution_time * (1. / dt))) + 1
     U0 = [SVector{m}(
         fill(1e-4, CONTROL_COUNT)
     ) for k = 1:N-1]
@@ -143,7 +144,7 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
     # must obey unit norm
     norm_constraints = [NormConstraint(n, m, 1, TO.Equality(), idx)
                         for idx in [STATE1_IDX, STATE2_IDX]]
-    
+
     constraints = ConstraintList(n, m, N)
     add_constraint!(constraints, control_bnd, 2:N-2)
     add_constraint!(constraints, control_bnd_boundary, N-1:N-1)
@@ -158,7 +159,6 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
     solver = ALTROSolver(prob)
     verbose_pn = verbose ? true : false
     verbose_ = verbose ? 2 : 0
-    projected_newton = solver_type == altro ? true : false
     constraint_tolerance = solver_type == altro ? constraint_tol : al_tol
     iterations_inner = smoke_test ? 1 : 300
     iterations_outer = smoke_test ? 1 : 30
@@ -217,9 +217,9 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
         "max_iterations" => max_iterations,
         "pn_steps" => pn_steps,
         "max_cost_value" => max_cost_value,
-        "benchmark_result" => benchmark_result,
+#        "benchmark_result" => benchmark_result,
     )
-    
+
     # save
     if save
         save_file_path = generate_file_path("h5", EXPERIMENT_NAME, SAVE_PATH)
@@ -233,6 +233,6 @@ function run_traj(;gate_type=zpiby2, evolution_time=30., solver_type=altro,
     end
 
     result = benchmark ? benchmark_result : result
-    
+
     return result
 end
