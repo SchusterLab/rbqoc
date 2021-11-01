@@ -71,8 +71,17 @@ const CNOT_ISO = SMatrix{HDIM_TWOSPIN_ISO, HDIM_TWOSPIN_ISO, Int64}(get_mat_iso(
 const iSWAP_ISO = SMatrix{HDIM_TWOSPIN_ISO, HDIM_TWOSPIN_ISO, Int64}(get_mat_iso(iSWAP))
 const sqrtiSWAP_ISO = SMatrix{HDIM_TWOSPIN_ISO, HDIM_TWOSPIN_ISO, Float64}(get_mat_iso(sqrtiSWAP))
 
-const NEGI_H0_TWOSPIN_ISO = pi * (-1im) * (FQ_1 * ZI_ISO + FQ_2 * IZ_ISO)
-const NEGI_H1_TWOSPIN_ISO_3 = 2.0 * pi * (-1im) * XX_ISO
+const NEGI_TWOSPIN = SA_F64[0   0   0   0  1  0  0  0;
+                            0   0   0   0  0  1  0  0;
+                            0   0   0   0  0  0  1  0;
+                            0   0   0   0  0  0  0  1;
+                            -1  0   0   0  0  0  0  0;
+                            0  -1   0   0  0  0  0  0;
+                            0   0  -1   0  0  0  0  0;
+                            0   0   0  -1  0  0  0  0]
+                            
+const NEGI_H0_TWOSPIN_ISO = pi * NEGI_TWOSPIN * (FQ_1 * ZI_ISO + FQ_2 * IZ_ISO)
+const NEGI_H1_TWOSPIN_ISO_3 = 2.0 * pi * NEGI_TWOSPIN * XX_ISO
 
 const CNOT_ISO_1 = SVector{HDIM_TWOSPIN_ISO}(get_vec_iso(CNOT[:,1]))
 const CNOT_ISO_2 = SVector{HDIM_TWOSPIN_ISO}(get_vec_iso(CNOT[:,2]))

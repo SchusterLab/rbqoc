@@ -4,7 +4,7 @@ want to directly control the magnitude of the XX term
 """
 
 WDIR = get(ENV, "ROBUST_QOC_PATH", "../../")
-include(joinpath(WDIR, "src", "twospin", "twospin.jl"))
+include(joinpath(WDIR, "src", "twospin", "twospin_minimal_base.jl"))
 
 using Altro
 using HDF5
@@ -69,7 +69,7 @@ function run_traj(;gate_type=sqrtiswap, evolution_time=70., solver_type=altro,
                   pn_steps=2, max_penalty=1e11, verbose=true, save=true,
                   max_iterations=Int64(2e5),
                   max_cost_value=1e8, qs=[1e0, 1e0, 1e0, 1e-1, 1e-1],
-                  benchmark=false,)
+                  benchmark=false, projected_newton=true)
     # model configuration
     model = Model()
     n = state_dim(model)
@@ -96,10 +96,10 @@ function run_traj(;gate_type=sqrtiswap, evolution_time=70., solver_type=altro,
 
     # control amplitude constraint
     x_max = fill(Inf, n)
-    x_max[CONTROLS_IDX] .= MAX_J_NORM
+    x_max[CONTROLS_IDX] .= 0.5
     x_max = SVector{n}(x_max)
     x_min = fill(-Inf, n)
-    x_min[CONTROLS_IDX] .= MIN_J_NORM
+    x_min[CONTROLS_IDX] .= -0.5
     x_min = SVector{n}(x_min)
 
     # control amplitude constraint at boundary
