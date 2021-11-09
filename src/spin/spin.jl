@@ -66,7 +66,7 @@ const DT_STR = Dict(
     schroed => "Schroedinger",
     lindbladnodis => "Lindblad No Dissipation",
     lindbladt1 => "Lindblad T_1 Dissipation",
-    lindbladt1 => "Lindblad T_2 Dissipation",
+    lindbladt2 => "Lindblad T_2 Dissipation",
 )
 
 const DT_ST = Dict(
