@@ -176,7 +176,7 @@ its Google Sheet counterpart
   - [Dynamo](https://github.com/shaimach/Dynamo) DYNAMO in MATLAB
   - [GOAT-QuantumControl](https://github.com/Bilal092/GOAT-QuantumControl) GOAT in MATLAB
   - [JuliaQuantumControl](https://github.com/JuliaQuantumControl) The JuliaQuantumControl organization collects
-  packages implementing a comprehensive collection of methods of open-loop quantum optimal control.
+  packages implementing a comprehensive collection of methods of open-loop quantum optimal control
   - [Juqbox.jl](https://github.com/LLNL/Juqbox.jl) QOC from LLNL in Julia,
   symplectic integrators, pseudo-spectral, exact derivatives
   - [krotov](https://github.com/qucontrol/krotov) Krotov in Python
