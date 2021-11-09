@@ -175,6 +175,8 @@ its Google Sheet counterpart
   - [CRAB](https://github.com/Bilal092/CRAB) CRAB in MATLAB
   - [Dynamo](https://github.com/shaimach/Dynamo) DYNAMO in MATLAB
   - [GOAT-QuantumControl](https://github.com/Bilal092/GOAT-QuantumControl) GOAT in MATLAB
+  - [JuliaQuantumControl](https://github.com/JuliaQuantumControl) The JuliaQuantumControl organization collects
+  packages implementing a comprehensive collection of methods of open-loop quantum optimal control.
   - [Juqbox.jl](https://github.com/LLNL/Juqbox.jl) QOC from LLNL in Julia,
   symplectic integrators, pseudo-spectral, exact derivatives
   - [krotov](https://github.com/qucontrol/krotov) Krotov in Python
@@ -182,9 +184,7 @@ its Google Sheet counterpart
   - [qoc](https://github.com/SchusterLab/qoc) GRAPE via autograd in Python
   - [qopt](https://github.com/qutech/qopt) and [filter-functions](https://github.com/qutech/filter_functions) QOC with filter functions
   - [quantum-optimal-control](https://github.com/SchusterLab/quantum-optimal-control)
-  GRAPE via TensorFlow in Python
-  - [QuOptimalControl.jl](https://github.com/alastair-marshall/QuOptimalControl.jl)
-	Library for solving quantum optimal control problems in Julia
+  GRAPE via TensorFlow in Python	
   - [QuTiP](http://qutip.org/docs/latest/guide/guide-control.html)
   QOC with QuTip
 
