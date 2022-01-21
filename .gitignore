@@ -25,5 +25,6 @@ paper/.texpadtmp/
 *.zip
 
 # ignore local files
+correspondence
 out
 _test
